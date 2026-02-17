@@ -334,7 +334,7 @@ Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -
 | 96-103 | v10.0 | 25/25 | Complete | 2026-02-17 |
 | 104-105.1 | v10.1 | 6/6 | Complete | 2026-02-17 |
 | 106. Advanced WHERE + Fragments | v11.0 | 2/2 | Complete | 2026-02-17 |
-| 107. JOINs | 2/2 | Complete   | 2026-02-17 | - |
+| 107. JOINs | 2/2 | Complete    | 2026-02-17 | - |
 | 108. Aggregations | v11.0 | 0/TBD | Not started | - |
 | 109. Upserts/RETURNING/Subqueries | v11.0 | 0/TBD | Not started | - |
 | 110. Rewrite: Auth & Users | v11.0 | 0/TBD | Not started | - |
