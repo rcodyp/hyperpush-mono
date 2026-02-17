@@ -60,6 +60,9 @@ pub use db::query::{
     mesh_query_having, mesh_query_fragment,
     mesh_query_select_raw, mesh_query_where_raw,
     mesh_query_order_by_raw, mesh_query_group_by_raw,
+    mesh_query_select_count, mesh_query_select_count_field,
+    mesh_query_select_sum, mesh_query_select_avg,
+    mesh_query_select_min, mesh_query_select_max,
 };
 pub use db::changeset::{
     mesh_changeset_cast, mesh_changeset_cast_with_types,

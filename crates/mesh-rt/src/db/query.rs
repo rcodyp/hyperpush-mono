@@ -583,6 +583,102 @@ pub extern "C" fn mesh_query_where_raw(
     }
 }
 
+// ── Aggregate SELECT functions ───────────────────────────────────────
+
+/// Add SELECT count(*) to the query.
+///
+/// `Query.select_count(q)` -> new Query with count(*) in SELECT
+#[no_mangle]
+pub extern "C" fn mesh_query_select_count(q: *mut u8) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let raw = rust_str_to_mesh("RAW:count(*)");
+        let sf = query_get(new_q, SLOT_SELECT);
+        query_set(new_q, SLOT_SELECT, mesh_list_append(sf, raw as u64));
+        new_q
+    }
+}
+
+/// Add SELECT count("field") to the query.
+///
+/// `Query.select_count_field(q, :assignee_id)` -> new Query with count("assignee_id") in SELECT
+#[no_mangle]
+pub extern "C" fn mesh_query_select_count_field(q: *mut u8, field: *mut u8) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let raw = format!("RAW:count(\"{}\")", field_str.replace('"', "\"\""));
+        let raw_mesh = rust_str_to_mesh(&raw);
+        let sf = query_get(new_q, SLOT_SELECT);
+        query_set(new_q, SLOT_SELECT, mesh_list_append(sf, raw_mesh as u64));
+        new_q
+    }
+}
+
+/// Add SELECT sum("field") to the query.
+///
+/// `Query.select_sum(q, :amount)` -> new Query with sum("amount") in SELECT
+#[no_mangle]
+pub extern "C" fn mesh_query_select_sum(q: *mut u8, field: *mut u8) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let raw = format!("RAW:sum(\"{}\")", field_str.replace('"', "\"\""));
+        let raw_mesh = rust_str_to_mesh(&raw);
+        let sf = query_get(new_q, SLOT_SELECT);
+        query_set(new_q, SLOT_SELECT, mesh_list_append(sf, raw_mesh as u64));
+        new_q
+    }
+}
+
+/// Add SELECT avg("field") to the query.
+///
+/// `Query.select_avg(q, :price)` -> new Query with avg("price") in SELECT
+#[no_mangle]
+pub extern "C" fn mesh_query_select_avg(q: *mut u8, field: *mut u8) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let raw = format!("RAW:avg(\"{}\")", field_str.replace('"', "\"\""));
+        let raw_mesh = rust_str_to_mesh(&raw);
+        let sf = query_get(new_q, SLOT_SELECT);
+        query_set(new_q, SLOT_SELECT, mesh_list_append(sf, raw_mesh as u64));
+        new_q
+    }
+}
+
+/// Add SELECT min("field") to the query.
+///
+/// `Query.select_min(q, :created_at)` -> new Query with min("created_at") in SELECT
+#[no_mangle]
+pub extern "C" fn mesh_query_select_min(q: *mut u8, field: *mut u8) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let raw = format!("RAW:min(\"{}\")", field_str.replace('"', "\"\""));
+        let raw_mesh = rust_str_to_mesh(&raw);
+        let sf = query_get(new_q, SLOT_SELECT);
+        query_set(new_q, SLOT_SELECT, mesh_list_append(sf, raw_mesh as u64));
+        new_q
+    }
+}
+
+/// Add SELECT max("field") to the query.
+///
+/// `Query.select_max(q, :created_at)` -> new Query with max("created_at") in SELECT
+#[no_mangle]
+pub extern "C" fn mesh_query_select_max(q: *mut u8, field: *mut u8) -> *mut u8 {
+    unsafe {
+        let new_q = clone_query(q);
+        let field_str = mesh_str_ref(field);
+        let raw = format!("RAW:max(\"{}\")", field_str.replace('"', "\"\""));
+        let raw_mesh = rust_str_to_mesh(&raw);
+        let sf = query_get(new_q, SLOT_SELECT);
+        query_set(new_q, SLOT_SELECT, mesh_list_append(sf, raw_mesh as u64));
+        new_q
+    }
+}
+
 /// Add a raw SQL fragment.
 ///
 /// `Query.fragment(q, "WHERE custom_fn($1)", params)` -> new Query with raw fragment

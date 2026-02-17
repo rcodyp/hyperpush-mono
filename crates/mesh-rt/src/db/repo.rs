@@ -2816,4 +2816,70 @@ mod tests {
             "SELECT * FROM \"users\" LEFT JOIN \"profiles\" p ON p.user_id = users.id"
         );
     }
+
+    // ── Phase 108: Aggregate SELECT functions ─────────────────────────────
+
+    #[test]
+    fn test_aggregate_select_count() {
+        let (sql, params) = build_select_sql_from_parts(
+            "issues",
+            &["RAW:count(*)".into()],
+            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(sql, "SELECT count(*) FROM \"issues\"");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_select_sum() {
+        let (sql, params) = build_select_sql_from_parts(
+            "orders",
+            &["RAW:sum(\"amount\")".into()],
+            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(sql, "SELECT sum(\"amount\") FROM \"orders\"");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_select_avg_with_group_by() {
+        let (sql, params) = build_select_sql_from_parts(
+            "products",
+            &["RAW:avg(\"price\")".into()],
+            &[], &[], &[], -1, -1, &[],
+            &["category".into()],
+            &[], &[], &[], &[],
+        );
+        assert_eq!(sql, "SELECT avg(\"price\") FROM \"products\" GROUP BY \"category\"");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_select_min_max() {
+        let (sql, params) = build_select_sql_from_parts(
+            "events",
+            &["RAW:min(\"created_at\")".into(), "RAW:max(\"created_at\")".into()],
+            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+        );
+        assert_eq!(sql, "SELECT min(\"created_at\"), max(\"created_at\") FROM \"events\"");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_with_having() {
+        let (sql, params) = build_select_sql_from_parts(
+            "issues",
+            &["RAW:count(*)".into()],
+            &[], &[], &[], -1, -1, &[],
+            &["project_id".into()],
+            &["count(*) >".into()],
+            &["5".into()],
+            &[], &[],
+        );
+        assert_eq!(
+            sql,
+            "SELECT count(*) FROM \"issues\" GROUP BY \"project_id\" HAVING count(*) > $1"
+        );
+        assert_eq!(params, vec!["5"]);
+    }
 }
