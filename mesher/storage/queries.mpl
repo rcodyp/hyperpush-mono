@@ -416,6 +416,10 @@ end
 # computing the fingerprint server-side with the same fallback chain as
 # Ingestion.Fingerprint: custom > stacktrace frames > exception type > message.
 # Returns a Map with keys: fingerprint, title, level.
+# ORM boundary: ORM fragments cannot express CASE/jsonb_array_elements/string_agg
+# fingerprint computation chain. This is the most complex SQL query in Mesher --
+# conditional fingerprint fallback with array element iteration, string aggregation,
+# and COALESCE chains. No ORM API can compose this. Intentional raw SQL.
 pub fn extract_event_fields(pool :: PoolHandle, event_json :: String) -> Map<String, String>!String do
   let sql = "SELECT CASE WHEN length(COALESCE(j->>'fingerprint', '')) > 0 THEN j->>'fingerprint' WHEN j->'stacktrace' IS NOT NULL AND jsonb_typeof(j->'stacktrace') = 'array' AND jsonb_array_length(j->'stacktrace') > 0 THEN (SELECT string_agg((frame->>'filename') || '|' || (frame->>'function_name'), ';' ORDER BY ordinality) FROM jsonb_array_elements(j->'stacktrace') WITH ORDINALITY AS t(frame, ordinality)) || ':' || lower(COALESCE(replace(j->>'message', '0x', ''), '')) WHEN j->'exception' IS NOT NULL AND j->'exception'->>'type_name' IS NOT NULL THEN (j->'exception'->>'type_name') || ':' || lower(COALESCE(replace(j->'exception'->>'value', '0x', ''), '')) ELSE 'msg:' || lower(COALESCE(replace(j->>'message', '0x', ''), '')) END AS fingerprint, COALESCE(NULLIF(j->>'message', ''), 'Untitled') AS title, COALESCE(j->>'level', 'error') AS level FROM (SELECT $1::jsonb AS j) AS sub"
   let rows = Repo.query_raw(pool, sql, [event_json])?
