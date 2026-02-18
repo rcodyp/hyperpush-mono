@@ -662,6 +662,9 @@ end
 # --- Alert system queries (Phase 92) ---
 
 # ALERT-01: Insert alert rule from JSON body using PostgreSQL JSONB extraction.
+# ORM boundary: INSERT...SELECT with server-side JSONB extraction from parameter ($2::jsonb)
+# and COALESCE defaults. Repo.insert takes Map<String,String> of literal values but this query
+# extracts and transforms fields from a JSONB parameter server-side. Intentional raw SQL.
 pub fn create_alert_rule(pool :: PoolHandle, project_id :: String, body :: String) -> String!String do
   let sql = "INSERT INTO alert_rules (project_id, name, condition_json, action_json, cooldown_minutes) SELECT $1::uuid, COALESCE(j->>'name', 'Unnamed Rule'), COALESCE((j->'condition')::jsonb, '{}'::jsonb), COALESCE((j->'action')::jsonb, '{\"type\":\"websocket\"}'::jsonb), COALESCE((j->>'cooldown_minutes')::int, 60) FROM (SELECT $2::jsonb AS j) AS sub RETURNING id::text"
   let rows = Repo.query_raw(pool, sql, [project_id, body])?
@@ -673,10 +676,13 @@ pub fn create_alert_rule(pool :: PoolHandle, project_id :: String, body :: Strin
 end
 
 # ALERT-01: List all alert rules for a project.
+# Uses ORM Query.where_raw + Query.select_raw + Query.order_by + Repo.all instead of Repo.query_raw.
 pub fn list_alert_rules(pool :: PoolHandle, project_id :: String) -> List<Map<String, String>>!String do
-  let sql = "SELECT id::text, project_id::text, name, condition_json::text, action_json::text, enabled::text, cooldown_minutes::text, COALESCE(last_fired_at::text, '') AS last_fired_at, created_at::text FROM alert_rules WHERE project_id = $1::uuid ORDER BY created_at DESC"
-  let rows = Repo.query_raw(pool, sql, [project_id])?
-  Ok(rows)
+  let q = Query.from(AlertRule.__table__())
+    |> Query.where_raw("project_id = ?::uuid", [project_id])
+    |> Query.select_raw(["id::text", "project_id::text", "name", "condition_json::text", "action_json::text", "enabled::text", "cooldown_minutes::text", "COALESCE(last_fired_at::text, '') AS last_fired_at", "created_at::text"])
+    |> Query.order_by(:created_at, :desc)
+  Repo.all(pool, q)
 end
 
 # Enable/disable an alert rule.
@@ -695,6 +701,9 @@ pub fn delete_alert_rule(pool :: PoolHandle, rule_id :: String) -> Int!String do
 end
 
 # ALERT-02: Count events in time window AND check cooldown, return true if should fire.
+# ORM boundary: Cross-join between two derived tables (event count subquery + cooldown subquery)
+# with CASE expression, interval arithmetic, and multiple bound parameters in complex expressions.
+# Not expressible via ORM query builder. Intentional raw SQL.
 pub fn evaluate_threshold_rule(pool :: PoolHandle, rule_id :: String, project_id :: String, threshold_str :: String, window_str :: String, cooldown_str :: String) -> Bool!String do
   let sql = "SELECT CASE WHEN event_count > $3::int AND (last_fired IS NULL OR last_fired < now() - interval '1 minute' * $6::int) THEN 1 ELSE 0 END AS should_fire FROM (SELECT count(*) AS event_count FROM events WHERE project_id = $2::uuid AND received_at > now() - interval '1 minute' * $4::int) counts, (SELECT last_fired_at AS last_fired FROM alert_rules WHERE id = $1::uuid) cooldown"
   let rows = Repo.query_raw(pool, sql, [rule_id, project_id, threshold_str, window_str, "", cooldown_str])?
@@ -707,6 +716,9 @@ pub fn evaluate_threshold_rule(pool :: PoolHandle, rule_id :: String, project_id
 end
 
 # ALERT-04/05: Insert alert record, update last_fired_at atomically, return alert_id.
+# ORM boundary: INSERT with jsonb_build_object() for computed JSONB column plus follow-up
+# UPDATE of last_fired_at = now(). Could split into two-step ORM pattern but jsonb_build_object
+# in INSERT VALUES is not expressible via Repo.insert Map<String,String>. Intentional raw SQL.
 pub fn fire_alert(pool :: PoolHandle, rule_id :: String, project_id :: String, message :: String, condition_type :: String, rule_name :: String) -> String!String do
   let sql = "INSERT INTO alerts (rule_id, project_id, status, message, condition_snapshot) VALUES ($1::uuid, $2::uuid, 'active', $3, jsonb_build_object('condition_type', $4, 'rule_name', $5)) RETURNING id::text"
   let rows = Repo.query_raw(pool, sql, [rule_id, project_id, message, condition_type, rule_name])?
@@ -730,15 +742,21 @@ pub fn check_new_issue(pool :: PoolHandle, issue_id :: String) -> Bool!String do
 end
 
 # ALERT-03: Get enabled alert rules for event-based conditions for a project.
+# Uses ORM Query.where_raw + Query.select_raw + Repo.all instead of Repo.query_raw.
 pub fn get_event_alert_rules(pool :: PoolHandle, project_id :: String, condition_type :: String) -> List<Map<String, String>>!String do
-  let sql = "SELECT id::text, name, cooldown_minutes::text FROM alert_rules WHERE project_id = $1::uuid AND enabled = true AND condition_json->>'condition_type' = $2"
-  let rows = Repo.query_raw(pool, sql, [project_id, condition_type])?
-  Ok(rows)
+  let q = Query.from(AlertRule.__table__())
+    |> Query.where_raw("project_id = ?::uuid AND enabled = true AND condition_json->>'condition_type' = ?", [project_id, condition_type])
+    |> Query.select_raw(["id::text", "name", "cooldown_minutes::text"])
+  Repo.all(pool, q)
 end
 
 # ALERT-05: Check cooldown before firing (for event-based triggers).
+# Uses ORM Query.where_raw + Query.select_raw + Repo.all instead of Repo.query_raw.
 pub fn should_fire_by_cooldown(pool :: PoolHandle, rule_id :: String, cooldown_str :: String) -> Bool!String do
-  let rows = Repo.query_raw(pool, "SELECT 1 AS ok FROM alert_rules WHERE id = $1::uuid AND (last_fired_at IS NULL OR last_fired_at < now() - interval '1 minute' * $2::int)", [rule_id, cooldown_str])?
+  let q = Query.from(AlertRule.__table__())
+    |> Query.where_raw("id = ?::uuid AND (last_fired_at IS NULL OR last_fired_at < now() - interval '1 minute' * ?::int)", [rule_id, cooldown_str])
+    |> Query.select_raw(["1 AS ok"])
+  let rows = Repo.all(pool, q)?
   Ok(List.length(rows) > 0)
 end
 
@@ -759,17 +777,24 @@ pub fn resolve_fired_alert(pool :: PoolHandle, alert_id :: String) -> Int!String
 end
 
 # ALERT-06: List alerts for a project filtered by status.
+# Uses ORM Query.join_as + Query.where_raw + Query.select_raw + Query.order_by_raw + Query.limit + Repo.all.
 pub fn list_alerts(pool :: PoolHandle, project_id :: String, status :: String) -> List<Map<String, String>>!String do
-  let sql = "SELECT a.id::text, a.rule_id::text, a.project_id::text, a.status, a.message, a.condition_snapshot::text, a.triggered_at::text, COALESCE(a.acknowledged_at::text, '') AS acknowledged_at, COALESCE(a.resolved_at::text, '') AS resolved_at, r.name AS rule_name FROM alerts a JOIN alert_rules r ON r.id = a.rule_id WHERE a.project_id = $1::uuid AND ($2 = '' OR a.status = $2) ORDER BY a.triggered_at DESC LIMIT 50"
-  let rows = Repo.query_raw(pool, sql, [project_id, status])?
-  Ok(rows)
+  let q = Query.from(Alert.__table__())
+    |> Query.join_as(:inner, AlertRule.__table__(), "r", "r.id = alerts.rule_id")
+    |> Query.where_raw("alerts.project_id = ?::uuid AND (? = '' OR alerts.status = ?)", [project_id, status, status])
+    |> Query.select_raw(["alerts.id::text", "alerts.rule_id::text", "alerts.project_id::text", "alerts.status", "alerts.message", "alerts.condition_snapshot::text", "alerts.triggered_at::text", "COALESCE(alerts.acknowledged_at::text, '') AS acknowledged_at", "COALESCE(alerts.resolved_at::text, '') AS resolved_at", "r.name AS rule_name"])
+    |> Query.order_by_raw("alerts.triggered_at DESC")
+    |> Query.limit(50)
+  Repo.all(pool, q)
 end
 
 # Load all enabled threshold rules for evaluation.
+# Uses ORM Query.where_raw + Query.select_raw + Repo.all instead of Repo.query_raw.
 pub fn get_threshold_rules(pool :: PoolHandle) -> List<Map<String, String>>!String do
-  let sql = "SELECT id::text, project_id::text, name, condition_json::text, cooldown_minutes::text FROM alert_rules WHERE enabled = true AND condition_json->>'condition_type' = 'threshold'"
-  let rows = Repo.query_raw(pool, sql, [])?
-  Ok(rows)
+  let q = Query.from(AlertRule.__table__())
+    |> Query.where_raw("enabled = true AND condition_json->>'condition_type' = 'threshold'", [])
+    |> Query.select_raw(["id::text", "project_id::text", "name", "condition_json::text", "cooldown_minutes::text"])
+  Repo.all(pool, q)
 end
 
 # --- Retention and storage queries (Phase 93) ---
