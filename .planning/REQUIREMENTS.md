@@ -45,7 +45,7 @@ Requirements for Query Builder milestone. Expand ORM with comprehensive query ca
 
 ### Mesher Rewrite
 
-- [ ] **REWR-01**: User/session/API-key queries rewritten with ORM (8 queries)
+- [x] **REWR-01**: User/session/API-key queries rewritten with ORM (8 queries)
 - [ ] **REWR-02**: Issue management queries rewritten with ORM + upserts (10 queries)
 - [ ] **REWR-03**: Search/filtering queries rewritten with ORM + fragments (4 queries)
 - [ ] **REWR-04**: Dashboard/analytics queries rewritten with ORM aggregations (7 queries)
@@ -109,7 +109,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPS-01 | Phase 109 | Complete |
 | UPS-02 | Phase 109 | Complete |
 | UPS-03 | Phase 109 | Complete |
-| REWR-01 | Phase 110 | Pending |
+| REWR-01 | Phase 110 | Complete |
 | REWR-02 | Phase 111 | Pending |
 | REWR-07 | Phase 111 | Pending |
 | REWR-03 | Phase 112 | Pending |

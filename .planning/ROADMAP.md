@@ -355,7 +355,7 @@ Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -
 | 107. JOINs | 2/2 | Complete    | 2026-02-17 | - |
 | 108. Aggregations | 2/2 | Complete    | 2026-02-17 | - |
 | 109. Upserts/RETURNING/Subqueries | 2/2 | Complete    | 2026-02-17 | - |
-| 110. Rewrite: Auth & Users | v11.0 | 0/TBD | Not started | - |
+| 110. Rewrite: Auth & Users | 1/2 | In Progress|  | - |
 | 111. Rewrite: Issues & Events | v11.0 | 0/TBD | Not started | - |
 | 112. Rewrite: Search/Dashboard/Alerts | v11.0 | 0/TBD | Not started | - |
 | 113. Rewrite: Retention & Cleanup | v11.0 | 0/TBD | Not started | - |
