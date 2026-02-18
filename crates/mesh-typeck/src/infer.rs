@@ -626,6 +626,7 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // ── Int module (Phase 43 Plan 01) ──────────────────────────────────
     let mut int_mod = HashMap::new();
     int_mod.insert("to_float".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::float())));
+    int_mod.insert("to_string".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::string())));
     modules.insert("Int".to_string(), int_mod);
 
     // ── Float module (Phase 43 Plan 01) ────────────────────────────────

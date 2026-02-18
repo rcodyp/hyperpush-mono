@@ -5061,6 +5061,31 @@ end
 }
 
 #[test]
+fn e2e_try_result_binding_arity() {
+    // Regression test: let x = Sqlite.execute(db, sql, params)? followed by
+    // Int.to_string(x) should NOT trigger a spurious E0003 arity mismatch.
+    let output = compile_and_run(r#"
+fn run() -> Int!String do
+  let db = Sqlite.open(":memory:")?
+  let _ = Sqlite.execute(db, "CREATE TABLE t (id INTEGER)", [])?
+  let x = Sqlite.execute(db, "INSERT INTO t VALUES (1)", [])?
+  println(Int.to_string(x))
+  Sqlite.close(db)
+  Ok(0)
+end
+
+fn main() do
+  let result = run()
+  case result do
+    Ok(v) -> println("ok")
+    Err(e) -> println(e)
+  end
+end
+"#);
+    assert!(output.contains("ok"));
+}
+
+#[test]
 fn e2e_repo_delete_where_returning() {
     // Verifies Repo.delete_where_returning compiles through full pipeline
     // (typechecker + MIR lowering + codegen + JIT symbol resolution).

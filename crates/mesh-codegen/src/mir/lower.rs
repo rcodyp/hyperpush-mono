@@ -10622,6 +10622,7 @@ fn map_builtin_name(name: &str) -> String {
         "math_ceil" => "mesh_math_ceil".to_string(),
         "math_round" => "mesh_math_round".to_string(),
         "int_to_float" => "mesh_int_to_float".to_string(),
+        "int_to_string" => "mesh_int_to_string".to_string(),
         "float_to_int" => "mesh_float_to_int".to_string(),
         // ── Phase 77: From conversion dispatch ──────────────────────────
         "float_from" => "mesh_int_to_float".to_string(),
