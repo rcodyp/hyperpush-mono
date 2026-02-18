@@ -383,6 +383,15 @@ fn parse_event_count(s :: String) -> Int do
   end
 end
 
+# Helper: parse limit string to Int, defaulting to 25 on failure.
+fn parse_limit(s :: String) -> Int do
+  let result = String.to_int(s)
+  case result do
+    Some(n) -> n
+    None -> 25
+  end
+end
+
 # List issues for a project filtered by status (for API listing).
 # Constructs Issue structs manually with parse_event_count for the Int field.
 # Uses ORM Query.where + Query.order_by + Query.select_raw + Repo.all instead of Repo.query_raw.
@@ -470,10 +479,7 @@ end
 # Includes 24-hour default time range (SEARCH-04).
 # Uses ORM Query.where_raw + Query.select_raw + Query.order_by + Query.limit + Repo.all.
 pub fn filter_events_by_tag(pool :: PoolHandle, project_id :: String, tag_json :: String, limit_str :: String) -> List<Map<String, String>>!String do
-  let lim = case String.to_int(limit_str) do
-    Some(n) -> n
-    None -> 25
-  end
+  let lim = parse_limit(limit_str)
   let q = Query.from(Event.__table__())
     |> Query.where_raw("project_id = ?::uuid", [project_id])
     |> Query.where_raw("tags @> ?::jsonb", [tag_json])
@@ -488,10 +494,7 @@ end
 # Keyset pagination on (received_at, id) for stable browsing.
 # Uses ORM Query.where_raw + Query.select_raw + Query.order_by_raw + Query.limit + Repo.all.
 pub fn list_events_for_issue(pool :: PoolHandle, issue_id :: String, cursor :: String, cursor_id :: String, limit_str :: String) -> List<Map<String, String>>!String do
-  let lim = case String.to_int(limit_str) do
-    Some(n) -> n
-    None -> 25
-  end
+  let lim = parse_limit(limit_str)
   let base = Query.from(Event.__table__())
     |> Query.where_raw("issue_id = ?::uuid", [issue_id])
     |> Query.select_raw(["id::text", "level", "message", "received_at::text"])
@@ -540,10 +543,7 @@ end
 # Returns unresolved issues ordered by event_count DESC.
 # Uses ORM Query.where_raw + Query.where + Query.select_raw + Query.order_by + Query.limit + Repo.all.
 pub fn top_issues_by_frequency(pool :: PoolHandle, project_id :: String, limit_str :: String) -> List<Map<String, String>>!String do
-  let lim = case String.to_int(limit_str) do
-    Some(n) -> n
-    None -> 25
-  end
+  let lim = parse_limit(limit_str)
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("project_id = ?::uuid", [project_id])
     |> Query.where(:status, "unresolved")
@@ -568,10 +568,7 @@ end
 # Ordered by received_at DESC for chronological browsing.
 # Uses ORM Query.where_raw + Query.select_raw + Query.order_by + Query.limit + Repo.all.
 pub fn issue_event_timeline(pool :: PoolHandle, issue_id :: String, limit_str :: String) -> List<Map<String, String>>!String do
-  let lim = case String.to_int(limit_str) do
-    Some(n) -> n
-    None -> 25
-  end
+  let lim = parse_limit(limit_str)
   let q = Query.from(Event.__table__())
     |> Query.where_raw("issue_id = ?::uuid", [issue_id])
     |> Query.select_raw(["id::text", "level", "message", "received_at::text"])
