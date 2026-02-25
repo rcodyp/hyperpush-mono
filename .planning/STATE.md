@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-17)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v11.0 Query Builder -- Phase 113
+**Current focus:** v11.0 Query Builder -- Phase 114
 
 ## Current Position
 
-Phase: 113 of 114 (v11.0 Query Builder)
-Plan: 1 of N in current phase
-Status: Ready for planning
-Last activity: 2026-02-18 -- Completed 112-02 (Rewrite alert system queries to ORM)
+Phase: 114 of 114 (v11.0 Query Builder)
+Plan: 1 of 2 in current phase (114-01 complete)
+Status: In progress -- 114-01 complete, 114-02 next
+Last activity: 2026-02-25 -- Completed 114-01 (Zero-error compile + startup verification against PostgreSQL)
 
-Progress: [███████░░░] 67% (v11.0)
+Progress: [████████░░] 75% (v11.0)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [███████░░░] 67% (v11.0)
 | 112   | 01   | 5min     | 2     | 1     |
 | 112   | 02   | 3min     | 2     | 1     |
 | 113   | 01   | 5min     | 2     | 1     |
+| 114   | 01   | 30min    | 2     | 2     |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Recent decisions affecting current work:
 - [Phase 113]: delete_expired_events uses Repo.delete_where + Query.where_raw for interval expression -- interval arithmetic expressible via where_raw
 - [Phase 113]: update_project_settings retains raw SQL: COALESCE with server-side JSONB extraction + fallback to current column not expressible via Repo.update_where Map<String,String>
 - [Phase 113]: check_sample_rate retains raw SQL: random() comparison with scalar subquery + COALESCE default not expressible via ORM query builder
+- [Phase 114]: MirType::Tuple SIGSEGV fix confirmed active: arm returns context.ptr_type(...) heap pointer, not by-value struct -- no crash during Mesher startup
+- [Phase 114]: PostgreSQL running in Docker mesher-postgres (postgres:16-alpine); single migration 20260216120000_create_initial_schema applied cleanly
+- [Phase 114]: Mesher startup reaches [Mesher] Foundation ready with all 7 services started; EventProcessor SIGSEGV does not manifest at startup (triggered by POST /api/v1/events, tested in 114-02)
 
 ### Roadmap Evolution
 
@@ -122,6 +126,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 113-01-PLAN.md (Retention/storage ORM rewrite + zero raw SQL data query audit)
+Stopped at: Completed 114-01-PLAN.md (Zero-error compile + Mesher startup verified against PostgreSQL)
 Resume file: None
-Next action: Continue Phase 113 if more plans remain, or advance to Phase 114.
+Next action: Execute Phase 114 Plan 02 -- HTTP API endpoint smoke test and WebSocket upgrade verification.
