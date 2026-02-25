@@ -14,8 +14,8 @@ use rowan::TextRange;
 use mesh_parser::ast::expr::{
     BinaryExpr, BreakExpr, CallExpr, CaseExpr, ClosureExpr, ContinueExpr, Expr, FieldAccess,
     ForInExpr, IfExpr, LinkExpr, ListLiteral, Literal, MapLiteral, NameRef, PipeExpr, ReceiveExpr,
-    ReturnExpr, SendExpr, SelfExpr, SpawnExpr, StructLiteral, StructUpdate, TryExpr, TupleExpr,
-    UnaryExpr, WhileExpr,
+    ReturnExpr, SendExpr, SelfExpr, SlotPipeExpr, SpawnExpr, StructLiteral, StructUpdate,
+    TryExpr, TupleExpr, UnaryExpr, WhileExpr,
 };
 use mesh_parser::ast::item::{
     ActorDef, Block, FnDef, InterfaceDef, ImplDef as AstImplDef, Item, LetBinding, ServiceDef,
@@ -4162,9 +4162,8 @@ fn infer_expr(
         Expr::StructUpdate(update) => {
             infer_struct_update(ctx, env, update, types, type_registry, trait_registry, fn_constraints)?
         }
-        Expr::SlotPipeExpr(_) => {
-            // TODO(116): Slot pipe type checking -- implemented in Plan 02
-            todo!("SlotPipeExpr type checking not yet implemented")
+        Expr::SlotPipeExpr(pipe) => {
+            infer_slot_pipe(ctx, env, pipe, types, type_registry, trait_registry, fn_constraints)?
         }
     };
 
@@ -4798,6 +4797,178 @@ fn infer_pipe(
         }
         _ => {
             // Existing behavior: infer rhs as function, unify with Fun([lhs_ty], ret).
+            let rhs_ty = infer_expr(ctx, env, &rhs, types, type_registry, trait_registry, fn_constraints)?;
+            let expected_fn = Ty::Fun(vec![lhs_ty], Box::new(ret_var.clone()));
+            ctx.unify(rhs_ty, expected_fn, ConstraintOrigin::Builtin)?;
+        }
+    }
+
+    Ok(ret_var)
+}
+
+/// Infer the type of a slot pipe expression: `lhs |N> rhs`
+///
+/// `x |N> f(a, b)` desugars to a call where `x` is inserted at 0-indexed position (N-1)
+/// among the explicit arguments. Example: `x |2> f(a, b)` = `f(a, x, b)`.
+fn infer_slot_pipe(
+    ctx: &mut InferCtx,
+    env: &mut TypeEnv,
+    pipe: &SlotPipeExpr,
+    types: &mut FxHashMap<TextRange, Ty>,
+    type_registry: &TypeRegistry,
+    trait_registry: &TraitRegistry,
+    fn_constraints: &FxHashMap<String, FnConstraints>,
+) -> Result<Ty, TypeError> {
+    let lhs = pipe.lhs().ok_or_else(|| {
+        let err = TypeError::Mismatch {
+            expected: Ty::Never,
+            found: Ty::Never,
+            origin: ConstraintOrigin::Builtin,
+        };
+        ctx.errors.push(err.clone());
+        err
+    })?;
+    let rhs = pipe.rhs().ok_or_else(|| {
+        let err = TypeError::Mismatch {
+            expected: Ty::Never,
+            found: Ty::Never,
+            origin: ConstraintOrigin::Builtin,
+        };
+        ctx.errors.push(err.clone());
+        err
+    })?;
+
+    let slot = pipe.slot().unwrap_or(2); // 1-indexed, >= 2 by parse guarantee
+    let insert_idx = (slot - 1) as usize; // 0-indexed insert position in the final arg list
+
+    let lhs_ty = infer_expr(ctx, env, &lhs, types, type_registry, trait_registry, fn_constraints)?;
+    let ret_var = ctx.fresh_var();
+
+    match &rhs {
+        Expr::CallExpr(call) => {
+            let callee_expr = call.callee().ok_or_else(|| {
+                let err = TypeError::Mismatch {
+                    expected: Ty::Never,
+                    found: Ty::Never,
+                    origin: ConstraintOrigin::Builtin,
+                };
+                ctx.errors.push(err.clone());
+                err
+            })?;
+
+            let callee_ty = infer_expr(ctx, env, &callee_expr, types, type_registry, trait_registry, fn_constraints)?;
+
+            // Infer explicit argument types
+            let mut explicit_arg_types: Vec<Ty> = Vec::new();
+            if let Some(arg_list) = call.arg_list() {
+                for arg in arg_list.args() {
+                    let arg_ty = infer_expr(ctx, env, &arg, types, type_registry, trait_registry, fn_constraints)?;
+                    explicit_arg_types.push(arg_ty);
+                }
+            }
+
+            // Conflict check: explicit args fill positions 0..N-1 (0-indexed).
+            // Piped value inserts at insert_idx (0-indexed). Conflict if insert_idx < explicit_arg_types.len().
+            // Per design: `x |2> func(a, b)` — explicit args (a, b) fill indices 0 and 1.
+            // Piping to slot 2 (insert_idx=1) conflicts with `b` at index 1.
+            if insert_idx < explicit_arg_types.len() {
+                let fn_name = if let Expr::NameRef(ref nr) = callee_expr {
+                    nr.text().unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                let err = TypeError::SlotPositionConflict {
+                    slot,
+                    fn_name,
+                    span: pipe.syntax().text_range(),
+                };
+                ctx.errors.push(err.clone());
+                return Err(err);
+            }
+
+            // Build the full arg type list with lhs inserted at insert_idx.
+            // Since conflict check passed, insert_idx >= explicit_arg_types.len(),
+            // meaning all explicit args come before the piped position.
+            // Any gap between explicit args and insert_idx is padded with fresh type vars.
+            let mut full_args: Vec<Ty> = Vec::new();
+            for i in 0..insert_idx {
+                if i < explicit_arg_types.len() {
+                    full_args.push(explicit_arg_types[i].clone());
+                } else {
+                    full_args.push(ctx.fresh_var()); // gap-filling (unusual case)
+                }
+            }
+            full_args.push(lhs_ty.clone());
+            // remaining explicit args after the insert point
+            for i in insert_idx..explicit_arg_types.len() {
+                full_args.push(explicit_arg_types[i].clone());
+            }
+
+            // Arity-range check: if callee has a known Fun type, validate slot <= arity
+            let resolved_callee = ctx.resolve(callee_ty.clone());
+            if let Ty::Fun(ref params, _) = resolved_callee {
+                if (slot as usize) > params.len() {
+                    let fn_name = if let Expr::NameRef(ref nr) = callee_expr {
+                        nr.text().unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
+                    let err = TypeError::SlotPipeOutOfRange {
+                        slot,
+                        fn_name,
+                        arity: params.len(),
+                        span: pipe.syntax().text_range(),
+                    };
+                    ctx.errors.push(err.clone());
+                    return Err(err);
+                }
+            }
+
+            let expected_fn_ty = Ty::Fun(full_args.clone(), Box::new(ret_var.clone()));
+            let origin = ConstraintOrigin::FnArg {
+                call_site: call.syntax().text_range(),
+                param_idx: insert_idx,
+            };
+            ctx.unify(callee_ty, expected_fn_ty, origin.clone())?;
+
+            // Record type for the CallExpr node (mirrors infer_pipe)
+            let resolved_call = ctx.resolve(ret_var.clone());
+            types.insert(call.syntax().text_range(), resolved_call);
+
+            // Where-clause constraint checking (mirrors infer_pipe's CallExpr arm)
+            if let Expr::NameRef(ref name_ref) = callee_expr {
+                if let Some(fn_name) = name_ref.text() {
+                    if let Some(constraints) = fn_constraints.get(&fn_name) {
+                        if !constraints.where_constraints.is_empty() {
+                            let mut resolved_type_args: FxHashMap<String, Ty> = FxHashMap::default();
+                            for (i, tp_name_opt) in constraints.param_type_param_names.iter().enumerate() {
+                                if let Some(tp_name) = tp_name_opt {
+                                    if i < full_args.len() {
+                                        resolved_type_args.insert(tp_name.clone(), ctx.resolve(full_args[i].clone()));
+                                    }
+                                }
+                            }
+                            for (param_name, param_ty) in &constraints.type_params {
+                                if !resolved_type_args.contains_key(param_name) {
+                                    resolved_type_args.insert(param_name.clone(), ctx.resolve(param_ty.clone()));
+                                }
+                            }
+                            let errors = trait_registry.check_where_constraints(
+                                &constraints.where_constraints,
+                                &resolved_type_args,
+                                origin.clone(),
+                            );
+                            ctx.errors.extend(errors.clone());
+                            if let Some(first_err) = errors.into_iter().next() {
+                                return Err(first_err);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            // Bare function reference: treat like regular pipe (insert lhs at position 0)
             let rhs_ty = infer_expr(ctx, env, &rhs, types, type_registry, trait_registry, fn_constraints)?;
             let expected_fn = Ty::Fun(vec![lhs_ty], Box::new(ret_var.clone()));
             ctx.unify(rhs_ty, expected_fn, ConstraintOrigin::Builtin)?;

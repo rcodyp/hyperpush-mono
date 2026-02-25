@@ -76,6 +76,28 @@ pub enum TypeError {
         found: usize,
         origin: ConstraintOrigin,
     },
+    /// Slot pipe position N conflicts with an explicitly provided argument.
+    ///
+    /// Example: `x |2> func(a, b)` — position 2 is already filled by `b`.
+    SlotPositionConflict {
+        /// The 1-indexed slot position that conflicts.
+        slot: u32,
+        /// Name of the function being called.
+        fn_name: String,
+        span: TextRange,
+    },
+    /// Slot pipe position N exceeds the function's total arity.
+    ///
+    /// Example: `x |5> func(a, b, c)` — func only takes 3 arguments.
+    SlotPipeOutOfRange {
+        /// The slot position used (1-indexed).
+        slot: u32,
+        /// Name of the function being called (empty string if unknown).
+        fn_name: String,
+        /// Total arity of the function (including all parameters).
+        arity: usize,
+        span: TextRange,
+    },
     /// A variable is used but not defined in scope.
     UnboundVariable { name: String, span: TextRange },
     /// A non-function value is called as a function.
@@ -347,6 +369,32 @@ impl fmt::Display for TypeError {
                     "arity mismatch: expected {} arguments, found {}",
                     expected, found
                 )
+            }
+            TypeError::SlotPositionConflict {
+                slot, fn_name, ..
+            } => {
+                write!(
+                    f,
+                    "slot position {} conflicts with an argument already provided to `{}`",
+                    slot, fn_name
+                )
+            }
+            TypeError::SlotPipeOutOfRange {
+                slot, fn_name, arity, ..
+            } => {
+                if *arity <= 1 {
+                    write!(
+                        f,
+                        "slot position {} is out of range: `{}` takes {} argument(s), so valid slot positions are none — use |> instead",
+                        slot, fn_name, arity
+                    )
+                } else {
+                    write!(
+                        f,
+                        "slot position {} is out of range: `{}` takes {} arguments, so valid slot positions are 2\u{2013}{}",
+                        slot, fn_name, arity, arity
+                    )
+                }
             }
             TypeError::UnboundVariable { name, .. } => {
                 write!(f, "unbound variable `{}`", name)

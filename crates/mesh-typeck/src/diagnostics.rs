@@ -133,6 +133,8 @@ fn error_code(err: &TypeError) -> &'static str {
         TypeError::MissingAssocType { .. } => "E0040",
         TypeError::ExtraAssocType { .. } => "E0041",
         TypeError::UnresolvedAssocType { .. } => "E0042",
+        TypeError::SlotPositionConflict { .. } => "E0043",
+        TypeError::SlotPipeOutOfRange { .. } => "E0044",
     }
 }
 
@@ -495,7 +497,9 @@ pub fn render_json_diagnostic(
                 | TypeError::PrivateItem { span, .. }
                 | TypeError::TryIncompatibleReturn { span, .. }
                 | TypeError::TryOnNonResultOption { span, .. }
-                | TypeError::UnresolvedAssocType { span, .. } => {
+                | TypeError::UnresolvedAssocType { span, .. }
+                | TypeError::SlotPositionConflict { span, .. }
+                | TypeError::SlotPipeOutOfRange { span, .. } => {
                     let range = text_range_to_range(*span);
                     spans.push(JsonSpan {
                         start: range.start,
@@ -1664,6 +1668,74 @@ pub fn render_diagnostic(
                         .with_color(Color::Red),
                 )
                 .finish()
+        }
+
+        TypeError::SlotPositionConflict {
+            slot,
+            fn_name,
+            span,
+        } => {
+            let msg = format!(
+                "slot position {} conflicts with an argument already provided to `{}`",
+                slot, fn_name
+            );
+            let range = clamp(text_range_to_range(*span));
+
+            Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(&msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message(format!(
+                            "position {} is already filled by an explicit argument",
+                            slot
+                        ))
+                        .with_color(Color::Red),
+                )
+                .with_help(format!(
+                    "remove the argument at position {} from the call, or use a different slot",
+                    slot
+                ))
+                .finish()
+        }
+
+        TypeError::SlotPipeOutOfRange {
+            slot,
+            fn_name,
+            arity,
+            span,
+        } => {
+            let msg = if *arity <= 1 {
+                format!(
+                    "slot position {} is out of range: `{}` takes {} argument(s)",
+                    slot, fn_name, arity
+                )
+            } else {
+                format!(
+                    "slot position {} is out of range: `{}` takes {} arguments, so valid slot positions are 2\u{2013}{}",
+                    slot, fn_name, arity, arity
+                )
+            };
+            let range = clamp(text_range_to_range(*span));
+
+            let mut builder = Report::build(ReportKind::Error, (fname.clone(), range.clone()))
+                .with_code(code)
+                .with_message(&msg)
+                .with_config(config)
+                .with_label(
+                    Label::new((fname.clone(), range))
+                        .with_message(format!("slot {} exceeds function arity {}", slot, arity))
+                        .with_color(Color::Red),
+                );
+
+            if *arity <= 1 {
+                builder.set_help("use |> to pipe as the first argument");
+            } else {
+                builder.set_help(format!("use |> to pipe as the first argument, or |2>...|{}> for other positions", arity));
+            }
+
+            builder.finish()
         }
     };
 
