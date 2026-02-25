@@ -32,9 +32,9 @@ Requirements for Query Builder milestone. Expand ORM with comprehensive query ca
 
 ### Upsert, RETURNING, Subqueries
 
-- [x] **UPS-01**: Repo supports upsert (INSERT ON CONFLICT DO UPDATE) with conflict target
-- [x] **UPS-02**: Repo insert/update/delete support RETURNING clause
-- [x] **UPS-03**: Query builder supports subqueries in WHERE clause
+- [ ] **UPS-01**: Repo supports upsert (INSERT ON CONFLICT DO UPDATE) with conflict target
+- [ ] **UPS-02**: Repo insert/update/delete support RETURNING clause
+- [ ] **UPS-03**: Query builder supports subqueries in WHERE clause
 
 ### Raw SQL Fragments
 
@@ -88,16 +88,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WHERE-01 | Phase 106 | Pending |
-| WHERE-02 | Phase 106 | Pending |
-| WHERE-03 | Phase 106 | Pending |
-| WHERE-04 | Phase 106 | Pending |
-| WHERE-05 | Phase 106 | Pending |
-| WHERE-06 | Phase 106 | Pending |
-| FRAG-01 | Phase 106 | Pending |
-| FRAG-02 | Phase 106 | Pending |
-| FRAG-03 | Phase 106 | Pending |
-| FRAG-04 | Phase 106 | Pending |
+| WHERE-01 | Phase 115 | Pending |
+| WHERE-02 | Phase 115 | Pending |
+| WHERE-03 | Phase 115 | Pending |
+| WHERE-04 | Phase 115 | Pending |
+| WHERE-05 | Phase 115 | Pending |
+| WHERE-06 | Phase 115 | Pending |
+| FRAG-01 | Phase 115 | Pending |
+| FRAG-02 | Phase 115 | Pending |
+| FRAG-03 | Phase 115 | Pending |
+| FRAG-04 | Phase 115 | Pending |
 | JOIN-01 | Phase 107 | Complete |
 | JOIN-02 | Phase 107 | Complete |
 | JOIN-03 | Phase 107 | Complete |
@@ -106,9 +106,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGG-02 | Phase 108 | Complete |
 | AGG-03 | Phase 108 | Complete |
 | AGG-04 | Phase 108 | Complete |
-| UPS-01 | Phase 109 | Complete |
-| UPS-02 | Phase 109 | Complete |
-| UPS-03 | Phase 109 | Complete |
+| UPS-01 | Phase 115 | Pending |
+| UPS-02 | Phase 115 | Pending |
+| UPS-03 | Phase 115 | Pending |
 | REWR-01 | Phase 110 | Complete |
 | REWR-02 | Phase 111 | Complete |
 | REWR-07 | Phase 111 | Complete |
@@ -128,4 +128,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-17*
-*Last updated: 2026-02-17 after roadmap creation (phases 106-114)*
+*Last updated: 2026-02-25 after gap closure plan (phases 114-115 added)*

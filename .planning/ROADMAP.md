@@ -22,7 +22,7 @@
 - [x] **v9.0 Mesher** - Phases 87-95 (shipped 2026-02-15)
 - [x] **v10.0 ORM** - Phases 96-103 (shipped 2026-02-17)
 - [x] **v10.1 Stabilization** - Phases 104-105.1 (shipped 2026-02-17)
-- [ ] **v11.0 Query Builder** - Phases 106-114 (in progress)
+- [ ] **v11.0 Query Builder** - Phases 106-115 (in progress)
 
 ## Phases
 
@@ -197,6 +197,7 @@ See milestones/v9.0-ROADMAP.md for full phase details.
 - [x] **Phase 112: Mesher Rewrite -- Search, Dashboard, and Alerts** - FTS search, aggregation dashboards, alert system with JSONB (completed 2026-02-18)
 - [x] **Phase 113: Mesher Rewrite -- Retention and Final Cleanup** - Retention/storage queries, zero remaining raw SQL data queries (completed 2026-02-25)
 - [ ] **Phase 114: Compile, Run, and End-to-End Verification** - Zero-error build, all HTTP/WS endpoints verified
+- [ ] **Phase 115: Tracking Corrections and API Acceptance** - Close 13 requirement tracking gaps, accept Phase 109 positional API, remove dead code
 
 ## Phase Details
 
@@ -332,10 +333,23 @@ Plans:
   5. The EventProcessor service call SIGSEGV from v10.1 is either fixed or confirmed not to affect ORM-rewritten query paths
 **Plans**: TBD
 
+### Phase 115: Tracking Corrections and API Acceptance
+**Goal**: Close all 13 requirement tracking gaps from the v11.0 audit — update Phase 106 requirement records, formally accept Phase 109 positional API style as canonical, and remove two dead-code query functions
+**Depends on**: Phase 114 (documentation cleanup after compilation verified)
+**Requirements**: WHERE-01, WHERE-02, WHERE-03, WHERE-04, WHERE-05, WHERE-06, FRAG-01, FRAG-02, FRAG-03, FRAG-04, UPS-01, UPS-02, UPS-03
+**Gap Closure:** Closes 13 requirement gaps from v11.0-MILESTONE-AUDIT.md (gaps_found status)
+**Success Criteria** (what must be TRUE):
+  1. REQUIREMENTS.md checkboxes for WHERE-01..06 and FRAG-01..04 are updated to `[x]` with traceability marked Complete
+  2. Phase 106 SUMMARY.md `requirements-completed` field lists WHERE-01, WHERE-02, WHERE-03, WHERE-04, WHERE-05, WHERE-06, FRAG-01, FRAG-02, FRAG-03, FRAG-04
+  3. ROADMAP.md Phase 109 success criteria updated to reflect the positional-arg API style actually implemented (`Repo.insert_or_update`, `Repo.delete_where_returning`, `Query.where_sub`)
+  4. UPS-01..03 marked `[x]` Complete in REQUIREMENTS.md after ROADMAP acceptance
+  5. Dead code functions `get_project_id_by_key` and `get_user_orgs` removed from mesher/storage/queries.mpl with no import sites affected
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -> 113 -> 114
+Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -> 113 -> 114 -> 115
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -368,5 +382,6 @@ Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -
 | 112. Rewrite: Search/Dashboard/Alerts | 2/2 | Complete    | 2026-02-18 | - |
 | 113. Rewrite: Retention & Cleanup | 1/1 | Complete    | 2026-02-25 | - |
 | 114. Verification | v11.0 | 0/TBD | Not started | - |
+| 115. Tracking Corrections & API Acceptance | v11.0 | 0/TBD | Not started | - |
 
-**Total: 106 phases shipped across 20 milestones. 313 plans completed. 8 phases remaining for v11.0.**
+**Total: 106 phases shipped across 20 milestones. 313 plans completed. 9 phases remaining for v11.0.**
