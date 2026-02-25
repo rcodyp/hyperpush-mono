@@ -366,7 +366,7 @@ Phases execute in numeric order: 106 -> 107 -> 108 -> 109 -> 110 -> 111 -> 112 -
 | 110. Rewrite: Auth & Users | 2/2 | Complete    | 2026-02-18 | - |
 | 111. Rewrite: Issues & Events | 2/2 | Complete    | 2026-02-18 | - |
 | 112. Rewrite: Search/Dashboard/Alerts | 2/2 | Complete    | 2026-02-18 | - |
-| 113. Rewrite: Retention & Cleanup | 1/1 | Complete   | 2026-02-25 | - |
+| 113. Rewrite: Retention & Cleanup | 1/1 | Complete    | 2026-02-25 | - |
 | 114. Verification | v11.0 | 0/TBD | Not started | - |
 
 **Total: 106 phases shipped across 20 milestones. 313 plans completed. 8 phases remaining for v11.0.**
