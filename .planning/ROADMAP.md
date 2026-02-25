@@ -331,7 +331,10 @@ Plans:
   3. All HTTP API endpoints (org/project/issue CRUD, search, dashboard, alerts, retention) return correct JSON responses with expected data
   4. WebSocket endpoint accepts connections, completes upgrade, and delivers real-time events
   5. The EventProcessor service call SIGSEGV from v10.1 is either fixed or confirmed not to affect ORM-rewritten query paths
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 114-01-PLAN.md -- Compile Mesher with zero errors and verify startup + migration against PostgreSQL
+- [ ] 114-02-PLAN.md -- HTTP API endpoint smoke test and WebSocket upgrade verification
 
 ### Phase 115: Tracking Corrections and API Acceptance
 **Goal**: Close all 13 requirement tracking gaps from the v11.0 audit — update Phase 106 requirement records, formally accept Phase 109 positional API style as canonical, and remove two dead-code query functions
