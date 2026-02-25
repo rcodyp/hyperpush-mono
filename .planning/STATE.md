@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v11.0
-milestone_name: Query Builder
-status: complete
+milestone: v12.0
+milestone_name: Language Ergonomics & Open Source Readiness
+status: defining_requirements
 last_updated: "2026-02-25"
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 22
-  completed_plans: 22
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 
 ## Current Position
 
-Phase: 115 of 115 (v11.0 Query Builder)
-Plan: 2 of 2 in current phase (115-01 complete, 115-02 complete)
-Status: Complete -- all plans in phase 115 finished; v11.0 Query Builder milestone complete
-Last activity: 2026-02-25 -- Completed 115-02 (Phase 109 positional API acceptance + dead code removal from queries.mpl)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-25 — Milestone v12.0 started
 
-Progress: [██████████] 100% (v11.0)
+Progress: [░░░░░░░░░░] 0% (v12.0)
 
 ## Performance Metrics
 
@@ -136,6 +136,6 @@ None. The EventProcessor SIGSEGV blocker is confirmed resolved (MirType::Tuple f
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: v11.0 milestone archived. All phases 106-115 shipped and complete.
+Stopped at: v12.0 milestone started. Requirements defined (33 requirements across 6 categories). Roadmap pending.
 Resume file: None
-Next action: Start next milestone with /gsd:new-milestone
+Next action: Complete roadmap creation, then /gsd:plan-phase 116

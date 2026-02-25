@@ -177,9 +177,27 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 - ✓ Mesher rewrite: zero Repo.query_raw/execute_raw for data queries (49+ rewrites, 18 documented boundaries) -- v11.0
 - ✓ Mesher verification: all 8 HTTP API domains return 2xx, WebSocket 101, EventProcessor SIGSEGV resolved -- v11.0
 
+## Current Milestone: v12.0 Language Ergonomics & Open Source Readiness
+
+**Goal:** Make Mesh more ergonomic for real programs and ready for open source with slot pipe operator, string interpolation, heredocs, regex, env var stdlib, Mesher dogfooding, a Mesh agent skill, repo reorganization, and performance benchmarks.
+
+**Target features:**
+- Slot pipe operator (`|2>`, `|3>`) for argument-position routing
+- String interpolation (`#{expr}`) and heredoc strings (`"""..."""`)
+- Regular expression support with literal and runtime compile
+- Env var stdlib with typed defaults (`Env.get`, `Env.get_int`)
+- Mesh agent skill with progressive disclosure
+- Repository reorganization for open source (compiler/, mesher/, website/, tools/)
+- Performance benchmarks vs Rust, Go, Elixir
+
 ### Active
 
-(none — planning next milestone)
+- [ ] PIPE: Slot pipe operator (`|N>`) with type-checked argument routing
+- [ ] REGEX: Regex literals, Regex.compile, match/captures/replace/split
+- [ ] STRG: String interpolation, heredocs, Env.get/get_int stdlib
+- [ ] SKILL: Mesh agent skill with progressive disclosure
+- [ ] REPO: Monorepo reorganization under compiler/mesher/website/tools/
+- [ ] BENCH: HTTP server benchmarks vs Rust/Go/Elixir
 
 ### Out of Scope
 
@@ -392,4 +410,4 @@ Tech debt (minor, pre-existing):
 | Type-aware service loop arg dispatch (Bool trunc, Float bitcast, Struct alloca) | i1/float/struct LLVM types need explicit casts; i64 passthrough insufficient | ✓ Good -- v11.0, correct codegen for all handler param types |
 
 ---
-*Last updated: 2026-02-25 after v11.0 Query Builder milestone*
+*Last updated: 2026-02-25 after v12.0 Language Ergonomics & Open Source Readiness milestone start*
