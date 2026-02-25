@@ -252,6 +252,9 @@ Plans:
   1. A Mesh program can call `Repo.insert_or_update(pool, table, fields, conflict_targets, update_fields)` and it inserts a new row or updates the existing one, generating `INSERT ... ON CONFLICT (...) DO UPDATE SET ... RETURNING *`
   2. A Mesh program can call `Repo.delete_where_returning(pool, table, query)` to delete matching rows and receive the deleted rows back via `RETURNING *`
   3. A Mesh program can use `Query.where_sub(q, :field, sub_query)` to nest a subquery in a WHERE IN clause with correct parameter binding
+
+**API acceptance note (Phase 115):** The positional-arg API style above (`Repo.insert_or_update`, `Repo.delete_where_returning`, `Query.where_sub`) is the canonical API shape for v11.0. These functions are implemented, tested, and verified end-to-end. The original keyword-option style described in the v11.0 roadmap proposal was never implemented; this positional style is the accepted replacement.
+
 **Plans**:
   - Plan 109-01 (Wave 1): Upsert, RETURNING, Subqueries -- full pipeline (runtime functions + compiler registration + E2E)
   - Plan 109-02 (Wave 2): Runtime SQLite E2E verification (upsert, delete verification, subquery WHERE)
