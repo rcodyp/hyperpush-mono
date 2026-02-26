@@ -258,8 +258,8 @@ Plans:
   2. User can call `Env.get_int("PORT", 8080)` and receive the env var parsed as Int, or the default Int if unset or not parseable as an integer
 **Plans**: 2 plans
 Plans:
-- [ ] 118-01-PLAN.md — Runtime functions + compiler wiring: mesh_env_get_with_default, mesh_env_get_int, typeck/MIR/JIT registration
-- [ ] 118-02-PLAN.md — E2E tests for STRG-04 and STRG-05 + migrate mesher/main.mpl and migrate.rs to 2-arg Env.get
+- [x] 118-01-PLAN.md — Runtime functions + compiler wiring: mesh_env_get_with_default, mesh_env_get_int, typeck/MIR/JIT registration
+- [x] 118-02-PLAN.md — E2E tests for STRG-04 and STRG-05 + migrate mesher/main.mpl and migrate.rs to 2-arg Env.get
 
 ### Phase 119: Regular Expressions
 **Goal**: Users can use regular expressions in Mesh programs via literals and runtime compilation with a complete API
@@ -271,7 +271,11 @@ Plans:
   3. User can call `Regex.match(rx, str)` returning Bool to test whether a pattern matches
   4. User can call `Regex.captures(rx, str)` returning `Option<List<String>>` to extract capture groups
   5. User can call `Regex.replace(rx, str, replacement)` and `Regex.split(rx, str)` for replacement and splitting
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 119-01-PLAN.md — Lexer + Parser + AST + typeck + MIR: RegexLiteral token, REGEX_EXPR node, ~r/pat/flags syntax (REGEX-01)
+- [ ] 119-02-PLAN.md — Runtime (mesh-rt/regex.rs) + full compiler pipeline: compile/match/captures/replace/split (REGEX-02 to REGEX-06)
+- [ ] 119-03-PLAN.md — E2E test fixtures and test functions for all 6 requirements
 
 ### Phase 120: Mesher Dogfooding
 **Goal**: Mesher production codebase demonstrates slot pipe and string features in real usage, verified end-to-end
@@ -350,7 +354,7 @@ Note: Phase 119 (Regex) depends only on Phase 115 and may proceed in parallel wi
 | 116. Slot Pipe Operator | 2/2 | Complete    | 2026-02-25 | - |
 | 117. String Interpolation & Heredocs | 2/2 | Complete    | 2026-02-26 | - |
 | 118. Env Var Stdlib | 2/2 | Complete    | 2026-02-26 | - |
-| 119. Regular Expressions | v12.0 | 0/? | Not started | - |
+| 119. Regular Expressions | v12.0 | 0/3 | Not started | - |
 | 120. Mesher Dogfooding | v12.0 | 0/? | Not started | - |
 | 121. Mesh Agent Skill | v12.0 | 0/? | Not started | - |
 | 122. Repository Reorganization | v12.0 | 0/? | Not started | - |
