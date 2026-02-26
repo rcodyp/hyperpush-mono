@@ -10498,7 +10498,7 @@ fn map_builtin_name(name: &str) -> String {
         "regex_from_literal" => "mesh_regex_from_literal".to_string(),
         // "regex_compile" is the prefixed form of Regex.compile
         "regex_compile" => "mesh_regex_compile".to_string(),
-        "regex_match" => "mesh_regex_match".to_string(),
+        "regex_is_match" => "mesh_regex_match".to_string(),
         "regex_captures" => "mesh_regex_captures".to_string(),
         "regex_replace" => "mesh_regex_replace".to_string(),
         "regex_split" => "mesh_regex_split".to_string(),

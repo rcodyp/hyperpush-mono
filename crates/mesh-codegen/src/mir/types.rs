@@ -87,7 +87,9 @@ fn resolve_con(con: &TyCon, registry: &TypeRegistry) -> MirType {
         | "MapAdapterIterator" | "FilterAdapterIterator" | "TakeAdapterIterator"
         | "SkipAdapterIterator" | "EnumerateAdapterIterator" | "ZipAdapterIterator"
         // Phase 98: Ptr is an explicit opaque pointer type used by Query and other runtime types
-        | "Ptr" => MirType::Ptr,
+        | "Ptr"
+        // Phase 119: Regex is a heap-allocated opaque pointer (Box<regex::Regex> raw ptr)
+        | "Regex" => MirType::Ptr,
         // Atom type resolves to String at MIR level (atoms are compile-time only, lowered to StringLit)
         "Atom" => MirType::String,
         name => {

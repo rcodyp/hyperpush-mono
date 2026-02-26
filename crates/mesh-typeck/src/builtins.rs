@@ -278,9 +278,9 @@ pub fn register_builtins(
         "regex_compile".into(),
         Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::Con(TyCon::new("Regex")), Ty::string()))),
     );
-    // Regex.match(rx, str) -> Bool
+    // Regex.is_match(rx, str) -> Bool
     env.insert(
-        "regex_match".into(),
+        "regex_is_match".into(),
         Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::bool())),
     );
     // Regex.captures(rx, str) -> Option<List<String>>
@@ -1775,7 +1775,7 @@ mod tests {
 
         // Regex functions (Phase 119)
         assert!(env.lookup("regex_compile").is_some());
-        assert!(env.lookup("regex_match").is_some());
+        assert!(env.lookup("regex_is_match").is_some());
         assert!(env.lookup("regex_captures").is_some());
         assert!(env.lookup("regex_replace").is_some());
         assert!(env.lookup("regex_split").is_some());

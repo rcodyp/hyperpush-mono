@@ -321,9 +321,9 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         "compile".to_string(),
         Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::Con(TyCon::new("Regex")), Ty::string()))),
     );
-    // Regex.match(rx, str) -> Bool
+    // Regex.is_match(rx, str) -> Bool
     regex_mod.insert(
-        "match".to_string(),
+        "is_match".to_string(),
         Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::bool())),
     );
     // Regex.captures(rx, str) -> Option<List<String>>
@@ -1491,6 +1491,7 @@ const STDLIB_MODULE_NAMES: &[&str] = &[
     "Repo",  // Phase 98
     "Changeset",  // Phase 99
     "Migration",  // Phase 101
+    "Regex",  // Phase 119
 ];
 
 /// Check if a name is a known stdlib module.

@@ -5250,3 +5250,58 @@ fn e2e_slot_pipe_parse_error_slot_1() {
         "Expected parse error for |1>, got: {}", err
     );
 }
+
+// ── Phase 119: Regular Expressions ────────────────────────────────────
+
+/// Phase 119: Regex literal ~r/pattern/ and ~r/pattern/flags (REGEX-01).
+#[test]
+fn e2e_regex_literal() {
+    let source = read_fixture("regex_literal.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "digit found\ncase insensitive match\n");
+}
+
+/// Phase 119: Regex.compile(str) returns Ok for valid, Err for invalid (REGEX-02).
+#[test]
+fn e2e_regex_compile() {
+    let source = read_fixture("regex_compile.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "compiled ok\ngot error\n");
+}
+
+/// Phase 119: Regex.is_match(rx, str) returns Bool (REGEX-03).
+#[test]
+fn e2e_regex_match() {
+    let source = read_fixture("regex_match.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "matched\nno match\n");
+}
+
+/// Phase 119: Regex.captures(rx, str) returns Option<List<String>> (REGEX-04).
+#[test]
+fn e2e_regex_captures() {
+    let source = read_fixture("regex_captures.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "hello world\nhello\nworld\nno match\n");
+}
+
+/// Phase 119: Regex.replace(rx, str, replacement) -> String (REGEX-05).
+#[test]
+fn e2e_regex_replace() {
+    let source = read_fixture("regex_replace_split.mpl");
+    let output = compile_and_run(&source);
+    assert!(output.starts_with("fooNbarN\n"), "Expected replace output, got: {}", output);
+}
+
+/// Phase 119: Regex.split(rx, str) -> List<String> (REGEX-06).
+#[test]
+fn e2e_regex_split() {
+    let source = read_fixture("regex_replace_split.mpl");
+    let output = compile_and_run(&source);
+    let lines: Vec<&str> = output.lines().collect();
+    assert!(lines.len() >= 5, "Expected 5 lines, got: {}", output);
+    assert_eq!(lines[1], "a");
+    assert_eq!(lines[2], "b");
+    assert_eq!(lines[3], "c");
+    assert_eq!(lines[4], "d");
+}
