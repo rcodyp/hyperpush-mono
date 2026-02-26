@@ -31,10 +31,8 @@ end
 # Format: "file|func;file|func;...:normalized_message"
 fn fingerprint_from_frames(frames, msg :: String) -> String do
   let suffix = ":" <> normalize_message(msg)
-  frames
-    |> List.map(fn(frame) do fingerprint_frame(frame) end)
-    |2> String.join(";")
-    <> suffix
+  let joined = frames |> List.map(fn(frame) do fingerprint_frame(frame) end) |> String.join(";")
+  joined <> suffix
 end
 
 # Fallback fingerprint when no stack trace is available (GROUP-02).

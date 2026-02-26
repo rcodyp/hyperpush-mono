@@ -258,7 +258,7 @@ end
 # Uses Node.spawn to spawn event_processor_worker on the target node.
 # The worker looks up its own node's PipelineRegistry via Process.whereis.
 # Does NOT send local PoolHandle across nodes (research pitfall 1 -- raw pointer, meaningless remotely).
-fn try_remote_spawn(nodes) do
+fn try_remote_spawn(nodes :: List<String>) do
   let target = List.head(nodes)
   let _ = println("[Mesher] Load high -- spawning remote processor on #{target}")
   let _ = Node.spawn(target, event_processor_worker)
