@@ -301,10 +301,10 @@ Plans:
   3. Skill is registered in the GSD system and can be auto-loaded for Mesh questions without explicit invocation
 **Plans**: 4 plans
 Plans:
-- [ ] 121-01-PLAN.md — Root SKILL.md + directory scaffold + syntax and types sub-skills (Wave 1)
-- [ ] 121-02-PLAN.md — pattern-matching, error-handling, and traits sub-skills (Wave 2, parallel)
-- [ ] 121-03-PLAN.md — actors, supervisors, and collections sub-skills (Wave 2, parallel)
-- [ ] 121-04-PLAN.md — strings/regex/env, http, and database sub-skills (Wave 2, parallel)
+- [x] 121-01-PLAN.md — Root SKILL.md + directory scaffold + syntax and types sub-skills (Wave 1)
+- [x] 121-02-PLAN.md — pattern-matching, error-handling, and traits sub-skills (Wave 2, parallel)
+- [x] 121-03-PLAN.md — actors, supervisors, and collections sub-skills (Wave 2, parallel)
+- [x] 121-04-PLAN.md — strings/regex/env, http, and database sub-skills (Wave 2, parallel)
 
 ### Phase 122: Repository Reorganization
 **Goal**: Repository top-level is clean and navigable for open source with compiler/mesher/website/tools/ directories
@@ -317,7 +317,11 @@ Plans:
   4. Install scripts and build tooling live under `tools/`
   5. All GitHub Actions CI/CD pipelines pass with the new directory structure
   6. All tests pass and Mesher E2E is verified after reorganization (all HTTP endpoints 2xx, WebSocket 101)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 122-01-PLAN.md — Execute all file moves and reference updates (crates→compiler/, frontend→mesher/frontend/, tools/, CI/README updates)
+- [ ] 122-02-PLAN.md — Build verification, Mesher E2E, atomic git commit, human checkpoint
 
 ### Phase 123: Performance Benchmarks
 **Goal**: Published benchmark results demonstrate Mesh HTTP performance compared to Rust, Go, and Elixir
