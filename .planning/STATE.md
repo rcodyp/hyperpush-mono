@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Ergonomics & Open Source Readiness
 status: unknown
-last_updated: "2026-02-26T05:32:15.284Z"
+last_updated: "2026-02-26T06:14:15.594Z"
 progress:
-  total_phases: 129
+  total_phases: 130
   completed_phases: 128
-  total_plans: 334
-  completed_plans: 334
+  total_plans: 336
+  completed_plans: 335
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 
 ## Current Position
 
-Phase: 121 of 123 (Phase 121: Mesh Agent Skill — COMPLETE)
-Plan: 04 complete (4 of 4 plans)
-Status: Phase 121 complete — all 11 sub-skills written; next is Phase 122 (repo restructure)
-Last activity: 2026-02-26 — 121-04 complete: strings, http, database sub-skills written
+Phase: 122 of 123 (Phase 122: Repository Reorganization — Plan 01 complete)
+Plan: 01 complete (1 of 1 plans)
+Status: Phase 122 plan 01 complete — compiler/, tools/, mesher/frontend/ moves done; next is Phase 123 (benchmarks)
+Last activity: 2026-02-26 — 122-01 complete: all crates moved to compiler/, tools/ created, root cleaned
 
 Progress: [█░░░░░░░░░] 5% (v12.0)
 
@@ -62,6 +62,7 @@ Progress: [█░░░░░░░░░] 5% (v12.0)
 | Phase 121 P02 | 2min | 3 tasks | 3 files |
 | Phase 121 P03 | 2min | 3 tasks | 3 files |
 | Phase 121 P04 | 2min | 3 tasks | 3 files |
+| Phase 122 P01 | 3min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 121]: strings sub-skill covers #{} and ${} interpolation (both syntaxes), heredocs, 11 String functions, Env.get/get_int, and full Regex API with literals and runtime compile
 - [Phase 121]: http sub-skill documents router rebind convention (let r = HTTP.use(r, ...)) and covers routing/middleware/client/WebSocket/crash isolation
 - [Phase 121]: database sub-skill covers Sqlite/PostgreSQL raw APIs, deriving(Row) ORM, upserts/RETURNING/subqueries, JOINs, and gotchas (execute vs query for RETURNING)
+- [Phase 122]: Root package.json deleted (not moved to website/) because website/ already has its own real package.json; root was dev-only concurrently wrapper
+- [Phase 122]: crates/ flattened directly to compiler/ with no intermediate directory — all 11 crates are direct children of compiler/
 
 ### Roadmap Evolution
 
@@ -128,6 +131,6 @@ None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 121-04-PLAN.md (strings, http, database sub-skills — Phase 121 complete)
+Stopped at: Completed 122-01-PLAN.md (repo reorganization — compiler/, tools/, mesher/frontend/ moves complete)
 Resume file: None
-Next action: /gsd:execute-phase 122 (repo restructure)
+Next action: /gsd:execute-phase 123 (benchmarks)

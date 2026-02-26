@@ -42,11 +42,11 @@ Requirements for v12.0 Language Ergonomics & Open Source Readiness. Each maps to
 
 ### Repository Reorganization
 
-- [ ] **REPO-01**: Compiler Rust crates moved under `compiler/` directory
-- [ ] **REPO-02**: Mesher application moved under `mesher/` directory
-- [ ] **REPO-03**: Documentation website moved under `website/` directory
-- [ ] **REPO-04**: Install scripts and build tooling moved under `tools/` directory
-- [ ] **REPO-05**: All CI/CD pipelines (GitHub Actions) updated for new directory structure
+- [x] **REPO-01**: Compiler Rust crates moved under `compiler/` directory
+- [x] **REPO-02**: Mesher application moved under `mesher/` directory
+- [x] **REPO-03**: Documentation website moved under `website/` directory
+- [x] **REPO-04**: Install scripts and build tooling moved under `tools/` directory
+- [x] **REPO-05**: All CI/CD pipelines (GitHub Actions) updated for new directory structure
 - [ ] **REPO-06**: All tests pass and Mesher E2E verified after reorganization
 
 ### Performance Benchmarks
@@ -112,11 +112,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SKILL-02 | Phase 121 | Complete |
 | SKILL-03 | Phase 121 | Complete |
 | SKILL-04 | Phase 121 | Complete |
-| REPO-01 | Phase 122 | Pending |
-| REPO-02 | Phase 122 | Pending |
-| REPO-03 | Phase 122 | Pending |
-| REPO-04 | Phase 122 | Pending |
-| REPO-05 | Phase 122 | Pending |
+| REPO-01 | Phase 122 | Complete |
+| REPO-02 | Phase 122 | Complete |
+| REPO-03 | Phase 122 | Complete |
+| REPO-04 | Phase 122 | Complete |
+| REPO-05 | Phase 122 | Complete |
 | REPO-06 | Phase 122 | Pending |
 | BENCH-01 | Phase 123 | Pending |
 | BENCH-02 | Phase 123 | Pending |

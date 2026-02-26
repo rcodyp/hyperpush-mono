@@ -369,7 +369,7 @@ Note: Phase 119 (Regex) depends only on Phase 115 and may proceed in parallel wi
 | 119. Regular Expressions | 3/3 | Complete    | 2026-02-26 | - |
 | 120. Mesher Dogfooding | 2/2 | Complete    | 2026-02-26 | - |
 | 121. Mesh Agent Skill | 4/4 | Complete    | 2026-02-26 | - |
-| 122. Repository Reorganization | v12.0 | 0/? | Not started | - |
+| 122. Repository Reorganization | 1/2 | In Progress|  | - |
 | 123. Performance Benchmarks | v12.0 | 0/? | Not started | - |
 
 **Total through v11.0: 115 phases shipped, 319 plans completed across 21 milestones.**
@@ -379,7 +379,7 @@ Note: Phase 119 (Regex) depends only on Phase 115 and may proceed in parallel wi
 **Goal:** [To be planned]
 **Requirements**: TBD
 **Depends on:** Phase 123
-**Plans:** 4/4 plans complete
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 124 to break down)
