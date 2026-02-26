@@ -62,16 +62,18 @@ RUN wget -q https://go.dev/dl/go1.21.6.linux-amd64.tar.gz -O /tmp/go.tar.gz \
     && rm /tmp/go.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Copy pre-built binaries from builder stage
+# Copy pre-built meshc binary from builder stage
 COPY --from=builder /app/target/release/meshc /usr/local/bin/meshc
-RUN mkdir -p /app/benchmarks/rust/target/release
-COPY --from=builder /app/benchmarks/rust/target/release/bench \
-    /app/benchmarks/rust/target/release/bench
 
 WORKDIR /app
 
 # Copy benchmark source files needed at runtime
 COPY benchmarks/ benchmarks/
+
+# Copy pre-built Rust bench binary AFTER benchmarks/ to prevent local macOS binary from overwriting
+RUN mkdir -p /app/benchmarks/rust/target/release
+COPY --from=builder /app/benchmarks/rust/target/release/bench \
+    /app/benchmarks/rust/target/release/bench
 
 # Pre-fetch Elixir dependencies
 RUN cd benchmarks/elixir \

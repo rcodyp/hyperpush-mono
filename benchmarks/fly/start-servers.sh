@@ -31,7 +31,8 @@ wait_for_server() {
 
 # Start Mesh server (port 3000)
 if command -v meshc &> /dev/null; then
-  meshc run "$REPO_ROOT/benchmarks/mesh/bench.mpl" &
+  meshc build "$REPO_ROOT/benchmarks/mesh"
+  "$REPO_ROOT/benchmarks/mesh/mesh" &
   MESH_PID=$!
   PIDS+=($MESH_PID)
   wait_for_server 3000 "Mesh" && echo "MESH_PID=$MESH_PID"
