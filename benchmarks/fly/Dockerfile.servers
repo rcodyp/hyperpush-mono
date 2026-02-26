@@ -45,7 +45,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     curl wget gnupg git build-essential pkg-config \
     libzstd1 libffi8 libxml2 libncurses6 unzip \
-    erlang-dev \
+    erlang-nox \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Elixir 1.16 prebuilt for OTP 24 (Ubuntu 22.04 ships OTP 24; Elixir 1.17+ requires OTP 25+)
