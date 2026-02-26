@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Ergonomics & Open Source Readiness
 status: unknown
-last_updated: "2026-02-26T01:27:47.506Z"
+last_updated: "2026-02-26T01:43:17.822Z"
 progress:
   total_phases: 114
-  completed_phases: 113
+  completed_phases: 114
   total_plans: 304
-  completed_plans: 303
+  completed_plans: 304
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 ## Current Position
 
 Phase: 118 of 123 (Phase 118: Env Var Stdlib)
-Plan: 01 complete (phase in progress)
-Status: Phase 118 Plan 01 complete — Plan 02 next
-Last activity: 2026-02-26 — 118-01 complete: Env.get, Env.get_int, Env.args stdlib functions wired end-to-end
+Plan: 02 complete (phase complete)
+Status: Phase 118 complete — Phase 119 next
+Last activity: 2026-02-26 — 118-02 complete: E2E tests for Env.get/Env.get_int, all callers migrated to 2-arg API
 
 Progress: [█░░░░░░░░░] 5% (v12.0)
 
@@ -52,6 +52,7 @@ Progress: [█░░░░░░░░░] 5% (v12.0)
 | 117   | 01   | 8min     | 2     | 3     |
 | 117   | 02   | 8min     | 2     | 4     |
 | 118   | 01   | 10min    | 2     | 6     |
+| 118   | 02   | 13min    | 2     | 6     |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 118]: Old bare env_get (Option-returning) removed entirely from builtins.rs; env_get now routes to 2-arg mesh_env_get_with_default
 - [Phase 118]: env_get_int silently returns default on any parse failure (non-numeric, overflow) — no stderr warning required
 - [Phase 118]: env_args type signature upgraded to Ty::list(Ty::string()) in builtins.rs
+- [Phase 118]: stdlib_modules() Env entry in infer.rs updated to 2-arg get, get_int, args signatures (was stale 1-arg Option-returning)
+- [Phase 118]: get_env_or_default helper removed from mesher/main.mpl; all callsites use direct Env.get(key, default)
 
 ### Roadmap Evolution
 
@@ -96,6 +99,6 @@ None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 118-01-PLAN.md (Env.get, Env.get_int, Env.args stdlib functions wired end-to-end)
+Stopped at: Completed 118-02-PLAN.md (E2E tests and migration of Env.get callers)
 Resume file: None
-Next action: /gsd:execute-phase 118 (plan 02)
+Next action: /gsd:execute-phase 119

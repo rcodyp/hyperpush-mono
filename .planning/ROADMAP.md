@@ -213,7 +213,7 @@ See milestones/v11.0-ROADMAP.md for full phase details.
 
 - [x] **Phase 116: Slot Pipe Operator** - Add `|N>` argument-position routing to the compiler with full type checking (completed 2026-02-25)
 - [x] **Phase 117: String Interpolation & Heredocs** - Add `#{expr}` interpolation and `"""..."""` multiline heredoc strings (completed 2026-02-26)
-- [ ] **Phase 118: Env Var Stdlib** - Add `Env.get` and `Env.get_int` typed stdlib functions
+- [x] **Phase 118: Env Var Stdlib** - Add `Env.get` and `Env.get_int` typed stdlib functions (completed 2026-02-26)
 - [ ] **Phase 119: Regular Expressions** - Add regex literals, `Regex.compile`, and match/capture/replace/split API
 - [ ] **Phase 120: Mesher Dogfooding** - Update Mesher to use slot pipe and string features; verify E2E
 - [ ] **Phase 121: Mesh Agent Skill** - Create GSD agent skill with progressive disclosure for all Mesh topics
@@ -233,8 +233,8 @@ See milestones/v11.0-ROADMAP.md for full phase details.
   4. Compiler emits a clear, actionable error when slot position N exceeds the target function's arity
 **Plans**: 2 plans
 Plans:
-- [ ] 116-01-PLAN.md — Lexer + Parser + AST: SlotPipe token, SLOT_PIPE_EXPR node, SlotPipeExpr with slot() accessor
-- [ ] 116-02-PLAN.md — Type checker + MIR lowering: infer_slot_pipe, error variants, E2E tests
+- [x] 116-01-PLAN.md — Lexer + Parser + AST: SlotPipe token, SLOT_PIPE_EXPR node, SlotPipeExpr with slot() accessor
+- [x] 116-02-PLAN.md — Type checker + MIR lowering: infer_slot_pipe, error variants, E2E tests
 
 ### Phase 117: String Interpolation & Heredocs
 **Goal**: Users can embed expressions directly in strings with `#{expr}` and write multiline strings with `"""..."""`
@@ -246,8 +246,8 @@ Plans:
   3. Heredoc strings support embedded interpolation: `"""{"id": "#{id}"}"""` evaluates correctly
 **Plans**: 2 plans
 Plans:
-- [ ] 117-01-PLAN.md — Lexer: #{...} interpolation delimiter, backward compat with ${...}, E2E tests for STRG-01
-- [ ] 117-02-PLAN.md — MIR lowerer: trimIndent for triple-quoted heredocs, E2E tests for STRG-02 and STRG-03
+- [x] 117-01-PLAN.md — Lexer: #{...} interpolation delimiter, backward compat with ${...}, E2E tests for STRG-01
+- [x] 117-02-PLAN.md — MIR lowerer: trimIndent for triple-quoted heredocs, E2E tests for STRG-02 and STRG-03
 
 ### Phase 118: Env Var Stdlib
 **Goal**: Users can read environment variables with typed defaults using `Env.get` and `Env.get_int`
@@ -349,7 +349,7 @@ Note: Phase 119 (Regex) depends only on Phase 115 and may proceed in parallel wi
 | 106-115 | v11.0 | 22/22 | Complete | 2026-02-25 |
 | 116. Slot Pipe Operator | 2/2 | Complete    | 2026-02-25 | - |
 | 117. String Interpolation & Heredocs | 2/2 | Complete    | 2026-02-26 | - |
-| 118. Env Var Stdlib | 1/2 | In Progress|  | - |
+| 118. Env Var Stdlib | 2/2 | Complete   | 2026-02-26 | - |
 | 119. Regular Expressions | v12.0 | 0/? | Not started | - |
 | 120. Mesher Dogfooding | v12.0 | 0/? | Not started | - |
 | 121. Mesh Agent Skill | v12.0 | 0/? | Not started | - |
