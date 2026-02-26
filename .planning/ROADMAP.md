@@ -256,7 +256,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can call `Env.get("KEY", "default")` and receive the env var string value, or the default string if unset
   2. User can call `Env.get_int("PORT", 8080)` and receive the env var parsed as Int, or the default Int if unset or not parseable as an integer
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 118-01-PLAN.md — Runtime functions + compiler wiring: mesh_env_get_with_default, mesh_env_get_int, typeck/MIR/JIT registration
+- [ ] 118-02-PLAN.md — E2E tests for STRG-04 and STRG-05 + migrate mesher/main.mpl and migrate.rs to 2-arg Env.get
 
 ### Phase 119: Regular Expressions
 **Goal**: Users can use regular expressions in Mesh programs via literals and runtime compilation with a complete API
@@ -346,7 +349,7 @@ Note: Phase 119 (Regex) depends only on Phase 115 and may proceed in parallel wi
 | 106-115 | v11.0 | 22/22 | Complete | 2026-02-25 |
 | 116. Slot Pipe Operator | 2/2 | Complete    | 2026-02-25 | - |
 | 117. String Interpolation & Heredocs | 2/2 | Complete    | 2026-02-26 | - |
-| 118. Env Var Stdlib | v12.0 | 0/? | Not started | - |
+| 118. Env Var Stdlib | v12.0 | 0/2 | Not started | - |
 | 119. Regular Expressions | v12.0 | 0/? | Not started | - |
 | 120. Mesher Dogfooding | v12.0 | 0/? | Not started | - |
 | 121. Mesh Agent Skill | v12.0 | 0/? | Not started | - |
