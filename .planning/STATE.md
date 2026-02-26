@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Ergonomics & Open Source Readiness
 status: unknown
-last_updated: "2026-02-26T02:52:11.494Z"
+last_updated: "2026-02-26T03:20:48.537Z"
 progress:
-  total_phases: 115
+  total_phases: 116
   completed_phases: 115
-  total_plans: 307
-  completed_plans: 307
+  total_plans: 309
+  completed_plans: 308
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-25)
 
 ## Current Position
 
-Phase: 119 of 123 (Phase 119: Regular Expressions)
-Plan: 03 complete — Phase 119 DONE
-Status: Phase 119 complete — next phase: 120 (Mesher Dogfooding)
-Last activity: 2026-02-26 — 119-03 complete: Regex E2E tests (6 new tests passing; 3 compiler bugs fixed)
+Phase: 120 of 123 (Phase 120: Mesher Dogfooding)
+Plan: 01 complete
+Status: Phase 120 in progress — Plan 01 done (slot pipe + string interpolation); Plan 02 next (E2E verification)
+Last activity: 2026-02-26 — 120-01 complete: dogfooding slot pipe and string interpolation across 6 Mesher files
 
 Progress: [█░░░░░░░░░] 5% (v12.0)
 
@@ -56,6 +56,7 @@ Progress: [█░░░░░░░░░] 5% (v12.0)
 | 119   | 01   | 6min     | 2     | 8     |
 | 119   | 02   | 10min    | 2     | 8     |
 | 119   | 03   | 13min    | 2     | 10    |
+| 120   | 01   | 4min     | 2     | 6     |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Recent decisions affecting current work:
 - [Phase 119]: Regex.is_match used instead of Regex.match: 'match' is a Mesh keyword causing parse errors
 - [Phase 119]: Ty::Con(Regex) maps to MirType::Ptr in types.rs resolve_con: opaque heap pointer, prevents LLVM opaque struct failures
 - [Phase 119]: Regex added to STDLIB_MODULE_NAMES in infer.rs: required for Regex.compile/is_match/etc to route through module call path
+- [Phase 120]: Slot pipe applied only in fingerprint.mpl where genuine argument threading exists; other API files already use idiomatic patterns
+- [Phase 120]: Heredocs used for JSON builders with 2+ embedded double quotes; simple error strings use regular #{} without heredoc
 
 ### Roadmap Evolution
 
@@ -110,6 +113,6 @@ None. v11.0 fully shipped and verified. Zero known compiler correctness issues.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 119-03-PLAN.md (Regex E2E tests + 3 compiler bug fixes; Phase 119 complete)
+Stopped at: Completed 120-01-PLAN.md (slot pipe + string interpolation dogfooding; cargo check passes; 6 files updated)
 Resume file: None
-Next action: /gsd:execute-phase 120 (Mesher Dogfooding)
+Next action: /gsd:execute-phase 120 Plan 02 (E2E verification)

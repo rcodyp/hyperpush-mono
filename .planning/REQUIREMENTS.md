@@ -13,7 +13,7 @@ Requirements for v12.0 Language Ergonomics & Open Source Readiness. Each maps to
 - [x] **PIPE-02**: User can write `expr |N>` for any argument position N ≥ 2
 - [x] **PIPE-03**: Slot pipes are chainable: `a |2> f(b) |> g()` works correctly
 - [x] **PIPE-04**: Type inference validates slot pipe position against function arity with a clear error
-- [ ] **PIPE-05**: Mesher codebase updated using slot pipe where it improves readability (dogfooding verified)
+- [x] **PIPE-05**: Mesher codebase updated using slot pipe where it improves readability (dogfooding verified)
 
 ### Regular Expressions
 
@@ -31,7 +31,7 @@ Requirements for v12.0 Language Ergonomics & Open Source Readiness. Each maps to
 - [x] **STRG-03**: Heredoc strings support interpolation: `"""{"id": "#{id}"}"""`
 - [x] **STRG-04**: User can read env var with default: `Env.get("KEY", "default") -> String`
 - [x] **STRG-05**: User can parse env var as integer with default: `Env.get_int("PORT", 8080) -> Int`
-- [ ] **STRG-06**: Mesher server code updated using new string features (dogfooding verified)
+- [x] **STRG-06**: Mesher server code updated using new string features (dogfooding verified)
 
 ### Mesh Agent Skill
 
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PIPE-02 | Phase 116 | Complete |
 | PIPE-03 | Phase 116 | Complete |
 | PIPE-04 | Phase 116 | Complete |
-| PIPE-05 | Phase 120 | Pending |
+| PIPE-05 | Phase 120 | Complete |
 | REGEX-01 | Phase 119 | Complete |
 | REGEX-02 | Phase 119 | Complete |
 | REGEX-03 | Phase 119 | Complete |
@@ -107,7 +107,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STRG-03 | Phase 117 | Complete |
 | STRG-04 | Phase 118 | Complete |
 | STRG-05 | Phase 118 | Complete |
-| STRG-06 | Phase 120 | Pending |
+| STRG-06 | Phase 120 | Complete |
 | SKILL-01 | Phase 121 | Pending |
 | SKILL-02 | Phase 121 | Pending |
 | SKILL-03 | Phase 121 | Pending |
