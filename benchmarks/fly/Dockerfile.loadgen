@@ -1,0 +1,19 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    curl git build-essential libssl-dev bc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build wrk from source (not in Ubuntu 22.04 apt)
+RUN git clone https://github.com/wg/wrk.git /tmp/wrk \
+    && cd /tmp/wrk && make \
+    && cp /tmp/wrk/wrk /usr/local/bin/wrk \
+    && rm -rf /tmp/wrk
+
+WORKDIR /app
+COPY benchmarks/fly/run-benchmarks.sh /app/run-benchmarks.sh
+RUN chmod +x /app/run-benchmarks.sh
+
+# SERVER_HOST must be provided at machine launch time via -e SERVER_HOST=<ip>
+CMD ["/app/run-benchmarks.sh"]
