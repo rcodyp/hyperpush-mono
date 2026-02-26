@@ -62,14 +62,6 @@ PIDS+=($ELIXIR_PID)
 wait_for_server 3003 "Elixir"
 echo "ELIXIR_PID=$ELIXIR_PID"
 
-# Bridge IPv6 → IPv4 for all server ports.
-# Fly's 6PN is IPv6-only; servers bind 0.0.0.0 (IPv4).
-# socat ipv6only=1 listens on [::]:port (IPv6 only, no conflict with IPv4 listener)
-# and forwards each connection to 127.0.0.1:port (IPv4 loopback).
-for port in 3000 3001 3002 3003; do
-  socat TCP6-LISTEN:${port},fork,reuseaddr,ipv6only=1 TCP4:127.0.0.1:${port} &
-done
-
 echo ""
 echo "=== All servers running ==="
 echo "Mesh:   http://localhost:3000 (PID: ${MESH_PID:-N/A})"

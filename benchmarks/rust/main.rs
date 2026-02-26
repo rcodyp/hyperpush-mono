@@ -23,7 +23,7 @@ async fn main() {
         .route("/text", get(text_handler))
         .route("/json", get(json_handler));
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3002));
+    let addr: SocketAddr = "[::]:3002".parse().unwrap();
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }

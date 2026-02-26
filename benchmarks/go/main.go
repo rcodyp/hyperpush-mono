@@ -21,5 +21,5 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/text", textHandler)
 	mux.HandleFunc("/json", jsonHandler)
-	http.ListenAndServe(":3001", mux)
+	http.ListenAndServe("[::]:3001", mux)
 }

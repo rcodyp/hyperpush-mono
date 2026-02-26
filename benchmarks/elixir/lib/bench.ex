@@ -27,7 +27,7 @@ defmodule Bench.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Plug.Cowboy, scheme: :http, plug: Bench.Router, options: [port: 3003]}
+      {Plug.Cowboy, scheme: :http, plug: Bench.Router, options: [port: 3003, ip: {0, 0, 0, 0, 0, 0, 0, 0}]}
     ]
 
     opts = [strategy: :one_for_one, name: Bench.Supervisor]

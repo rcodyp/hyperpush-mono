@@ -442,6 +442,7 @@ extern "C" fn connection_handler_entry(args: *const u8) {
 
     if let Err(panic_info) = result {
         eprintln!("[mesh-rt] HTTP handler panicked: {:?}", panic_info);
+        let _ = write_response(&mut stream, 500, b"Internal Server Error", None);
     }
 }
 
@@ -462,7 +463,7 @@ pub extern "C" fn mesh_http_serve(router: *mut u8, port: i64) {
     // Ensure the actor scheduler is initialized (idempotent).
     crate::actor::mesh_rt_init_actor(0);
 
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("[::]:{}",  port);
     let listener = match std::net::TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
@@ -538,7 +539,7 @@ pub extern "C" fn mesh_http_serve_tls(
         }
     };
 
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("[::]:{}",  port);
     let listener = match std::net::TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
