@@ -15,10 +15,10 @@ Requirements for v13.0. Each maps to roadmap phases.
 
 ### ALIAS — Type aliases
 
-- [ ] **ALIAS-01**: User can declare `type Alias = ExistingType` in any module
-- [ ] **ALIAS-02**: User can use a type alias anywhere the aliased type is valid (function signatures, struct field types, let bindings)
+- [x] **ALIAS-01**: User can declare `type Alias = ExistingType` in any module
+- [x] **ALIAS-02**: User can use a type alias anywhere the aliased type is valid (function signatures, struct field types, let bindings)
 - [ ] **ALIAS-03**: User can export type aliases with `pub type Alias = ExistingType` for cross-module use
-- [ ] **ALIAS-04**: Compiler emits an error when a type alias references an undefined type
+- [x] **ALIAS-04**: Compiler emits an error when a type alias references an undefined type
 
 ### TRYFROM — TryFrom/TryInto traits
 
@@ -73,10 +73,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | PIPE-01 | Phase 126 | Complete |
 | PIPE-02 | Phase 126 | Complete |
-| ALIAS-01 | Phase 127 | Pending |
-| ALIAS-02 | Phase 127 | Pending |
+| ALIAS-01 | Phase 127 | Complete |
+| ALIAS-02 | Phase 127 | Complete |
 | ALIAS-03 | Phase 127 | Pending |
-| ALIAS-04 | Phase 127 | Pending |
+| ALIAS-04 | Phase 127 | Complete |
 | TRYFROM-01 | Phase 128 | Pending |
 | TRYFROM-02 | Phase 128 | Pending |
 | TRYFROM-03 | Phase 128 | Pending |

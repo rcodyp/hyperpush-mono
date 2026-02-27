@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Language Completeness
 status: unknown
-last_updated: "2026-02-27T19:28:31.114Z"
+last_updated: "2026-02-27T20:13:07.232Z"
 progress:
-  total_phases: 123
+  total_phases: 124
   completed_phases: 123
-  total_plans: 321
-  completed_plans: 321
+  total_plans: 323
+  completed_plans: 322
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-27)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v13.0 Language Completeness — Phase 126 complete, Phase 127 next
+**Current focus:** v13.0 Language Completeness — Phase 127 Plan 01 complete, Plan 02 next
 
 ## Current Position
 
-Phase: 126 of 131 (Multi-line Pipe Continuation) — COMPLETE
-Plan: 02 complete — Phase 127 next
+Phase: 127 of 131 (Type Aliases) — In Progress
+Plan: 01 complete — Plan 02 next
 Status: In Progress
-Last activity: 2026-02-27 — 126-02 complete: E2E tests for multi-line pipe (24 pipe tests passing)
+Last activity: 2026-02-27 — 127-01 complete: pub type parsing fix, ALIAS-04 undefined type validation, E2E test
 
-Progress: [██░░░░░░░░] 18% (2/11 plans)
+Progress: [███░░░░░░░] 27% (3/11 plans)
 
 ## Performance Metrics
 
@@ -41,7 +41,7 @@ Progress: [██░░░░░░░░] 18% (2/11 plans)
 | Phase | Plans | Status |
 |-------|-------|--------|
 | 126. Multi-line Pipe | 2 | Complete (2/2) |
-| 127. Type Aliases | 2 | Not started |
+| 127. Type Aliases | 2 | In Progress (1/2) |
 | 128. TryFrom/TryInto | 2 | Not started |
 | 129. Map.collect + Quality | 2 | Not started |
 | 130. Mesher Dogfooding | 1 | Not started |
@@ -53,6 +53,7 @@ Progress: [██░░░░░░░░] 18% (2/11 plans)
 |-------|------|----------|-------|-------|
 | 126 | P01 | 4m 7s | 2 | 8 |
 | 126 | P02 | 3m | 2 | 3 |
+| 127 | P01 | 18m | 2 | 9 |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ Recent decisions affecting current work:
 - [v13.0 Roadmap]: Phase 131 (Docs) after dogfooding — examples sourced from verified Mesher patterns
 - [Phase 126]: Made is_newline_insignificant pub(crate) rather than adding a new method — minimal change
 - [Phase 126]: Named regression test e2e_pipe_126_regression (not e2e_pipe_regression_single_line) because e2e_pipe already exists
+- [Phase 127-01]: ALIAS-04 validation skips generic aliases (type Pair<A,B>=...) since type vars aren't in registry
+- [Phase 127-01]: target_type_name() returns None for complex types — only validates simple single-IDENT alias targets to avoid false positives
 
 ### Pending Todos
 
@@ -80,5 +83,5 @@ None. v12.0 fully shipped. v13.0 roadmap created with 100% requirement coverage 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 126-02-PLAN.md — E2E tests for multi-line pipe continuation
+Stopped at: Completed 127-01-PLAN.md — pub type parsing fix, ALIAS-04 validation, E2E test
 Resume file: None
