@@ -186,22 +186,26 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 - ✓ Developer seed migration: default org/project/API key created by `meshc migrate up` — v12.0
 - ✓ Public documentation updated to v12.0 (README, landing page, cheatsheet, guides) — v12.0
 
-## Next Milestone
+## Current Milestone: v13.0 Language Completeness
 
-No next milestone defined yet. Use `/gsd:new-milestone` to plan the next version.
+**Goal:** Round out the language with multi-line pipes, type aliases, TryFrom/TryInto, Map.collect string keys, and fix pre-existing compiler/inference tech debt.
 
-Potential directions:
+**Target features:**
 - Multi-line pipe continuation (parser support for `|>` at start of next line)
-- Tree-sitter grammar for better editor integration
-- Homebrew packaging for easier installation
-- Inlay hints in LSP
-- TryFrom/TryInto traits (fallible conversion)
-- Type aliases
-- Semantic tokens for LSP
+- Type aliases (`type Url = String`, `type UserId = Int`)
+- TryFrom/TryInto traits (fallible conversions returning `Result<T,E>`)
+- Map.collect string keys (fix deferred string-keyed map collection)
+- Fix 3 pre-existing compiler warnings
+- Middleware type inference (eliminate mandatory `:: Request` annotations)
 
 ### Active
 
-(None — v12.0 complete. Start next milestone with `/gsd:new-milestone`)
+- [ ] Multi-line pipe continuation — parser support for `|>` at line start
+- [ ] Type aliases — `type Name = ExistingType` declaration and resolution
+- [ ] TryFrom/TryInto traits — fallible `Result<T,E>` conversions
+- [ ] Map.collect string keys — string-keyed map collection from iterators
+- [ ] Fix 3 compiler warnings — `cargo fix` eligible warnings removed
+- [ ] Middleware type inference — implicit `Request` type in middleware handlers
 
 ### Out of Scope
 
@@ -424,4 +428,4 @@ Tech debt (minor, pre-existing):
 | projects.slug ON CONFLICT requires WHERE slug IS NOT NULL predicate | Partial index requires predicate match to avoid PostgreSQL runtime error | ✓ Good -- v12.0, correct partial index semantics |
 
 ---
-*Last updated: 2026-02-27 after v12.0 milestone*
+*Last updated: 2026-02-27 after v13.0 milestone start*
