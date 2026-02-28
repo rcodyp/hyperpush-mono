@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-27)
 
 ## Current Position
 
-Phase: 131 of 131 (Documentation) — Complete
-Plan: 02 complete — Phase 131 done, v13.0 complete
-Status: Complete
-Last activity: 2026-02-28 — 131-02 complete: DOCS-02 Type Aliases section, DOCS-03 TryFrom/TryInto section added to type-system guide
+Phase: 132 of 132 (Improve Language JSON Handling) — In Progress
+Plan: 01 complete — Wave 1 done; proceeding to Wave 2 (codegen)
+Status: In Progress
+Last activity: 2026-02-27 — 132-01 complete: json keyword, JsonExpr AST, parser, Ty::json() newtype, Json→String unify coercion
 
-Progress: [█████████░] 100% (11/11 plans)
+Progress: [░░░░░░░░░░] 33% (1/3 plans)
 
 ## Performance Metrics
 
