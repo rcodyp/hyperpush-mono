@@ -22,7 +22,11 @@ pub mod client;
 pub mod router;
 pub mod server;
 
-pub use client::{mesh_http_get, mesh_http_post};
+pub use client::{
+    mesh_http_get, mesh_http_post,
+    mesh_http_build, mesh_http_header, mesh_http_body, mesh_http_timeout,
+    mesh_http_query, mesh_http_json, mesh_http_send,
+};
 pub use router::{
     mesh_http_route, mesh_http_route_delete, mesh_http_route_get, mesh_http_route_post,
     mesh_http_route_put, mesh_http_router, mesh_http_use_middleware,

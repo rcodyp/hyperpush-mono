@@ -15,7 +15,7 @@ corosensei = "0.3"
 parking_lot = "0.12"
 rustc-hash = { workspace = true }
 serde_json = "1"
-ureq = "2"
+ureq = { version = "3", features = ["gzip"] }
 libsqlite3-sys = { version = "0.36", features = ["bundled"] }
 # Phase 54: PostgreSQL wire protocol
 sha2 = "0.10"
@@ -33,8 +33,7 @@ regex = "1"
 # on macOS in static library builds. utc_now() uses std::time::SystemTime instead.
 chrono = { version = "0.4", default-features = false, features = ["std", "alloc"] }
 # Phase 55: TLS for PostgreSQL connections
-# All three crates are already compiled as transitive deps of ureq 2.12.
-# Adding them as direct deps costs zero additional compile time.
+# Direct deps for TLS (ureq 3 uses rustls internally as well).
 rustls = { version = "0.23", default-features = false, features = ["ring", "tls12", "logging", "std"] }
 webpki-roots = "0.26"
 rustls-pki-types = "1"
