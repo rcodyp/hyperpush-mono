@@ -2949,6 +2949,16 @@ fn e2e_collect_map_string_keys() {
     assert_eq!(output, "1\n2\n3\n");
 }
 
+/// Phase 129 MAPCOL-01: Map.collect with string keys via Iter.zip pattern.
+/// Zipping string key list with int value list and collecting should produce a
+/// Map<String, Int> where Map.get with a string key returns the correct value.
+#[test]
+fn e2e_collect_map_string_keys_zip() {
+    let source = read_fixture("collect_map_string_keys_zip.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "1\n2\n3\n");
+}
+
 // ── Phase 87.1: Codegen Bug Fixes ──────────────────────────────────────
 
 /// Phase 87.1: Err(e) variable binding in pattern matching compiles and runs.
