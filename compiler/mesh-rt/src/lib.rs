@@ -37,6 +37,7 @@ pub mod option;
 pub mod panic;
 pub mod crypto;
 pub mod datetime;  // Phase 136
+pub mod test;      // Phase 138
 pub mod regex;
 pub mod string;
 
@@ -164,6 +165,11 @@ pub use json::{
 };
 pub use dist::node::{mesh_node_self, mesh_node_list, mesh_node_start, mesh_node_connect, mesh_register_function, mesh_node_spawn};
 pub use panic::mesh_panic;
+pub use test::{
+    mesh_test_assert, mesh_test_assert_eq, mesh_test_assert_ne,
+    mesh_test_assert_raises, mesh_test_begin, mesh_test_pass,
+    mesh_test_fail_msg, mesh_test_summary, mesh_test_cleanup_actors,
+};
 pub use string::{
     mesh_bool_to_string, mesh_float_to_string, mesh_int_to_string, mesh_print, mesh_println,
     mesh_string_concat, mesh_string_contains, mesh_string_ends_with, mesh_string_eq,
