@@ -910,6 +910,24 @@ impl<'a> Lowerer<'a> {
             MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Int)));
         self.known_functions.insert("mesh_http_send".to_string(),
             MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        // Http streaming + cancel + keep-alive (Phase 137 Plan 02)
+        // mesh_http_stream(req: i64, fn_ptr: ptr, env_ptr: ptr) -> i64 (cancel handle)
+        self.known_functions.insert("mesh_http_stream".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert("mesh_http_stream_bytes".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        // mesh_http_cancel(cancel_handle: i64) -> unit
+        self.known_functions.insert("mesh_http_cancel".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
+        // mesh_http_client() -> i64 (Agent handle)
+        self.known_functions.insert("mesh_http_client".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)));
+        // mesh_http_send_with(client: i64, req: i64) -> ptr
+        self.known_functions.insert("mesh_http_send_with".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
+        // mesh_http_client_close(client: i64) -> unit
+        self.known_functions.insert("mesh_http_client_close".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
         // ── Collection functions (Phase 8 Plan 02) ─────────────────────
         // List
         self.known_functions.insert("mesh_list_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
@@ -10941,6 +10959,13 @@ fn map_builtin_name(name: &str) -> String {
         "http_query"   => "mesh_http_query".to_string(),
         "http_json"    => "mesh_http_json".to_string(),
         "http_send"    => "mesh_http_send".to_string(),
+        // Http streaming + cancel + keep-alive (Phase 137 Plan 02)
+        "http_stream"       => "mesh_http_stream".to_string(),
+        "http_stream_bytes" => "mesh_http_stream_bytes".to_string(),
+        "http_cancel"       => "mesh_http_cancel".to_string(),
+        "http_client"       => "mesh_http_client".to_string(),
+        "http_send_with"    => "mesh_http_send_with".to_string(),
+        "http_client_close" => "mesh_http_client_close".to_string(),
         // Bare name for compile (from Regex import compile)
         "compile" => "mesh_regex_compile".to_string(),
         // Names that have already been resolved via from-import and lowered

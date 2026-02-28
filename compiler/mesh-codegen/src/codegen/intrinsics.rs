@@ -406,6 +406,31 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     let send_ty = ptr_type.fn_type(&[i64_type.into()], false);
     module.add_function("mesh_http_send", send_ty, Some(inkwell::module::Linkage::External));
 
+    // ── Http streaming + cancel + keep-alive (Phase 137 Plan 02) ──────────
+
+    // mesh_http_stream(req: i64, fn_ptr: ptr, env_ptr: ptr) -> i64 (cancel handle)
+    let stream_ty = i64_type.fn_type(&[i64_type.into(), ptr_type.into(), ptr_type.into()], false);
+    module.add_function("mesh_http_stream", stream_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_http_stream_bytes(req: i64, fn_ptr: ptr, env_ptr: ptr) -> i64
+    module.add_function("mesh_http_stream_bytes", stream_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_http_cancel(cancel_handle: i64) -> void
+    let cancel_ty = void_type.fn_type(&[i64_type.into()], false);
+    module.add_function("mesh_http_cancel", cancel_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_http_client() -> i64 (keep-alive Agent handle)
+    let client_ty = i64_type.fn_type(&[], false);
+    module.add_function("mesh_http_client", client_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_http_send_with(client: i64, req: i64) -> ptr (Result<HttpResponse, String>)
+    let send_with_ty = ptr_type.fn_type(&[i64_type.into(), i64_type.into()], false);
+    module.add_function("mesh_http_send_with", send_with_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_http_client_close(client: i64) -> void
+    let close_ty = void_type.fn_type(&[i64_type.into()], false);
+    module.add_function("mesh_http_client_close", close_ty, Some(inkwell::module::Linkage::External));
+
     // ── Standard library: Collection functions (Phase 8 Plan 02) ──────────
 
     // List functions

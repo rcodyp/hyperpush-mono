@@ -419,6 +419,38 @@ pub fn register_builtins(
     )));
     // HttpResponse type name available as a type annotation
     env.insert("HttpResponse".into(), Scheme::mono(http_resp_t.clone()));
+    // Http.stream(req, fn(String) -> String) -> Int  (Int = cancel handle u64)
+    // Callback receives chunk as String, returns atom :continue or :stop (lowered to String)
+    let stream_cb_t = Ty::fun(vec![Ty::string()], Ty::string());
+    env.insert("http_stream".into(), Scheme::mono(Ty::fun(
+        vec![http_req_t.clone(), stream_cb_t.clone()],
+        Ty::int()  // cancel handle
+    )));
+    env.insert("http_stream_bytes".into(), Scheme::mono(Ty::fun(
+        vec![http_req_t.clone(), stream_cb_t],
+        Ty::int()  // cancel handle
+    )));
+    // Http.cancel(cancel_handle) -> ()
+    env.insert("http_cancel".into(), Scheme::mono(Ty::fun(
+        vec![Ty::int()],
+        Ty::Tuple(vec![])
+    )));
+    // Http.client() -> Int (keep-alive Agent handle)
+    let http_client_handle_t = Ty::int();
+    env.insert("http_client".into(), Scheme::mono(Ty::fun(
+        vec![],
+        http_client_handle_t.clone()
+    )));
+    // Http.send_with(client, req) -> Result<HttpResponse, String>
+    env.insert("http_send_with".into(), Scheme::mono(Ty::fun(
+        vec![http_client_handle_t.clone(), http_req_t.clone()],
+        Ty::result(http_resp_t.clone(), Ty::string())
+    )));
+    // Http.client_close(client) -> ()
+    env.insert("http_client_close".into(), Scheme::mono(Ty::fun(
+        vec![http_client_handle_t],
+        Ty::Tuple(vec![])
+    )));
 
     // ── Standard library: Collection types (Phase 8) ─────────────────
 

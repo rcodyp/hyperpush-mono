@@ -5659,3 +5659,35 @@ fn e2e_http_builder_compiles() {
     let output = compile_and_run(&source);
     assert_eq!(output, "built\n");
 }
+
+/// Phase 137: Http.stream compile check (HTTP-06).
+/// Verifies Http.stream type-checks and compiles with a closure callback.
+/// Http.stream returns an Int (cancel handle). Compile-only — runtime may fail
+/// if network is unavailable, so we only assert compilation succeeds.
+#[test]
+fn e2e_http_stream_compiles() {
+    let source = read_fixture("http_stream_compile.mpl");
+    // Compile success is the goal — runtime may fail if network unavailable.
+    let _ = compile_and_run(&source);
+}
+
+/// Phase 137: Http.client + Http.client_close compile and run (HTTP-07).
+/// Creates a keep-alive client, prints "client_created", closes client.
+/// No network request is made — only the Agent allocation is tested.
+#[test]
+fn e2e_http_client_keepalive_compiles() {
+    let source = read_fixture("http_client_keepalive.mpl");
+    let output = compile_and_run(&source);
+    assert_eq!(output, "client_created\n");
+}
+
+/// Phase 137: Http.cancel compile check.
+/// Verifies Http.stream returns a cancel handle and Http.cancel accepts it.
+/// Compile success + handle type-check is the goal. If network is available,
+/// output will include "cancel_called".
+#[test]
+fn e2e_http_cancel_compiles() {
+    let source = read_fixture("http_cancel_compile.mpl");
+    // Network may be unavailable; compile success + handle type-check is the goal.
+    let _ = compile_and_run(&source);
+}

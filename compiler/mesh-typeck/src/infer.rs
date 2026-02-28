@@ -469,6 +469,34 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         Scheme::mono(Ty::fun(vec![http_req_t.clone(), Ty::string()], http_req_t.clone())));
     http_client_mod.insert("send".to_string(),
         Scheme::mono(Ty::fun(vec![http_req_t.clone()], Ty::result(http_resp_t.clone(), Ty::string()))));
+    // Http.stream(req, fn(String) -> String) -> Int (cancel handle)
+    // Callback receives chunk as String, returns :continue or :stop (lowered to String)
+    let stream_cb_t = Ty::fun(vec![Ty::string()], Ty::string());
+    http_client_mod.insert("stream".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), stream_cb_t.clone()],
+            Ty::int()  // cancel handle
+        )));
+    http_client_mod.insert("stream_bytes".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), stream_cb_t],
+            Ty::int()  // cancel handle
+        )));
+    // Http.cancel(cancel_handle) -> ()
+    http_client_mod.insert("cancel".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))));
+    // Http.client() -> Int (keep-alive Agent handle)
+    http_client_mod.insert("client".to_string(),
+        Scheme::mono(Ty::fun(vec![], Ty::int())));
+    // Http.send_with(client, req) -> Result<HttpResponse, String>
+    http_client_mod.insert("send_with".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::int(), http_req_t.clone()],
+            Ty::result(http_resp_t.clone(), Ty::string())
+        )));
+    // Http.client_close(client) -> ()
+    http_client_mod.insert("client_close".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))));
 
     modules.insert("Http".to_string(), http_client_mod);
 
