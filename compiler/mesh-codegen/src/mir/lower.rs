@@ -438,14 +438,25 @@ impl<'a> Lowerer<'a> {
     /// map keys. Used for Map.collect dispatch: when the source of the pipe
     /// chain is a List<(String, V)> or Map<String, V>, the collected map needs
     /// string key_type (1) rather than integer key_type (0).
+    ///
+    /// Also handles the Iter.zip pattern: `string_keys |> Iter.from() |> Iter.zip(values)`
+    /// where the key source (LHS before the zip step) is a List<String> or String iterator.
     fn pipe_chain_has_string_keys(&self, pipe: &PipeExpr) -> bool {
-        // Walk backwards through the pipe chain until we find a non-pipe LHS.
+        // Walk backwards through the pipe chain.
+        // At each inner pipe step, check whether the RHS is an Iter.zip call --
+        // if so, the LHS of that pipe is the key source; check it for string type.
         let mut current_lhs = pipe.lhs();
         loop {
             match current_lhs {
                 Some(Expr::PipeExpr(inner_pipe)) => {
-                    // Check the inner pipe's LHS type -- if it's not a pipe,
-                    // check its typeck type for string keys.
+                    // Check if this inner pipe step zips with string keys.
+                    // Pattern: <key_iter> |> Iter.zip(<val_iter>)
+                    // If the RHS is a call to Iter.zip, check the LHS (key source).
+                    if Self::rhs_is_iter_zip(&inner_pipe) {
+                        if self.pipe_source_has_string_list(inner_pipe.lhs()) {
+                            return true;
+                        }
+                    }
                     current_lhs = inner_pipe.lhs();
                 }
                 Some(ref expr) => {
@@ -457,6 +468,55 @@ impl<'a> Lowerer<'a> {
                 }
                 None => return false,
             }
+        }
+    }
+
+    /// Check if the RHS of a pipe expression is a call to `Iter.zip`.
+    fn rhs_is_iter_zip(pipe: &PipeExpr) -> bool {
+        match pipe.rhs() {
+            Some(Expr::CallExpr(call)) => {
+                if let Some(callee) = call.callee() {
+                    if let Expr::FieldAccess(fa) = callee {
+                        let module = fa.base().and_then(|b| {
+                            if let Expr::NameRef(nr) = b {
+                                nr.text()
+                            } else {
+                                None
+                            }
+                        });
+                        let field = fa.field().map(|t| t.text().to_string());
+                        return module.as_deref() == Some("Iter")
+                            && field.as_deref() == Some("zip");
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    /// Walk a chain of pipes or a bare expression to see if its ultimate
+    /// source is a List<String> (string elements used as zip keys).
+    fn pipe_source_has_string_list(&self, expr: Option<Expr>) -> bool {
+        match expr {
+            Some(Expr::PipeExpr(inner)) => {
+                // Keep walking to the root of any nested pipes.
+                self.pipe_source_has_string_list(inner.lhs())
+            }
+            Some(ref e) => {
+                if let Some(ty) = self.types.get(&e.syntax().text_range()) {
+                    // List<String>: the elements are string keys.
+                    if let Ty::App(con, args) = ty {
+                        if let Ty::Con(ref tc) = **con {
+                            if tc.name == "List" && !args.is_empty() {
+                                return args[0] == Ty::string();
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            None => false,
         }
     }
 
@@ -6479,14 +6539,27 @@ impl<'a> Lowerer<'a> {
             None => MirExpr::Unit,
         };
 
-        // Phase 96: Map.collect string key detection.
-        // If the pipe result is mesh_map_collect and the pipe chain's source
-        // has string keys (e.g., List<(String, V)> or Map<String, V>), swap
-        // to the string-key variant.
+        // Phase 96 / 129: Map.collect string key detection.
+        // If the pipe result is mesh_map_collect, use the string-key variant when:
+        //   1. (Primary) The resolved result type of this pipe expression is Map<String, V>.
+        //      This handles Iter.zip(string_keys, values) chains where K is unified to
+        //      String by downstream Map.get("string_key") calls in the type-checker.
+        //   2. (Fallback) Walk the pipe chain source types via pipe_chain_has_string_keys.
+        //      This handles the Map.to_list roundtrip pattern (List<(String,V)> source).
         if let MirExpr::Call { ref mut func, .. } = result {
             if let MirExpr::Var(ref name, _) = **func {
                 if name == "mesh_map_collect" {
-                    if self.pipe_chain_has_string_keys(pipe) {
+                    // Primary check: resolved result type of this pipe expression.
+                    // If Map<String, V>, use string-key variant.
+                    // (Handles Iter.zip chains where K is unified by downstream Map.get calls.)
+                    let result_is_string_keyed = self
+                        .types
+                        .get(&pipe.syntax().text_range())
+                        .map(|ty| Self::ty_has_string_map_keys(ty))
+                        .unwrap_or(false);
+                    // Fallback: walk pipe chain source (handles Map.to_list roundtrip
+                    // and Iter.zip-with-string-keys patterns).
+                    if result_is_string_keyed || self.pipe_chain_has_string_keys(pipe) {
                         let fn_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
                         **func = MirExpr::Var("mesh_map_collect_string_keys".to_string(), fn_ty);
                     }
