@@ -42,9 +42,9 @@ Requirements for v13.0. Each maps to roadmap phases.
 
 ### DOCS — Documentation site
 
-- [ ] **DOCS-01**: Documentation site updated with multi-line pipe syntax (examples, cheatsheet)
-- [ ] **DOCS-02**: Documentation site updated with type alias declaration and usage
-- [ ] **DOCS-03**: Documentation site updated with TryFrom/TryInto trait documentation
+- [x] **DOCS-01**: Documentation site updated with multi-line pipe syntax (examples, cheatsheet)
+- [x] **DOCS-02**: Documentation site updated with type alias declaration and usage
+- [x] **DOCS-03**: Documentation site updated with TryFrom/TryInto trait documentation
 
 ## Future Requirements
 
@@ -85,9 +85,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-02 | Phase 129 | Pending |
 | DOGFOOD-01 | Phase 130 | Complete |
 | DOGFOOD-02 | Phase 130 | Complete |
-| DOCS-01 | Phase 131 | Pending |
-| DOCS-02 | Phase 131 | Pending |
-| DOCS-03 | Phase 131 | Pending |
+| DOCS-01 | Phase 131 | Complete |
+| DOCS-02 | Phase 131 | Complete |
+| DOCS-03 | Phase 131 | Complete |
 
 **Coverage:**
 - v13.0 requirements: 17 total
