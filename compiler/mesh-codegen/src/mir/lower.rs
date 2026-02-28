@@ -8,10 +8,10 @@ use std::collections::{HashMap, HashSet};
 use rowan::TextRange;
 use rustc_hash::FxHashMap;
 use mesh_parser::ast::expr::{
-    BinaryExpr, CallExpr, CaseExpr, ClosureExpr, Expr, FieldAccess, ForInExpr, IfExpr, LinkExpr,
-    ListLiteral, Literal, MapLiteral, MatchArm, NameRef, PipeExpr, ReceiveExpr, ReturnExpr,
-    SendExpr, SlotPipeExpr, SpawnExpr, StringExpr, StructLiteral, StructUpdate, TryExpr,
-    TupleExpr, UnaryExpr, WhileExpr,
+    BinaryExpr, CallExpr, CaseExpr, ClosureExpr, Expr, FieldAccess, ForInExpr, IfExpr, JsonExpr,
+    LinkExpr, ListLiteral, Literal, MapLiteral, MatchArm, NameRef, PipeExpr, ReceiveExpr,
+    ReturnExpr, SendExpr, SlotPipeExpr, SpawnExpr, StringExpr, StructLiteral, StructUpdate,
+    TryExpr, TupleExpr, UnaryExpr, WhileExpr,
 };
 use mesh_parser::ast::item::{
     ActorDef, Block, FnDef, ImplDef, InterfaceMethod, Item, LetBinding, RelationshipDecl,
@@ -31,6 +31,16 @@ use super::{
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/// Return true if `ty` is the `Json` newtype introduced in Phase 132.
+///
+/// Json is represented as `Ty::Con(TyCon { name: "Json", .. })` and resolves
+/// to `MirType::Ptr` at the LLVM level (see types.rs resolve_con).
+/// Codegen uses this predicate to detect Json-typed values and pass them
+/// through as raw opaque pointers instead of re-encoding them as strings.
+fn ty_is_json(ty: &Ty) -> bool {
+    matches!(ty, Ty::Con(con) if con.name == "Json")
+}
 
 /// Extract the element type T from a `Ty::App(Con("List"), [T])`.
 /// Returns `None` if the type is not a List.
@@ -4176,6 +4186,91 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    // ── json { } literal lowering (Phase 132-02) ─────────────────────
+
+    /// Lower a `json { key: val, ... }` expression to a MirType::String via
+    /// `mesh_json_encode(mesh_json_object_put(...(mesh_json_object_new())))`.
+    ///
+    /// This is the public entry point; it wraps the raw object pointer with
+    /// `mesh_json_encode` to produce a MeshString.
+    fn lower_json_expr(&mut self, json_expr: &JsonExpr) -> MirExpr {
+        let inner = self.lower_json_expr_inner(json_expr);
+        let enc_fn_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String));
+        MirExpr::Call {
+            func: Box::new(MirExpr::Var("mesh_json_encode".to_string(), enc_fn_ty)),
+            args: vec![inner],
+            ty: MirType::String,
+        }
+    }
+
+    /// Lower a `json { }` to a raw `*mut MeshJson` pointer (MirType::Ptr) WITHOUT
+    /// calling `mesh_json_encode`.  Used internally so that nested `json { }` values
+    /// can be embedded into a parent object without double-encoding.
+    fn lower_json_expr_inner(&mut self, json_expr: &JsonExpr) -> MirExpr {
+        let new_fn_ty = MirType::FnPtr(vec![], Box::new(MirType::Ptr));
+        let mut result = MirExpr::Call {
+            func: Box::new(MirExpr::Var("mesh_json_object_new".to_string(), new_fn_ty)),
+            args: vec![],
+            ty: MirType::Ptr,
+        };
+
+        let put_fn_ty = MirType::FnPtr(
+            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+            Box::new(MirType::Ptr),
+        );
+
+        for field in json_expr.fields() {
+            let key_str = field.key_text().unwrap_or_default();
+            let key_mir = MirExpr::StringLit(key_str, MirType::String);
+
+            let val_expr = match field.value() {
+                Some(e) => e,
+                None => continue,
+            };
+
+            // Look up the typeck-inferred type for this field value.
+            let val_ty = self
+                .types
+                .get(&val_expr.syntax().text_range())
+                .cloned()
+                .unwrap_or_else(Ty::string);
+
+            // Dispatch: choose how to convert the field value to a JSON pointer.
+            let json_val = if let Expr::JsonExpr(inner_json) = &val_expr {
+                // Nested json { } literal: recurse without encoding so that the
+                // raw object pointer is embedded directly (no double-encoding).
+                self.lower_json_expr_inner(inner_json)
+            } else if ty_is_json(&val_ty) {
+                // Variable of type Json — its MIR type is Ptr (see types.rs resolve_con).
+                // Pass the opaque pointer through without wrapping in mesh_json_from_string.
+                self.lower_expr(&val_expr)
+            } else {
+                // All other types: lower to the raw Mesh value then convert to a JSON pointer.
+                let val_lowered = self.lower_expr(&val_expr);
+                let mir_ty = resolve_type(&val_ty, self.registry, false);
+                match &mir_ty {
+                    MirType::Ptr => {
+                        // Collection types (List, Map, Option<T>, etc.): delegate to
+                        // emit_collection_to_json which dispatches on the typeck Ty.
+                        self.emit_collection_to_json(val_lowered, &val_ty, "json_literal")
+                    }
+                    _ => self.emit_to_json_for_type(val_lowered, &mir_ty, "json_literal"),
+                }
+            };
+
+            result = MirExpr::Call {
+                func: Box::new(MirExpr::Var(
+                    "mesh_json_object_put".to_string(),
+                    put_fn_ty.clone(),
+                )),
+                args: vec![result, key_mir, json_val],
+                ty: MirType::Ptr,
+            };
+        }
+
+        result
+    }
+
     /// Resolve the runtime callback function name for decoding a JSON element to a typed value.
     fn resolve_from_json_callback(&self, elem_ty: &Ty) -> String {
         match elem_ty {
@@ -5696,10 +5791,8 @@ impl<'a> Lowerer<'a> {
             Expr::StructUpdate(update) => self.lower_struct_update(update),
             // Slot pipe expression -- |N> desugaring (Phase 116, Plan 02)
             Expr::SlotPipeExpr(pipe) => self.lower_slot_pipe_expr(pipe),
-            // Json object literal -- codegen implemented in Phase 132, Plan 02
-            Expr::JsonExpr(_) => {
-                todo!("json literal codegen not yet implemented (Phase 132-02)")
-            }
+            // Json object literal -- Phase 132-02 codegen
+            Expr::JsonExpr(json_expr) => self.lower_json_expr(json_expr),
         }
     }
 
