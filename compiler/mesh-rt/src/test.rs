@@ -19,6 +19,13 @@
 //! Failures print inline as each test fails, and are also accumulated in
 //! `FAIL_MESSAGES`. `mesh_test_summary` reprints all failures in a
 //! `Failures:` section before the final count line.
+//!
+//! ## assert_raises mechanism
+//!
+//! `mesh_test_assert_raises` uses a flag-based mechanism to detect whether
+//! a closure "raised" (i.e., triggered a failing assertion). This avoids
+//! panicking through `extern "C"` closures, which aborts in Rust 1.73+.
+//! See the `IN_ASSERT_RAISES` / `ASSERT_RAISES_TRIGGERED` thread-locals.
 
 use std::cell::{Cell, RefCell};
 use std::io::Write as _;
@@ -44,6 +51,20 @@ thread_local! {
     static FAIL_MESSAGES: RefCell<Vec<String>> = RefCell::new(Vec::new());
     /// Pids of mock actors spawned during the run; drained by cleanup_actors.
     static MOCK_ACTOR_PIDS: RefCell<Vec<i64>> = RefCell::new(Vec::new());
+
+    // ── assert_raises flag-based mechanism ───────────────────────────────────
+    //
+    // When mesh_test_assert_raises calls a closure, it sets IN_ASSERT_RAISES.
+    // mesh_test_assert checks this flag:
+    //   - If IN_ASSERT_RAISES is true: set ASSERT_RAISES_TRIGGERED = true and
+    //     return normally (do NOT record a failure or panic).
+    //   - If IN_ASSERT_RAISES is false: record failure normally and return.
+    //
+    // This avoids panicking through extern "C" closures (which would abort in
+    // Rust 1.73+). Test bodies do not early-exit on failure; all assertions
+    // in a body run to completion.
+    static IN_ASSERT_RAISES: Cell<bool> = Cell::new(false);
+    static ASSERT_RAISES_TRIGGERED: Cell<bool> = Cell::new(false);
 }
 
 // ── Helper: read a MeshString as a &str ──────────────────────────────────────
@@ -126,8 +147,16 @@ pub unsafe extern "C" fn mesh_test_fail_msg(msg: *const MeshString) {
 
 /// Assert that `cond` is non-zero.
 ///
-/// On failure, records the failure message and panics so the test harness
-/// can catch the unwind and continue to the next test.
+/// On failure, records the failure message (unless inside `assert_raises`).
+///
+/// Note: this function does NOT panic on failure. Panicking through
+/// `extern "C"` Mesh closures is undefined behaviour (hard abort in Rust
+/// 1.73+). Instead, failures are recorded via the fail-count / FAIL_MESSAGES
+/// state; test bodies continue running after a failed assert.
+///
+/// When called from inside `mesh_test_assert_raises`, the failure is
+/// silently intercepted: `ASSERT_RAISES_TRIGGERED` is set and no failure
+/// is recorded, allowing `assert_raises` to verify that the closure "raised".
 #[no_mangle]
 pub unsafe extern "C" fn mesh_test_assert(
     cond: i8,
@@ -137,17 +166,22 @@ pub unsafe extern "C" fn mesh_test_assert(
     _line: i64,
 ) {
     if cond == 0 {
+        if IN_ASSERT_RAISES.with(|f| f.get()) {
+            // We are inside an assert_raises closure. Signal that a raise
+            // occurred without recording it as a test failure.
+            ASSERT_RAISES_TRIGGERED.with(|f| f.set(true));
+            return;
+        }
         let src = mesh_str(expr_src);
         let msg = format!("assert failed: {src}");
         fail_with(&msg);
-        // Panic so the harness (catch_unwind in the test runner) can skip
-        // the remainder of this test body.
-        panic!("mesh_test_assert: {}", msg);
     }
 }
 
 /// Assert that `lhs` and `rhs` (already converted to strings by the lowerer)
 /// are equal. Fails with an `expected`/`actual` diagnostic.
+///
+/// Does NOT panic on failure (see `mesh_test_assert` for rationale).
 #[no_mangle]
 pub unsafe extern "C" fn mesh_test_assert_eq(
     lhs: *const MeshString,
@@ -160,14 +194,19 @@ pub unsafe extern "C" fn mesh_test_assert_eq(
     let l = mesh_str(lhs);
     let r = mesh_str(rhs);
     if l != r {
+        if IN_ASSERT_RAISES.with(|f| f.get()) {
+            ASSERT_RAISES_TRIGGERED.with(|f| f.set(true));
+            return;
+        }
         let src = mesh_str(expr_src);
         let msg = format!("assert_eq failed: {src}\n  left:  {l}\n  right: {r}");
         fail_with(&msg);
-        panic!("mesh_test_assert_eq: {}", msg);
     }
 }
 
 /// Assert that `lhs` and `rhs` are NOT equal. Fails when they are equal.
+///
+/// Does NOT panic on failure (see `mesh_test_assert` for rationale).
 #[no_mangle]
 pub unsafe extern "C" fn mesh_test_assert_ne(
     lhs: *const MeshString,
@@ -180,16 +219,30 @@ pub unsafe extern "C" fn mesh_test_assert_ne(
     let l = mesh_str(lhs);
     let r = mesh_str(rhs);
     if l == r {
+        if IN_ASSERT_RAISES.with(|f| f.get()) {
+            ASSERT_RAISES_TRIGGERED.with(|f| f.set(true));
+            return;
+        }
         let src = mesh_str(expr_src);
         let msg = format!("assert_ne failed: {src}\n  both sides equal: {l}");
         fail_with(&msg);
-        panic!("mesh_test_assert_ne: {}", msg);
     }
 }
 
-/// Assert that calling the closure `fn_ptr(env_ptr)` raises (panics).
+/// Assert that calling the closure `fn_ptr(env_ptr)` raises (i.e., triggers a
+/// failing assertion inside the closure body).
 ///
-/// Passes when the closure panics; fails when it returns normally.
+/// This uses a flag-based mechanism rather than panic/catch_unwind, because
+/// Mesh closures are compiled with `extern "C"` ABI and panicking through an
+/// `extern "C"` boundary causes an abort in Rust 1.73+.
+///
+/// Mechanism:
+/// 1. Set `IN_ASSERT_RAISES = true` before calling the closure.
+/// 2. `mesh_test_assert` (and eq/ne variants) check this flag: when true they
+///    set `ASSERT_RAISES_TRIGGERED = true` and return without recording failure.
+/// 3. After the closure returns, check `ASSERT_RAISES_TRIGGERED`.
+///    - If triggered → passes (the closure "raised" as expected).
+///    - If not triggered → records a test failure.
 ///
 /// The closure ABI matches the Mesh runtime closure convention:
 /// `extern "C" fn(*const u8) -> i64`.
@@ -201,28 +254,37 @@ pub unsafe extern "C" fn mesh_test_assert_raises(
     _file_len: i64,
     _line: i64,
 ) {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let f: extern "C" fn(*const u8) -> i64 = std::mem::transmute(fn_ptr);
-        f(env_ptr);
-    }));
+    // Save previous state in case of nested assert_raises calls.
+    let prev_in_raises = IN_ASSERT_RAISES.with(|f| f.get());
+    let prev_triggered = ASSERT_RAISES_TRIGGERED.with(|f| f.get());
 
-    match result {
-        Ok(_) => {
-            // The closure returned normally — expected a panic, got none.
-            let msg = "assert_raises failed: expression did not raise";
-            fail_with(msg);
-            panic!("mesh_test_assert_raises: {}", msg);
-        }
-        Err(_) => {
-            // Raised as expected — assertion passes.
-        }
+    IN_ASSERT_RAISES.with(|f| f.set(true));
+    ASSERT_RAISES_TRIGGERED.with(|f| f.set(false));
+
+    let f: extern "C" fn(*const u8) -> i64 = std::mem::transmute(fn_ptr);
+    f(env_ptr);
+
+    let triggered = ASSERT_RAISES_TRIGGERED.with(|f| f.get());
+
+    // Restore previous state.
+    IN_ASSERT_RAISES.with(|f| f.set(prev_in_raises));
+    ASSERT_RAISES_TRIGGERED.with(|f| f.set(prev_triggered));
+
+    if !triggered {
+        // The closure returned normally without triggering any assertion failure.
+        let msg = "assert_raises failed: expression did not raise";
+        fail_with(msg);
     }
+    // If triggered: the closure raised as expected — no failure to record.
 }
 
-/// Print the run summary.
+/// Print the run summary and exit the process with the appropriate code.
 ///
 /// First reprints all accumulated failure messages in a `Failures:` section,
 /// then prints the final `N passed` / `N failed, M passed` count line.
+///
+/// Exits with code `0` when all tests passed, `1` when any tests failed.
+/// This lets the outer `meshc test` runner detect test failures via exit code.
 ///
 /// The harness (`Plan 03`) passes the elapsed time as milliseconds.
 #[no_mangle]
@@ -243,8 +305,10 @@ pub extern "C" fn mesh_test_summary(passed: i64, failed: i64, elapsed_ms: i64) {
         println!(
             "\n{RED}{BOLD}{failed} failed{RESET}, {passed} passed in {elapsed:.2}s"
         );
+        std::process::exit(1);
     } else {
         println!("\n{GREEN}{BOLD}{passed} passed{RESET} in {elapsed:.2}s");
+        std::process::exit(0);
     }
 }
 
@@ -267,4 +331,105 @@ pub extern "C" fn mesh_test_cleanup_actors() {
 #[allow(dead_code)]
 pub fn register_mock_actor_pid(pid: i64) {
     MOCK_ACTOR_PIDS.with(|p| p.borrow_mut().push(pid));
+}
+
+/// Return the current pass count (for use in test harness summary).
+#[no_mangle]
+pub extern "C" fn mesh_test_pass_count() -> i64 {
+    PASS_COUNT.with(|c| c.get())
+}
+
+/// Return the current fail count (for use in test harness summary).
+#[no_mangle]
+pub extern "C" fn mesh_test_fail_count() -> i64 {
+    FAIL_COUNT.with(|c| c.get())
+}
+
+/// Run a test body closure and record the pass/fail outcome.
+///
+/// The test harness calls this for every `test(...)` block. The closure
+/// ABI matches the Mesh runtime closure convention:
+/// `extern "C" fn(*const u8) -> i64`.
+///
+/// Outcome detection uses the fail-count snapshot approach:
+/// - Record `FAIL_COUNT` before calling the closure.
+/// - Call the closure (any assert failures increment `FAIL_COUNT` directly).
+/// - After the closure returns, if `FAIL_COUNT` increased → a test failure
+///   was recorded; otherwise call `mesh_test_pass()`.
+///
+/// This avoids panicking through `extern "C"` closures (which aborts in
+/// Rust 1.73+). The trade-off is that all assertions in a test body run to
+/// completion even after a failure (no early-exit on first assert failure).
+#[no_mangle]
+pub unsafe extern "C" fn mesh_test_run_body(fn_ptr: *const u8, env_ptr: *const u8) {
+    let fail_before = FAIL_COUNT.with(|c| c.get());
+
+    let f: extern "C" fn(*const u8) -> i64 = std::mem::transmute(fn_ptr);
+    f(env_ptr);
+
+    let fail_after = FAIL_COUNT.with(|c| c.get());
+    if fail_after == fail_before {
+        mesh_test_pass();
+    }
+    // If fail_after > fail_before: a failure was already recorded by an assert
+    // helper; mesh_test_fail_msg already incremented FAIL_COUNT. No extra
+    // counting needed here.
+}
+
+/// Spawn a mock actor whose body is the given closure.
+///
+/// The spawned actor runs the closure for every message it receives.
+/// The Pid is tracked in `MOCK_ACTOR_PIDS` for cleanup between tests.
+///
+/// Closure ABI: `extern "C" fn(env_ptr: *const u8) -> i64`.
+///
+/// Requires `mesh_rt_init_actor` to have been called first.
+#[no_mangle]
+pub unsafe extern "C" fn mesh_test_mock_actor(fn_ptr: *const u8, env_ptr: *const u8) -> i64 {
+    // Build a small args block: {fn_ptr, env_ptr} so the spawned actor
+    // has access to the closure. The actor entry function is the standard
+    // closure dispatch shim at mesh_actor_closure_runner (from actor/mod.rs).
+    // Since we don't have a dedicated closure-runner entry point exposed here,
+    // we use mesh_actor_spawn with the fn_ptr directly.
+    //
+    // Pack fn_ptr and env_ptr into a heap-allocated args block.
+    #[repr(C)]
+    struct MockArgs {
+        fn_ptr: *const u8,
+        env_ptr: *const u8,
+    }
+
+    // Leak args so the actor thread can read them.
+    let args = Box::new(MockArgs { fn_ptr, env_ptr });
+    let args_ptr = Box::into_raw(args) as *const u8;
+    let args_size = std::mem::size_of::<MockArgs>() as u64;
+
+    // The actor entry function: reads MockArgs and calls fn_ptr(env_ptr) in a loop.
+    // We use a generic wrapper defined below.
+    extern "C" fn mock_actor_entry(args: *const u8) {
+        unsafe {
+            let mock_args = &*(args as *const MockArgs);
+            let f: extern "C" fn(*const u8) -> i64 = std::mem::transmute(mock_args.fn_ptr);
+            // Run the closure once per message received.
+            // In a real implementation this would loop on receive; for test mocks
+            // we run the closure once and exit.
+            loop {
+                let msg_ptr = crate::actor::mesh_actor_receive(100); // 100ms timeout
+                if msg_ptr.is_null() {
+                    break; // no message in time window — exit actor
+                }
+                f(mock_args.env_ptr);
+            }
+        }
+    }
+
+    let pid = crate::actor::mesh_actor_spawn(
+        mock_actor_entry as *const u8,
+        args_ptr,
+        args_size,
+        1, // Normal priority
+    ) as i64;
+
+    MOCK_ACTOR_PIDS.with(|p| p.borrow_mut().push(pid));
+    pid
 }

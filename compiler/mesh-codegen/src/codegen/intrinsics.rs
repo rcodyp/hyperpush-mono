@@ -480,6 +480,22 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     let test_cleanup_ty = void_type.fn_type(&[], false);
     module.add_function("mesh_test_cleanup_actors", test_cleanup_ty, Some(inkwell::module::Linkage::External));
 
+    // mesh_test_run_body(fn_ptr: ptr, env_ptr: ptr) -> void
+    let test_run_body_ty = void_type.fn_type(&[ptr_type.into(), ptr_type.into()], false);
+    module.add_function("mesh_test_run_body", test_run_body_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_mock_actor(fn_ptr: ptr, env_ptr: ptr) -> i64
+    let test_mock_actor_ty = i64_type.fn_type(&[ptr_type.into(), ptr_type.into()], false);
+    module.add_function("mesh_test_mock_actor", test_mock_actor_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_pass_count() -> i64
+    let test_pass_count_ty = i64_type.fn_type(&[], false);
+    module.add_function("mesh_test_pass_count", test_pass_count_ty, Some(inkwell::module::Linkage::External));
+
+    // mesh_test_fail_count() -> i64
+    let test_fail_count_ty = i64_type.fn_type(&[], false);
+    module.add_function("mesh_test_fail_count", test_fail_count_ty, Some(inkwell::module::Linkage::External));
+
     // ── Standard library: Collection functions (Phase 8 Plan 02) ──────────
 
     // List functions

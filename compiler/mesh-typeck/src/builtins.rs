@@ -1023,6 +1023,111 @@ pub fn register_builtins(
             Ty::option(Ty::string()),
         )),
     );
+
+    // ── Phase 138: Test DSL builtins ─────────────────────────────────────────
+    //
+    // These builtins are available in ALL .mpl source files (not just .test.mpl).
+    // They're registered globally so typeck doesn't reject them. The lowerer
+    // (mesh-codegen) intercepts them in test mode and expands them to proper
+    // mesh_test_assert_* runtime calls. In non-test mode they're mapped to
+    // the runtime functions via map_builtin_name (no-op unless is_test_mode).
+    let unit_t = Ty::Tuple(vec![]);
+    let bool_t = Ty::bool();
+    let str_t = Ty::string();
+
+    // assert(cond: Bool) -> Unit
+    env.insert(
+        "assert".into(),
+        Scheme::mono(Ty::fun(vec![bool_t.clone()], unit_t.clone())),
+    );
+
+    // assert_eq(lhs: String, rhs: String) -> Unit
+    env.insert(
+        "assert_eq".into(),
+        Scheme::mono(Ty::fun(vec![str_t.clone(), str_t.clone()], unit_t.clone())),
+    );
+
+    // assert_ne(lhs: String, rhs: String) -> Unit
+    env.insert(
+        "assert_ne".into(),
+        Scheme::mono(Ty::fun(vec![str_t.clone(), str_t.clone()], unit_t.clone())),
+    );
+
+    // assert_raises(fn: fn() -> Unit) -> Unit
+    let raise_cb = Ty::fun(vec![], unit_t.clone());
+    env.insert(
+        "assert_raises".into(),
+        Scheme::mono(Ty::fun(vec![raise_cb], unit_t.clone())),
+    );
+
+    // test(label: String, body: fn() -> Unit) -> Unit
+    let test_cb = Ty::fun(vec![], unit_t.clone());
+    env.insert(
+        "test".into(),
+        Scheme::mono(Ty::fun(vec![str_t.clone(), test_cb], unit_t.clone())),
+    );
+
+    // describe(label: String, body: fn() -> Unit) -> Unit
+    let describe_cb = Ty::fun(vec![], unit_t.clone());
+    env.insert(
+        "describe".into(),
+        Scheme::mono(Ty::fun(vec![str_t.clone(), describe_cb], unit_t.clone())),
+    );
+
+    // setup(body: fn() -> Unit) -> Unit
+    let setup_cb = Ty::fun(vec![], unit_t.clone());
+    env.insert(
+        "setup".into(),
+        Scheme::mono(Ty::fun(vec![setup_cb], unit_t.clone())),
+    );
+
+    // teardown(body: fn() -> Unit) -> Unit
+    let teardown_cb = Ty::fun(vec![], unit_t.clone());
+    env.insert(
+        "teardown".into(),
+        Scheme::mono(Ty::fun(vec![teardown_cb], unit_t.clone())),
+    );
+
+    // test_run_body(body: fn() -> Unit) -> Unit
+    // (used by the generated harness in fn main())
+    let run_body_cb = Ty::fun(vec![], unit_t.clone());
+    env.insert(
+        "test_run_body".into(),
+        Scheme::mono(Ty::fun(vec![run_body_cb], unit_t.clone())),
+    );
+
+    // test_begin(label: String) -> Unit
+    env.insert(
+        "test_begin".into(),
+        Scheme::mono(Ty::fun(vec![str_t.clone()], unit_t.clone())),
+    );
+
+    // test_summary(passed: Int, failed: Int, elapsed_ms: Int) -> Unit
+    env.insert(
+        "test_summary".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::int(), Ty::int(), Ty::int()],
+            unit_t.clone(),
+        )),
+    );
+
+    // test_cleanup_actors() -> Unit
+    env.insert(
+        "test_cleanup_actors".into(),
+        Scheme::mono(Ty::fun(vec![], unit_t.clone())),
+    );
+
+    // test_pass_count() -> Int
+    env.insert(
+        "test_pass_count".into(),
+        Scheme::mono(Ty::fun(vec![], Ty::int())),
+    );
+
+    // test_fail_count() -> Int
+    env.insert(
+        "test_fail_count".into(),
+        Scheme::mono(Ty::fun(vec![], Ty::int())),
+    );
 }
 
 /// Register compiler-known traits and their built-in implementations.

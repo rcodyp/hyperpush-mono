@@ -268,6 +268,10 @@ struct Lowerer<'a> {
     /// Counter for generating unique try binding names (Phase 45).
     /// Incremented per `?` usage to avoid shadowing in nested `?` expressions.
     try_counter: u32,
+    /// Enables special lowering of test DSL constructs (assert, assert_eq, assert_ne,
+    /// assert_raises). Detected in lower_source_file's pre-scan pass by looking
+    /// for `fn __test_body_*` function definitions (injected by the preprocessor).
+    is_test_mode: bool,
 }
 
 /// Walk through Let/Block wrappers to find the effective return type of a MIR expression.
@@ -325,6 +329,7 @@ impl<'a> Lowerer<'a> {
             fn_value_usage_types: HashMap::new(),
             current_fn_return_type: None,
             try_counter: 0,
+            is_test_mode: false,
         }
     }
 
@@ -678,6 +683,19 @@ impl<'a> Lowerer<'a> {
             }
         }
 
+        // Detect test mode: scan for `fn __test_body_*` functions injected by the
+        // test preprocessor. When found, enable special DSL lowering for assert/assert_raises.
+        for item in sf.items() {
+            if let Item::FnDef(ref fn_def) = item {
+                if let Some(name) = fn_def.name().and_then(|n| n.text()) {
+                    if name.starts_with("__test_body_") {
+                        self.is_test_mode = true;
+                        break;
+                    }
+                }
+            }
+        }
+
         // Register builtin I/O functions as known functions.
         self.known_functions.insert(
             "println".to_string(),
@@ -956,6 +974,18 @@ impl<'a> Lowerer<'a> {
         // mesh_test_cleanup_actors() -> void
         self.known_functions.insert("mesh_test_cleanup_actors".to_string(),
             MirType::FnPtr(vec![], Box::new(MirType::Unit)));
+        // mesh_test_run_body(fn_ptr: ptr, env_ptr: ptr) -> void
+        self.known_functions.insert("mesh_test_run_body".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)));
+        // mesh_test_mock_actor(fn_ptr: ptr, env_ptr: ptr) -> i64
+        self.known_functions.insert("mesh_test_mock_actor".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        // mesh_test_pass_count() -> i64
+        self.known_functions.insert("mesh_test_pass_count".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)));
+        // mesh_test_fail_count() -> i64
+        self.known_functions.insert("mesh_test_fail_count".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)));
         // ── Collection functions (Phase 8 Plan 02) ─────────────────────
         // List
         self.known_functions.insert("mesh_list_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
@@ -6516,6 +6546,116 @@ impl<'a> Lowerer<'a> {
             }
         }
 
+        // ── Test DSL special lowering (Phase 138) ────────────────────────────
+        // In test mode, assert/assert_eq/assert_ne/assert_raises are intercepted
+        // here and expanded to full runtime calls with source location metadata.
+        // This must happen BEFORE the normal lowering path to avoid arg-count mismatches.
+        if self.is_test_mode {
+            let callee_name = call.callee().and_then(|e| {
+                if let Expr::NameRef(nr) = e {
+                    nr.text()
+                } else {
+                    None
+                }
+            });
+            if let Some(ref name) = callee_name {
+                match name.as_str() {
+                    "assert" => {
+                        let args: Vec<MirExpr> = call
+                            .arg_list()
+                            .map(|al| al.args().map(|a| self.lower_expr(&a)).collect())
+                            .unwrap_or_default();
+                        let cond = args.into_iter().next().unwrap_or(MirExpr::BoolLit(true, MirType::Bool));
+                        // Build source string from the condition's syntax text
+                        let src_str = call.arg_list()
+                            .and_then(|al| al.args().next())
+                            .map(|arg| arg.syntax().text().to_string())
+                            .unwrap_or_else(|| "assert".to_string());
+                        let empty_str = MirExpr::StringLit(String::new(), MirType::String);
+                        let src_lit = MirExpr::StringLit(src_str, MirType::String);
+                        let fn_ty = MirType::FnPtr(
+                            vec![MirType::Bool, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            Box::new(MirType::Unit),
+                        );
+                        return MirExpr::Call {
+                            func: Box::new(MirExpr::Var("mesh_test_assert".to_string(), fn_ty)),
+                            args: vec![cond, src_lit, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            ty: MirType::Unit,
+                        };
+                    }
+                    "assert_eq" => {
+                        let mut raw_args: Vec<MirExpr> = call
+                            .arg_list()
+                            .map(|al| al.args().map(|a| self.lower_expr(&a)).collect())
+                            .unwrap_or_default();
+                        // Both args must be strings (MirType::String or MirType::Ptr).
+                        // If they're non-string, try to convert.
+                        let lhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
+                        let rhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
+                        let lhs_str = self.coerce_to_string(lhs);
+                        let rhs_str = self.coerce_to_string(rhs);
+                        let src_lit = MirExpr::StringLit("assert_eq".to_string(), MirType::String);
+                        let empty_str = MirExpr::StringLit(String::new(), MirType::String);
+                        let fn_ty = MirType::FnPtr(
+                            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            Box::new(MirType::Unit),
+                        );
+                        return MirExpr::Call {
+                            func: Box::new(MirExpr::Var("mesh_test_assert_eq".to_string(), fn_ty)),
+                            args: vec![lhs_str, rhs_str, src_lit, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            ty: MirType::Unit,
+                        };
+                    }
+                    "assert_ne" => {
+                        let mut raw_args: Vec<MirExpr> = call
+                            .arg_list()
+                            .map(|al| al.args().map(|a| self.lower_expr(&a)).collect())
+                            .unwrap_or_default();
+                        let lhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
+                        let rhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
+                        let lhs_str = self.coerce_to_string(lhs);
+                        let rhs_str = self.coerce_to_string(rhs);
+                        let src_lit = MirExpr::StringLit("assert_ne".to_string(), MirType::String);
+                        let empty_str = MirExpr::StringLit(String::new(), MirType::String);
+                        let fn_ty = MirType::FnPtr(
+                            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            Box::new(MirType::Unit),
+                        );
+                        return MirExpr::Call {
+                            func: Box::new(MirExpr::Var("mesh_test_assert_ne".to_string(), fn_ty)),
+                            args: vec![lhs_str, rhs_str, src_lit, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            ty: MirType::Unit,
+                        };
+                    }
+                    "assert_raises" => {
+                        // assert_raises(fn() -> Unit) → mesh_test_assert_raises(fn_ptr, env_ptr, file, file_len, line)
+                        // The closure is split into (fn_ptr, env_ptr) by the codegen when
+                        // it detects that expanded_arg_count matches the function's param count.
+                        //
+                        // We pass [closure, file_ptr, file_len, line] = 4 MIR args.
+                        // After closure expansion: [fn_ptr, env_ptr, file_ptr, file_len, line] = 5 LLVM args.
+                        let args: Vec<MirExpr> = call
+                            .arg_list()
+                            .map(|al| al.args().map(|a| self.lower_expr(&a)).collect())
+                            .unwrap_or_default();
+                        let closure = args.into_iter().next().unwrap_or(MirExpr::Unit);
+                        let empty_str = MirExpr::StringLit(String::new(), MirType::String);
+                        let fn_ty = MirType::FnPtr(
+                            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            Box::new(MirType::Unit),
+                        );
+                        return MirExpr::Call {
+                            func: Box::new(MirExpr::Var("mesh_test_assert_raises".to_string(), fn_ty)),
+                            // [closure, file_ptr, file_len, line] — closure expands to (fn_ptr, env_ptr)
+                            args: vec![closure, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            ty: MirType::Unit,
+                        };
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         // Non-method-call path: normal function calls (unchanged from before).
         let callee = call.callee().map(|e| self.lower_expr(&e));
         let args: Vec<MirExpr> = call
@@ -10882,6 +11022,54 @@ impl<'a> Lowerer<'a> {
             ty: MirType::Unit,
         }
     }
+
+    /// Coerce a MIR expression to a String (MirType::String) for test assertions.
+    ///
+    /// Handles Int → string, Float → string, Bool → string, and passes through
+    /// String/Ptr values unchanged.
+    ///
+    /// Used by the test DSL lowering for `assert_eq(a, b)` and `assert_ne(a, b)`.
+    fn coerce_to_string(&mut self, expr: MirExpr) -> MirExpr {
+        let ty = expr.ty().clone();
+        match &ty {
+            MirType::String => expr,
+            MirType::Int => {
+                let fn_ty = MirType::FnPtr(
+                    vec![MirType::Int],
+                    Box::new(MirType::String),
+                );
+                MirExpr::Call {
+                    func: Box::new(MirExpr::Var("mesh_int_to_string".to_string(), fn_ty)),
+                    args: vec![expr],
+                    ty: MirType::String,
+                }
+            }
+            MirType::Float => {
+                let fn_ty = MirType::FnPtr(
+                    vec![MirType::Float],
+                    Box::new(MirType::String),
+                );
+                MirExpr::Call {
+                    func: Box::new(MirExpr::Var("mesh_float_to_string".to_string(), fn_ty)),
+                    args: vec![expr],
+                    ty: MirType::String,
+                }
+            }
+            MirType::Bool => {
+                let fn_ty = MirType::FnPtr(
+                    vec![MirType::Bool],
+                    Box::new(MirType::String),
+                );
+                MirExpr::Call {
+                    func: Box::new(MirExpr::Var("mesh_bool_to_string".to_string(), fn_ty)),
+                    args: vec![expr],
+                    ty: MirType::String,
+                }
+            }
+            // The runtime mesh_test_assert_eq accepts both String and Ptr
+            _ => expr,
+        }
+    }
 }
 
 // ── Helper functions ─────────────────────────────────────────────────
@@ -11005,6 +11193,10 @@ fn map_builtin_name(name: &str) -> String {
         "test_fail_msg"       => "mesh_test_fail_msg".to_string(),
         "test_summary"        => "mesh_test_summary".to_string(),
         "test_cleanup_actors" => "mesh_test_cleanup_actors".to_string(),
+        "test_run_body"       => "mesh_test_run_body".to_string(),
+        "test_mock_actor"     => "mesh_test_mock_actor".to_string(),
+        "test_pass_count"     => "mesh_test_pass_count".to_string(),
+        "test_fail_count"     => "mesh_test_fail_count".to_string(),
         // Bare name for compile (from Regex import compile)
         "compile" => "mesh_regex_compile".to_string(),
         // Names that have already been resolved via from-import and lowered

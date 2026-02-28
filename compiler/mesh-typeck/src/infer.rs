@@ -503,10 +503,16 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // ── Test module (Phase 138) ──────────────────────────────────────
     // assert/assert_eq/assert_ne/assert_raises are test-mode DSL builtins lowered
     // in lower.rs, not module-qualified functions. Only Test.mock_actor is a module
-    // function, and it is wired in Plan 03. Register the module now so the name
-    // is recognised as a stdlib module (prevents "unknown module" errors).
-    let test_mod: HashMap<String, Scheme> = HashMap::new();
-    // mock_actor signature is added in Phase 138 Plan 03.
+    // function.
+    let mut test_mod: HashMap<String, Scheme> = HashMap::new();
+    // Test.mock_actor(fn(msg: String) -> String) -> Pid
+    // The callback receives a message (as opaque string/any) and handles it.
+    // Returns an untyped Pid for the spawned mock actor.
+    {
+        let msg_cb_t = Ty::fun(vec![Ty::string()], Ty::string());
+        let pid_t = Ty::untyped_pid();
+        test_mod.insert("mock_actor".to_string(), Scheme::mono(Ty::fun(vec![msg_cb_t], pid_t)));
+    }
     modules.insert("Test".to_string(), test_mod);
 
     // ── File module ─────────────────────────────────────────────────
