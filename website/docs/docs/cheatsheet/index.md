@@ -84,9 +84,24 @@ let result = 5 |> double |> add_one
 
 # Slot pipe: route value to argument position N
 let result = 10 |2> add(1)   # = add(1, 10) = 11
+
+# Multi-line pipe: trailing form (|> at end of line)
+let result = 5 |>
+  double |>
+  add_one
+
+# Multi-line pipe: leading form (|> at start of next line)
+let result = value
+  |> transform
+  |> process
+
+# Useful for long chains (e.g. HTTP router setup)
+let router = HTTP.router()
+  |> HTTP.on_post("/events", handle_event)
+  |> HTTP.on_get("/issues", handle_issues)
 ```
 
-See [Language Basics](/docs/language-basics/) for details.
+Both trailing and leading forms produce identical output to their single-line equivalents -- only formatting differs. See [Language Basics](/docs/language-basics/) for details.
 
 ## Control Flow
 
@@ -141,11 +156,21 @@ type Color do
   Blue
 end deriving(Eq, Display)
 
-# Type alias
-type Mapper = Fun(Int) -> String
+# Type alias (transparent -- alias and aliased type are interchangeable)
+type Url = String
+type Count = Int
+
+# Exported type alias (importable by other modules)
+pub type UserId = Int
+
+# Cross-module import of a type alias
+from Types.User import UserId
+fn get_user(id :: UserId) -> String do
+  String.from(id)
+end
 ```
 
-See [Type System](/docs/type-system/) for details.
+Type aliases are transparent -- a `UserId` value works wherever `Int` is valid (and vice versa), with no conversion needed. See [Type System](/docs/type-system/) for details.
 
 ## Interfaces & Traits
 
