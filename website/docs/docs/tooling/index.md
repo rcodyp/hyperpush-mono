@@ -156,6 +156,92 @@ Git dependencies support `rev`, `branch`, and `tag` specifiers for pinning to a 
 
 When dependencies are resolved, a lockfile (`mesh.lock`) is generated to ensure reproducible builds. The lockfile records the exact version and source of every dependency in the project.
 
+## Test Runner
+
+Run all `*.test.mpl` files in a project with `meshc test`:
+
+```bash
+meshc test .              # all test files in current directory
+meshc test path/to/dir/  # specific directory
+```
+
+The test runner discovers all files ending in `.test.mpl`, compiles and executes each independently, and prints a per-test pass/fail summary:
+
+```
+test arithmetic is correct ... ok
+test string operations/length ... FAIL
+  assert_eq failed: expected 5, got 6
+
+2 tests, 1 failure
+```
+
+Exit code is non-zero if any test fails, making `meshc test` suitable for CI pipelines.
+
+See the [Testing guide](/docs/testing/) for the full assertion API, grouping, mock actors, and receive expectations.
+
+## meshpkg — Package Registry CLI
+
+The `meshpkg` binary provides commands for publishing and consuming packages from the Mesh package registry.
+
+### Authentication
+
+Log in to the registry to store an API token locally:
+
+```bash
+meshpkg login
+```
+
+Credentials are stored in `~/.mesh/credentials`.
+
+### Publishing a Package
+
+Publish the current directory as a package:
+
+```bash
+meshpkg publish
+```
+
+This reads `mesh.toml`, creates a `.tar.gz` tarball, computes the SHA-256 checksum, and uploads to the registry. Publishing the same name+version twice is rejected (HTTP 409).
+
+### Installing a Package
+
+Install a package from the registry into the current project:
+
+```bash
+meshpkg install some_pkg
+```
+
+This downloads the latest version, verifies its SHA-256 checksum, and extracts it into the project's dependency directory. A `mesh.lock` lockfile is updated to pin the exact version.
+
+### Searching
+
+Search the registry by name or keyword:
+
+```bash
+meshpkg search json
+```
+
+Returns matching package names and descriptions.
+
+### mesh.toml with Registry Dependencies
+
+Declare registry dependencies in `mesh.toml`:
+
+```toml
+[package]
+name = "my_app"
+version = "1.0.0"
+description = "A Mesh application"
+license = "MIT"
+
+[dependencies]
+some_pkg = "1.0.0"                                           # registry: exact version
+my_lib = { path = "../my_lib" }                              # local path
+utils = { git = "https://github.com/user/utils", tag = "v1.0.0" }  # git
+```
+
+Browse and search available packages at [packages.meshlang.dev](https://packages.meshlang.dev).
+
 ## Language Server (LSP)
 
 Mesh includes a Language Server Protocol implementation that provides real-time feedback in your editor:
@@ -232,10 +318,14 @@ For editors that support LSP (Neovim, Emacs, Helix, Zed), configure `meshc lsp` 
 | Formatter | `meshc fmt [file]` | Canonically format Mesh source code |
 | REPL | `meshc repl` | Interactive evaluation with LLVM JIT |
 | Package Manager | `meshc new [name]` | Create a new Mesh project |
+| Test Runner | `meshc test [dir]` | Run `*.test.mpl` files with pass/fail summary |
+| Package CLI | `meshpkg <command>` | Publish, install, and search registry packages |
 | Language Server | `meshc lsp` | LSP server for editor integration |
 | VS Code Extension | -- | Syntax highlighting, diagnostics, hover, go-to-def |
 
 ## Next Steps
 
+- [Testing](/docs/testing/) -- write and run tests with `meshc test`
+- [Standard Library](/docs/stdlib/) -- Crypto, Encoding, and DateTime modules
 - [Language Basics](/docs/language-basics/) -- core language features and syntax
 - [Distributed Actors](/docs/distributed/) -- building distributed systems with Mesh

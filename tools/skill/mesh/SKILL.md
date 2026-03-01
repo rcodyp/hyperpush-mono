@@ -39,10 +39,13 @@ description: Mesh programming language — use for any question about Mesh synta
 
 ## Ecosystem Overview
 1. Actors & Supervisors: Erlang/OTP-style lightweight actors with typed PIDs and supervision trees.
-2. HTTP/WebSocket: built-in `HTTP.router()`, `HTTP.route()`, `HTTP.serve()`, `HTTP.use()` for middleware.
+2. HTTP Server/WebSocket: built-in `HTTP.router()`, `HTTP.route()`, `HTTP.serve()`, `HTTP.use()` for middleware; `Ws.serve()` for WebSocket.
 3. Database: Sqlite and PostgreSQL raw clients plus an ORM query builder (deriving Row, schema DSL).
-4. Stdlib: List, Map, Set, Range, Queue, Iter (pipeline), String, Json (encode/parse + `json { }` literals), IO, Env, Regex modules.
+4. Stdlib: List, Map, Set, Range, Queue, Iter (pipeline), String, Json (encode/parse + `json { }` literals), IO, Env, Regex, Crypto (sha256/sha512/hmac/uuid4), Base64, Hex, DateTime modules.
 5. Concurrency Utilities: Job module for async task spawning/awaiting; service blocks for stateful OTP-style gen_server processes.
+6. HTTP Client (v14): fluent builder API — `Http.build`, `Http.header`, `Http.body`, `Http.timeout`, `Http.send`, `Http.stream`, `Http.client`, `Http.send_with` (note: lowercase `Http`, distinct from `HTTP` server).
+7. Testing: `meshc test` runner, `test()/describe()/setup/teardown` DSL, `assert/assert_eq/assert_ne/assert_raises`, `Test.mock_actor`, `assert_receive`.
+8. Package Registry: `meshpkg` CLI for publish/install/search/login; `mesh.toml` manifest with `[package]` and `[dependencies]` sections.
 
 ## Available Sub-Skills
 1. `skills/syntax` — Functions, closures, pipe operators (|> and |N>), operators, control flow
