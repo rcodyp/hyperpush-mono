@@ -370,4 +370,4 @@ Plans:
 | 137. HTTP Client Improvements | 2/2 | Complete    | 2026-02-28 |
 | 138. Testing Framework | 5/5 | Complete    | 2026-02-28 |
 | 139. Package Manifest & meshpkg CLI | 2/2 | Complete    | 2026-03-01 |
-| 140. Package Registry Backend & Website | 2/4 | In Progress|  |
+| 140. Package Registry Backend & Website | 3/4 | In Progress|  |

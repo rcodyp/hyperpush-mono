@@ -106,6 +106,10 @@ Recent decisions affecting current work:
 - [Phase 140]: ClientOnly wrapping mandatory for packages components — components access window.location.search and fetch(), unavailable during VitePress SSG build
 - [Phase 140]: registry/ excluded from main Cargo workspace to avoid libsqlite3-sys links conflict with mesh-rt's bundled sqlite3; has own [workspace] root
 - [Phase 140]: Runtime sqlx::query() used over compile-time query\!() macros — no live DB available for cargo sqlx prepare during scaffold; upgrade deferred to runtime
+- [Phase 140 Plan 03]: PostgresStore from tower-sessions-sqlx-store crate (not tower-sessions itself) — import path is tower_sessions_sqlx_store::PostgresStore
+- [Phase 140 Plan 03]: time::Duration::days(30) for session expiry — tower-sessions uses the time crate (0.3), not std::time; explicit time dep required
+- [Phase 140 Plan 03]: reqwest 0.11 added as explicit dep for GitHub user API calls — matches transitive version pulled in by oauth2 4.4
+- [Phase 140 Plan 03]: session.remove::<String>(SESSION_CSRF) called immediately after retrieval — prevents CSRF replay attacks
 
 ### Pending Todos
 
@@ -120,5 +124,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 140-04-PLAN.md — packages section on website: PackageBrowse, PackageCard, PackageList, PackagePage Vue 3 components; /packages and /packages/package?name= VitePress pages; Packages nav entry; REG-02 REG-03 REG-04 satisfied; VitePress build clean
+Stopped at: Completed 140-03-PLAN.md — GitHub OAuth flow (github_login, github_callback), tower-sessions PostgresStore middleware, dashboard page, token management API (create_token_handler, list_tokens_handler), argon2 hash in DB; REG-01 satisfied
 Resume file: None
