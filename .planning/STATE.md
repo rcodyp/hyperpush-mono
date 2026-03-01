@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v14.0 Phase 141 — Dogfeed v14 Changes to Mesher (plan 01 of 03 done)
+**Current focus:** v14.0 Phase 141 — Dogfeed v14 Changes to Mesher (all 3 plans complete)
 
 ## Current Position
 
-Phase: 141 of 143 (Dogfeed v14 Changes to Mesher) — Plan 1 of 3 complete
-Plan: 1 of 3 in current phase — In Progress
-Status: Phase 141 Plan 01 complete — Crypto.uuid4() token generation in Mesher; mesher/mesh.toml manifest added; DOGFEED-141 (CRYPTO-03 + PKG-01 dogfeed) satisfied
-Last activity: 2026-03-01 — Phase 141 Plan 01 complete: create_api_key and create_session use Crypto.uuid4(); mesher/mesh.toml declares Mesher as Mesh package
+Phase: 141 of 143 (Dogfeed v14 Changes to Mesher) — All 3 plans complete
+Plan: 3 of 3 in current phase — Complete
+Status: Phase 141 complete — Crypto.uuid4() token generation, mesh.toml manifest, fingerprint/validation unit tests, build + test verification all passing (18/18 tests)
+Last activity: 2026-03-01 — Phase 141 Plan 03 complete: meshc build mesher/ exits 0; 18/18 tests passing; meshc test project_dir bug fixed
 
 Progress: [██████████] 99%  (13/13 plans)
 
@@ -50,6 +50,7 @@ Progress: [██████████] 99%  (13/13 plans)
 | Phase 140 P02 | 3 | 2 tasks | 7 files |
 | Phase 141 P01 | 1 | 2 tasks | 2 files |
 | Phase 141 P02 | 5 | 2 tasks | 3 files |
+| Phase 141 P03 | 3 | 2 tasks | 1 file |
 
 ## Accumulated Context
 
@@ -119,6 +120,7 @@ Recent decisions affecting current work:
 - [Phase 141]: Crypto.uuid4() for Mesher tokens: API key format changes from 53 to 41 chars (mshr_+UUID4); session uses two stripped UUIDs for 64-char hex; bcrypt preserved via pgcrypto — no stdlib equivalent
 - [Phase 141]: validate_level exposed as pub fn in validation.mpl — required for direct import in test files; was private fn in source but plan interface spec listed it as pub
 - [Phase 141]: meshc test pure function pattern established: test files in mesher/tests/ import from Ingestion.* modules; Result variants tested via case expression
+- [Phase 141 Plan 03]: meshc test project_dir must walk upward from test file path to find nearest main.mpl — using CWD caused entire workspace to be copied to temp build dir
 
 ### Roadmap Evolution
 
@@ -139,5 +141,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 141-01-PLAN.md — Crypto.uuid4() token generation in Mesher storage layer (create_api_key, create_session); mesher/mesh.toml package manifest added; DOGFEED-141 (CRYPTO-03 + PKG-01 dogfeed) complete
+Stopped at: Completed 141-03-PLAN.md — Build and test verification; meshc build mesher/ exits 0; 18/18 unit tests passing (5 fingerprint + 13 validation); meshc test project_dir bug fixed; Phase 141 complete
 Resume file: None
