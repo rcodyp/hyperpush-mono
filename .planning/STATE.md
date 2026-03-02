@@ -1,8 +1,8 @@
 ---
 gsd_state_version: 1.0
-milestone: v14.0
-milestone_name: Ecosystem & Standard Library
-status: complete
+milestone: v15.0
+milestone_name: Package Dogfood
+status: planning
 last_updated: "2026-03-01T00:00:00.000Z"
 progress:
   total_phases: 145
@@ -18,16 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Expressive, readable concurrency -- writing concurrent programs should feel as natural and clean as writing sequential code, with the safety net of supervision and fault tolerance built into the language.
-**Current focus:** v14.0 milestone complete — planning v15.0 via /gsd:new-milestone
+**Current focus:** v15.0 Package Dogfood — defining requirements
 
 ## Current Position
 
-Phase: 145 of 145 (Completely redesign the mesh packages page) — 4 of 4 plans COMPLETE
-Plan: 4 of 4 — DONE
-Status: Phase 145 Plan 04 complete — human visual verification passed; all automated smoke tests passed; redesign production-approved; ready to deploy
-Last activity: 2026-03-02 - Completed quick task 10: add icons to each button in the docs sidebar
-
-Progress: [██████████] 100%  (4/4 plans for phase 145) — PHASE COMPLETE
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-01 — Milestone v15.0 started
 
 ## Performance Metrics
 

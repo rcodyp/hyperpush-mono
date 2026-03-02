@@ -4,9 +4,15 @@
 
 Mesh is a programming language that combines Elixir/Ruby-style expressive syntax with static Hindley-Milner type inference and BEAM-style concurrency (actors, supervision trees, fault tolerance), compiled via LLVM to native single-binary executables. The compiler is written in Rust. v1.0-v1.9 built a complete language: compiler pipeline, actor runtime, trait system, module system, loops, stdlib, and developer tooling. v2.0 added database drivers and JSON serde. v3.0 made Mesh production-ready: TLS, connection pooling, transactions, deriving(Row). v4.0 added WebSocket support with actor-per-connection model. v5.0 added distributed actors with location-transparent PIDs and TLS-encrypted node clustering. v6.0 added a documentation website. v7.0 added a comprehensive trait ecosystem (iterators, From/Into, numeric traits, Collect). v8.0 made Mesh installable with one-command install scripts, VS Code extension, and LSP. v9.0 shipped Mesher, a production error-monitoring backend (~4,441 lines of Mesh). v10.0 added a full ORM. v11.0 expanded the ORM with comprehensive query builder capabilities and rewrote all Mesher data queries. v12.0 added language ergonomics: slot pipe operator (`|N>`), string interpolation (`#{expr}`), heredoc strings, regex literals, typed env var stdlib, Mesh agent skill, repository reorganization, and published performance benchmarks (29,108 req/s — within 4% of Go). v13.0 completed the language's expressiveness: multi-line pipe continuation, type aliases (cross-module), TryFrom/TryInto traits, Map.collect string keys, native `json { }` object literals, VS Code extension v0.3.0, and full documentation. v14.0 shipped a complete ecosystem: Crypto/Encoding/DateTime stdlib, HTTP client fluent builder API with streaming and keep-alive, `meshc test` testing framework with mock actors, meshpkg CLI + hosted package registry (Fly.io + Cloudflare R2), dogfooded in Mesher, automated CI/CD on tag push, and a production-grade redesign of packages.meshlang.dev with Tailwind CSS v4 + OKLCH. ~132,524 total LOC across 24 milestones. Zero known compiler correctness issues.
 
-## Current Milestone: Planning v15.0
+## Current Milestone: v15.0 Package Dogfood
 
-v14.0 shipped 2026-03-01. Next milestone to be determined via `/gsd:new-milestone`.
+**Goal:** Validate the end-to-end package manager workflow by building, publishing, and consuming a real Mesh package in production.
+
+**Target features:**
+- `mesh-slug` library: pure-Mesh slug/URL-safe identifier generation
+- Published to packages.meshlang.dev registry via `meshpkg publish`
+- Consumed in Mesher via `meshpkg install` + import
+- Test coverage for the package itself via `meshc test`
 
 ## Current State
 
@@ -217,7 +223,7 @@ Expressive, readable concurrency -- writing concurrent programs should feel as n
 
 ### Active
 
-<!-- v15.0 to be defined via /gsd:new-milestone -->
+<!-- v15.0 requirements — see .planning/REQUIREMENTS.md (defined via /gsd:new-milestone) -->
 
 ### Out of Scope
 
@@ -456,4 +462,4 @@ Tech debt (minor, pre-existing):
 | meshpkg credentials stored as TOML at ~/.mesh/credentials | Consistent with ~/.mesh/bin install location from v8.0 | ✓ Good -- v14.0, familiar convention |
 
 ---
-*Last updated: 2026-03-01 after v14.0 milestone*
+*Last updated: 2026-03-01 after v14.0 milestone; v15.0 started*
