@@ -23,8 +23,9 @@ pub fn run(project_dir: &Path, registry: &str, json_mode: bool) -> Result<(), St
 
     // Upload with spinner
     let msg = format!("Publishing {}@{}...", name, version);
+    let description = manifest.package.description.as_deref().unwrap_or("");
     with_spinner(&msg, json_mode, || {
-        upload_tarball(&tarball_bytes, &sha256, name, version, registry)
+        upload_tarball(&tarball_bytes, &sha256, name, version, description, registry)
     })?;
 
     if json_mode {
@@ -94,6 +95,7 @@ fn upload_tarball(
     sha256: &str,
     name: &str,
     version: &str,
+    description: &str,
     registry: &str,
 ) -> Result<(), String> {
     // Read auth token
@@ -109,6 +111,7 @@ fn upload_tarball(
         .header("X-Package-Name", name)
         .header("X-Package-Version", version)
         .header("X-Package-SHA256", sha256)
+        .header("X-Package-Description", description)
         .send(tarball)
         .map_err(|e| format!("Failed to connect to registry: {}", e))?;
 

@@ -52,23 +52,26 @@ pub async fn insert_version(
     sha256: &str,
     size_bytes: i64,
     readme: Option<String>,
+    description: &str,
     owner_login: &str,
     published_by: Uuid,
 ) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
 
-    // Upsert package row
+    // Upsert package row — update description when a new version is published
     sqlx::query(
         r#"
         INSERT INTO packages (name, owner_login, description, latest_version, updated_at)
-        VALUES ($1, $2, '', $3, now())
+        VALUES ($1, $2, $3, $4, now())
         ON CONFLICT (name) DO UPDATE
           SET latest_version = EXCLUDED.latest_version,
+              description = EXCLUDED.description,
               updated_at = now()
         "#,
     )
     .bind(package_name)
     .bind(owner_login)
+    .bind(description)
     .bind(version)
     .execute(&mut *tx)
     .await?;

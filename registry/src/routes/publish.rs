@@ -25,6 +25,7 @@ pub async fn handler(
     let name = header_str(&headers, "x-package-name")?;
     let version = header_str(&headers, "x-package-version")?;
     let expected_sha256 = header_str(&headers, "x-package-sha256")?;
+    let description = header_str_opt(&headers, "x-package-description");
 
     // 4. Namespace check: name must start with "{owner}/"
     if !name.starts_with(&format!("{}/", owner)) {
@@ -84,6 +85,7 @@ pub async fn handler(
         &actual_sha256,
         body_bytes.len() as i64,
         readme,
+        &description,
         &owner,
         user_row.id,
     )
@@ -155,4 +157,12 @@ fn header_str(headers: &HeaderMap, name: &str) -> Result<String, AppError> {
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or_else(|| AppError::BadRequest(format!("Missing required header: {}", name)))
+}
+
+fn header_str_opt(headers: &HeaderMap, name: &str) -> String {
+    headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string()
 }
