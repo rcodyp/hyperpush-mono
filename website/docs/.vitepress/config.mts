@@ -83,60 +83,60 @@ export default defineConfig({
         {
           text: 'Getting Started',
           items: [
-            { text: 'Introduction', link: '/docs/getting-started/' },
+            { text: 'Introduction', link: '/docs/getting-started/', icon: 'BookOpen' } as any,
           ],
         },
         {
           text: 'Language Guide',
           collapsed: false,
           items: [
-            { text: 'Language Basics', link: '/docs/language-basics/' },
-            { text: 'Type System', link: '/docs/type-system/' },
-            { text: 'Iterators', link: '/docs/iterators/' },
-            { text: 'Concurrency', link: '/docs/concurrency/' },
+            { text: 'Language Basics', link: '/docs/language-basics/', icon: 'Code2' } as any,
+            { text: 'Type System', link: '/docs/type-system/', icon: 'Shapes' } as any,
+            { text: 'Iterators', link: '/docs/iterators/', icon: 'Repeat' } as any,
+            { text: 'Concurrency', link: '/docs/concurrency/', icon: 'Workflow' } as any,
           ],
         },
         {
           text: 'Web & Networking',
           collapsed: false,
           items: [
-            { text: 'Web', link: '/docs/web/' },
+            { text: 'Web', link: '/docs/web/', icon: 'Globe' } as any,
           ],
         },
         {
           text: 'Data',
           collapsed: false,
           items: [
-            { text: 'Databases', link: '/docs/databases/' },
+            { text: 'Databases', link: '/docs/databases/', icon: 'Database' } as any,
           ],
         },
         {
           text: 'Distribution',
           collapsed: false,
           items: [
-            { text: 'Distributed Actors', link: '/docs/distributed/' },
+            { text: 'Distributed Actors', link: '/docs/distributed/', icon: 'Network' } as any,
           ],
         },
         {
           text: 'Tooling',
           collapsed: false,
           items: [
-            { text: 'Developer Tools', link: '/docs/tooling/' },
+            { text: 'Developer Tools', link: '/docs/tooling/', icon: 'Wrench' } as any,
           ],
         },
         {
           text: 'Standard Library',
           collapsed: false,
           items: [
-            { text: 'Standard Library', link: '/docs/stdlib/' },
-            { text: 'Testing', link: '/docs/testing/' },
+            { text: 'Standard Library', link: '/docs/stdlib/', icon: 'Library' } as any,
+            { text: 'Testing', link: '/docs/testing/', icon: 'FlaskConical' } as any,
           ],
         },
         {
           text: 'Reference',
           collapsed: false,
           items: [
-            { text: 'Syntax Cheatsheet', link: '/docs/cheatsheet/' },
+            { text: 'Syntax Cheatsheet', link: '/docs/cheatsheet/', icon: 'ClipboardList' } as any,
           ],
         },
       ],
