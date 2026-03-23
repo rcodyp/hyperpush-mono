@@ -21,6 +21,7 @@
 - `cargo build -p mesh-rt && cargo test -p meshc e2e_reference_backend_builds --test e2e_reference_backend -- --nocapture`
 - `DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo test -p meshc e2e_reference_backend_postgres_smoke --test e2e_reference_backend -- --ignored --nocapture`
 - `DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} PORT=18080 JOB_POLL_MS=500 bash reference-backend/scripts/smoke.sh`
+- `env -u DATABASE_URL PORT=18080 JOB_POLL_MS=500 ./reference-backend/reference-backend 2>&1 | rg "DATABASE_URL"`
 
 ## Observability / Diagnostics
 
@@ -37,7 +38,7 @@
 
 ## Tasks
 
-- [ ] **T01: Scaffold the `reference-backend/` package and startup contract** `est:1h`
+- [x] **T01: Scaffold the `reference-backend/` package and startup contract** `est:1h`
   - Why: S01 needs a new narrow proof target; without a stable package boundary and env contract, later work will keep leaning on `mesher/` or ad-hoc commands.
   - Files: `reference-backend/mesh.toml`, `reference-backend/main.mpl`, `reference-backend/config.mpl`, `reference-backend/api/router.mpl`, `reference-backend/api/health.mpl`
   - Do: Create the top-level Mesh project, encode the `DATABASE_URL`/`PORT`/`JOB_POLL_MS` startup contract in package-local code, follow Mesher’s startup order (pool first, services next, HTTP serve last), and keep the initial HTTP surface to a real `GET /health` path wired through modules rather than a monolithic `main.mpl`.
