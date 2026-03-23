@@ -197,6 +197,35 @@ fn spawn_reference_backend(
     }
 }
 
+fn spawn_staged_reference_backend(
+    bundle_dir: &Path,
+    database_url: &str,
+    config: ReferenceBackendConfig,
+) -> SpawnedReferenceBackend {
+    let binary = bundle_dir.join("reference-backend");
+    let (stdout_path, stderr_path) = reference_backend_log_paths();
+    let stdout_file = File::create(&stdout_path)
+        .unwrap_or_else(|e| panic!("failed to create {}: {}", stdout_path.display(), e));
+    let stderr_file = File::create(&stderr_path)
+        .unwrap_or_else(|e| panic!("failed to create {}: {}", stderr_path.display(), e));
+
+    let child = Command::new(&binary)
+        .current_dir(bundle_dir)
+        .env("DATABASE_URL", database_url)
+        .env("PORT", config.port.to_string())
+        .env("JOB_POLL_MS", config.job_poll_ms.to_string())
+        .stdout(Stdio::from(stdout_file))
+        .stderr(Stdio::from(stderr_file))
+        .spawn()
+        .unwrap_or_else(|e| panic!("failed to spawn staged binary {}: {}", binary.display(), e));
+
+    SpawnedReferenceBackend {
+        child,
+        stdout_path,
+        stderr_path,
+    }
+}
+
 fn spawn_reference_backend_pair(
     database_url: &str,
     job_poll_ms: u64,
@@ -459,6 +488,91 @@ fn run_reference_backend_stage_deploy_script(bundle_dir: &Path) -> Output {
         .expect("failed to invoke reference-backend/scripts/stage-deploy.sh")
 }
 
+fn run_staged_apply_deploy_migrations_script(bundle_dir: &Path, database_url: &str) -> Output {
+    let apply_script = bundle_dir.join("apply-deploy-migrations.sh");
+    let sql_path = bundle_dir.join("reference-backend.up.sql");
+    Command::new("bash")
+        .current_dir(bundle_dir)
+        .arg(&apply_script)
+        .arg(&sql_path)
+        .env("DATABASE_URL", database_url)
+        .output()
+        .expect("failed to invoke staged apply-deploy-migrations.sh")
+}
+
+fn run_staged_deploy_smoke_script(bundle_dir: &Path, config: &ReferenceBackendConfig) -> Output {
+    let smoke_script = bundle_dir.join("deploy-smoke.sh");
+    let base_url = format!("http://127.0.0.1:{}", config.port);
+    Command::new("bash")
+        .current_dir(bundle_dir)
+        .arg(&smoke_script)
+        .env("BASE_URL", &base_url)
+        .env("PORT", config.port.to_string())
+        .output()
+        .expect("failed to invoke staged deploy-smoke.sh")
+}
+
+fn assert_staged_bundle_dir_outside_repo_root(bundle_dir: &Path) {
+    let bundle_dir = fs::canonicalize(bundle_dir)
+        .unwrap_or_else(|e| panic!("failed to canonicalize {}: {}", bundle_dir.display(), e));
+    let repo_root = fs::canonicalize(repo_root()).expect("failed to canonicalize repo root");
+    assert!(
+        !bundle_dir.starts_with(&repo_root),
+        "staged bundle dir must live outside the repo root; bundle_dir={} repo_root={}",
+        bundle_dir.display(),
+        repo_root.display()
+    );
+}
+
+fn parse_last_json_line(output_text: &str, description: &str) -> Value {
+    let json_line = output_text
+        .lines()
+        .rev()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') && trimmed.ends_with('}') {
+                Some(trimmed)
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| panic!("expected trailing JSON line in {description}, got:\n{output_text}"));
+    serde_json::from_str(json_line).unwrap_or_else(|e| {
+        panic!(
+            "expected valid trailing JSON line in {description}, got parse error {e}: {json_line}"
+        )
+    })
+}
+
+fn wait_for_worker_processed_job(
+    config: &ReferenceBackendConfig,
+    min_processed_jobs: i64,
+    max_attempts: usize,
+) -> Option<(String, Value)> {
+    for attempt in 0..max_attempts {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+
+        let health = match send_http_request(config, "GET", "/health", None) {
+            Ok(response) if response.status_code == 200 => {
+                assert_json_response(response, 200, "/health")
+            }
+            Ok(_) | Err(_) => continue,
+        };
+
+        let processed_jobs = health["worker"]["processed_jobs"].as_i64().unwrap_or(-1);
+        let failed_jobs = health["worker"]["failed_jobs"].as_i64().unwrap_or(-1);
+        let last_job_id = health["worker"]["last_job_id"].as_str().unwrap_or("");
+
+        if processed_jobs >= min_processed_jobs && failed_jobs == 0 && !last_job_id.is_empty() {
+            return Some((last_job_id.to_string(), health));
+        }
+    }
+
+    None
+}
+
 fn assert_is_executable(path: &Path) {
     let metadata = fs::metadata(path)
         .unwrap_or_else(|e| panic!("failed to stat {}: {}", path.display(), e));
@@ -567,14 +681,47 @@ fn wait_for_processed_job_and_health(
 ) -> (Value, Value) {
     let mut last_job = Value::Null;
     let mut last_health = Value::Null;
+    let mut last_job_issue = String::new();
+    let mut last_health_issue = String::new();
 
     for attempt in 0..120 {
         if attempt > 0 {
             std::thread::sleep(Duration::from_millis(100));
         }
 
-        let job = get_json(config, &format!("/jobs/{job_id}"), 200);
-        let health = get_json(config, "/health", 200);
+        let job = match send_http_request(config, "GET", &format!("/jobs/{job_id}"), None) {
+            Ok(response) if response.status_code == 200 => {
+                last_job_issue.clear();
+                assert_json_response(response, 200, &format!("/jobs/{job_id}"))
+            }
+            Ok(response) => {
+                last_job_issue = format!(
+                    "unexpected HTTP {} for /jobs/{} on :{}",
+                    response.status_code, job_id, config.port
+                );
+                continue;
+            }
+            Err(e) => {
+                last_job_issue = format!("GET /jobs/{} failed on {}: {}", job_id, config.port, e);
+                continue;
+            }
+        };
+
+        let health = match send_http_request(config, "GET", "/health", None) {
+            Ok(response) if response.status_code == 200 => {
+                last_health_issue.clear();
+                assert_json_response(response, 200, "/health")
+            }
+            Ok(response) => {
+                last_health_issue =
+                    format!("unexpected HTTP {} for /health on :{}", response.status_code, config.port);
+                continue;
+            }
+            Err(e) => {
+                last_health_issue = format!("GET /health failed on {}: {}", config.port, e);
+                continue;
+            }
+        };
 
         let job_status = job["status"].as_str().unwrap_or("");
         let processed_at = job["processed_at"].as_str().unwrap_or("");
@@ -585,7 +732,7 @@ fn wait_for_processed_job_and_health(
         if job_status == "processed"
             && !processed_at.is_empty()
             && health_last_job_id == job_id
-            && health_processed_jobs == 1
+            && health_processed_jobs >= 1
             && health_failed_jobs == 0
         {
             return (job, health);
@@ -596,7 +743,7 @@ fn wait_for_processed_job_and_health(
     }
 
     panic!(
-        "job {job_id} never reached processed health-aligned state; last_job={last_job}; last_health={last_health}"
+        "job {job_id} never reached processed health-aligned state; last_job={last_job}; last_health={last_health}; last_job_issue={last_job_issue}; last_health_issue={last_health_issue}"
     );
 }
 
@@ -928,6 +1075,256 @@ fn e2e_reference_backend_stage_deploy_bundle() {
     );
     assert_is_executable(&bundle.path().join("apply-deploy-migrations.sh"));
     assert_is_executable(&bundle.path().join("deploy-smoke.sh"));
+}
+
+#[test]
+#[ignore]
+fn e2e_reference_backend_deploy_artifact_smoke() {
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set for e2e_reference_backend_deploy_artifact_smoke");
+
+    reset_reference_backend_database(&database_url);
+
+    let bundle = tempfile::tempdir().expect("failed to create deploy bundle dir");
+    assert_staged_bundle_dir_outside_repo_root(bundle.path());
+
+    let stage_output = run_reference_backend_stage_deploy_script(bundle.path());
+    let stage_text = command_output_text(&stage_output);
+    assert_command_success(&stage_output, "reference-backend/scripts/stage-deploy.sh");
+    assert!(
+        stage_text.contains("[stage-deploy] bundle ready dir="),
+        "expected staged bundle ready output, got:\n{}",
+        stage_text
+    );
+
+    let staged_binary = bundle.path().join("reference-backend");
+    let staged_sql = bundle.path().join("reference-backend.up.sql");
+    assert_is_executable(&staged_binary);
+    assert_is_executable(&bundle.path().join("apply-deploy-migrations.sh"));
+    assert_is_executable(&bundle.path().join("deploy-smoke.sh"));
+    assert!(staged_sql.is_file(), "expected staged deploy SQL artifact");
+    assert!(
+        !bundle.path().join("meshc").exists(),
+        "staged deploy bundle should not include meshc"
+    );
+    assert!(
+        !bundle.path().join("main.mpl").exists(),
+        "staged deploy bundle should not require repo source files"
+    );
+
+    let apply_output = run_staged_apply_deploy_migrations_script(bundle.path(), &database_url);
+    let apply_text = command_output_text(&apply_output);
+    assert_command_success(&apply_output, "staged apply-deploy-migrations.sh");
+    assert!(
+        apply_text.contains("[deploy-apply] sql artifact="),
+        "expected deploy-apply artifact output, got:\n{}",
+        apply_text
+    );
+    assert!(
+        apply_text.contains(&format!(
+            "[deploy-apply] migration recorded version={}",
+            REFERENCE_BACKEND_MIGRATION_VERSION
+        )),
+        "expected recorded migration output, got:\n{}",
+        apply_text
+    );
+    assert!(
+        !apply_text.contains(&database_url),
+        "staged apply output must not echo DATABASE_URL\n{}",
+        apply_text
+    );
+
+    let migration_rows = query_database_rows(
+        &database_url,
+        "SELECT version::text AS version, name, applied_at::text AS applied_at FROM _mesh_migrations ORDER BY version",
+        &[],
+    );
+    assert_eq!(
+        migration_rows.len(),
+        1,
+        "expected exactly one applied migration row after staged deploy apply"
+    );
+    let migration_row = &migration_rows[0];
+    assert_eq!(
+        migration_row.get("version").map(String::as_str),
+        Some("20260323010000")
+    );
+    assert_eq!(
+        migration_row.get("name").map(String::as_str),
+        Some(REFERENCE_BACKEND_MIGRATION_NAME)
+    );
+    assert!(
+        migration_row
+            .get("applied_at")
+            .map(|value| !value.is_empty())
+            .unwrap_or(false),
+        "expected applied_at to be recorded for staged deploy migration: {:?}",
+        migration_row
+    );
+
+    let config = reference_backend_test_config(100);
+    let spawned = spawn_staged_reference_backend(bundle.path(), &database_url, config);
+    let mut smoke_text = String::new();
+    let mut smoke_job_id = String::new();
+    let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let startup_health = wait_for_reference_backend(&config);
+        assert_eq!(startup_health["status"].as_str(), Some("ok"));
+        assert_eq!(startup_health["worker"]["poll_ms"].as_i64(), Some(100));
+        assert_eq!(startup_health["worker"]["processed_jobs"].as_i64(), Some(0));
+        assert_eq!(startup_health["worker"]["failed_jobs"].as_i64(), Some(0));
+
+        let smoke_output = run_staged_deploy_smoke_script(bundle.path(), &config);
+        smoke_text = command_output_text(&smoke_output);
+        assert_command_success(&smoke_output, "staged deploy-smoke.sh");
+        assert!(
+            smoke_text.contains("[deploy-smoke] health ready body="),
+            "expected staged deploy smoke health output, got:\n{}",
+            smoke_text
+        );
+        assert!(
+            smoke_text.contains("[deploy-smoke] created job body="),
+            "expected staged deploy smoke create output, got:\n{}",
+            smoke_text
+        );
+        assert!(
+            smoke_text.contains("[deploy-smoke] polling job id="),
+            "expected staged deploy smoke polling output, got:\n{}",
+            smoke_text
+        );
+        assert!(
+            smoke_text.contains("[deploy-smoke] processed job id="),
+            "expected staged deploy smoke processed output, got:\n{}",
+            smoke_text
+        );
+        assert!(
+            !smoke_text.contains(&database_url),
+            "staged deploy smoke output must not echo DATABASE_URL\n{}",
+            smoke_text
+        );
+
+        let smoke_job = parse_last_json_line(&smoke_text, "staged deploy-smoke.sh");
+        smoke_job_id = smoke_job["id"]
+            .as_str()
+            .expect("staged deploy smoke payload must include job id")
+            .to_string();
+        assert_eq!(smoke_job["status"].as_str(), Some("processed"));
+        assert_eq!(smoke_job["attempts"].as_i64(), Some(1));
+        assert_eq!(smoke_job["last_error"], Value::Null);
+        assert!(
+            smoke_job["processed_at"]
+                .as_str()
+                .map(|value| !value.is_empty())
+                .unwrap_or(false),
+            "staged deploy smoke JSON must include processed_at: {}",
+            smoke_job
+        );
+
+        let mut worker_job_id = None;
+        for seq in 0..6 {
+            let payload_body = format!(
+                r#"{{"kind":"deploy-artifact-owned","seq":{},"source":"rust-harness"}}"#,
+                seq
+            );
+            let created_job = post_json(&config, "/jobs", &payload_body, 201);
+            assert!(
+                matches!(created_job["status"].as_str(), Some("pending" | "processing" | "processed")),
+                "unexpected created job status while waiting for staged worker ownership: {}",
+                created_job
+            );
+
+            if let Some((job_id, _)) = wait_for_worker_processed_job(&config, 1, 20) {
+                worker_job_id = Some(job_id);
+                break;
+            }
+        }
+
+        let worker_job_id = worker_job_id.expect(
+            "staged worker never recorded a processed job in /health; another shared-DB worker may still be active",
+        );
+        let (job_json, health_json) = wait_for_processed_job_and_health(&config, &worker_job_id);
+        let db_row = query_single_row(
+            &database_url,
+            "SELECT id::text, status, attempts::text, COALESCE(last_error, '') AS last_error, payload::text, COALESCE(processed_at::text, '') AS processed_at FROM jobs WHERE id = $1::uuid",
+            &[&worker_job_id],
+        );
+
+        assert_eq!(job_json["id"].as_str(), Some(worker_job_id.as_str()));
+        assert_eq!(job_json["status"].as_str(), Some("processed"));
+        assert_eq!(job_json["attempts"].as_i64().unwrap_or(0), 1);
+        assert_eq!(job_json["last_error"], Value::Null);
+        let processed_at = job_json["processed_at"]
+            .as_str()
+            .expect("processed staged job must expose processed_at");
+        assert!(!processed_at.is_empty(), "processed_at must be non-empty");
+
+        assert_eq!(db_row.get("id").map(String::as_str), Some(worker_job_id.as_str()));
+        assert_eq!(db_row.get("status").map(String::as_str), Some("processed"));
+        assert_eq!(db_row.get("attempts").map(String::as_str), Some("1"));
+        assert_eq!(db_row.get("last_error").map(String::as_str), Some(""));
+        assert_eq!(
+            db_row.get("processed_at").map(String::as_str),
+            Some(processed_at)
+        );
+        let db_payload = serde_json::from_str::<Value>(
+            db_row.get("payload").expect("payload column must exist"),
+        )
+        .expect("DB payload must be valid JSON");
+        assert_eq!(db_payload, job_json["payload"]);
+
+        assert_eq!(health_json["status"].as_str(), Some("ok"));
+        assert_eq!(
+            health_json["worker"]["last_job_id"].as_str(),
+            Some(worker_job_id.as_str())
+        );
+        assert!(
+            health_json["worker"]["processed_jobs"].as_i64().unwrap_or(0) >= 1,
+            "expected staged worker to record at least one processed job: {}",
+            health_json
+        );
+        assert_eq!(health_json["worker"]["failed_jobs"].as_i64(), Some(0));
+        assert_eq!(health_json["worker"]["last_error"], Value::Null);
+        let worker_status = health_json["worker"]["status"]
+            .as_str()
+            .expect("worker status must be a string");
+        assert!(
+            matches!(worker_status, "processed" | "idle"),
+            "expected staged worker status to show a healthy post-processing state, got {worker_status}"
+        );
+    }));
+    let logs = stop_reference_backend(spawned);
+
+    match test_result {
+        Ok(()) => {
+            assert_startup_logs(&logs.combined, &config, &database_url);
+            assert!(
+                logs.combined.contains("[reference-backend] Job created id="),
+                "staged runtime never logged job creation:\n{}",
+                logs.combined
+            );
+            assert!(
+                logs.combined.contains("[reference-backend] Job worker processed id="),
+                "staged runtime never logged job processing:\n{}",
+                logs.combined
+            );
+            assert!(
+                logs.combined.contains("[reference-backend] Job fetched id="),
+                "staged runtime never logged /jobs fetches:\n{}",
+                logs.combined
+            );
+        }
+        Err(payload) => panic!(
+            "reference-backend deploy-artifact smoke assertions failed: {}\nbundle_dir: {}\nstaged_binary: {}\nstage_output: {}\napply_output: {}\nsmoke_output: {}\nsmoke_job_id: {}\nstdout: {}\nstderr: {}",
+            panic_payload_to_string(payload),
+            bundle.path().display(),
+            staged_binary.display(),
+            stage_text,
+            apply_text,
+            smoke_text,
+            smoke_job_id,
+            logs.stdout,
+            logs.stderr
+        ),
+    }
 }
 
 #[test]
