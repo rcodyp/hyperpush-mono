@@ -26,17 +26,6 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: mapped
 - Notes: The milestone does not need every deployment target, but it does need one honest boring path.
 
-### R006 — Diagnostics, formatter, LSP, tests, and the coverage story are credible enough that a backend engineer can use Mesh daily without fighting the toolchain.
-- Class: quality-attribute
-- Status: active
-- Description: Diagnostics, formatter, LSP, tests, and the coverage story are credible enough that a backend engineer can use Mesh daily without fighting the toolchain.
-- Why it matters: Better DX is part of the explicit comparison target against Elixir, and weak tooling would erase gains from static typing or native binaries.
-- Source: user
-- Primary owning slice: M028/S03
-- Supporting slices: M030/S01 (provisional), M030/S02 (provisional)
-- Validation: mapped
-- Notes: The toolchain should be judged against the real reference backend, not only tiny fixtures.
-
 ### R007 — Mesh projects have a believable dependency/package workflow for building and shipping backend applications with reproducible inputs.
 - Class: launchability
 - Status: active
@@ -57,7 +46,7 @@ This file is the explicit capability and coverage contract for the project.
 - Primary owning slice: M028/S06
 - Supporting slices: M028/S01, M028/S03, M028/S04, M028/S05
 - Validation: mapped
-- Notes: The docs surface should become part of the proof, not an afterthought.
+- Notes: S03 advanced the documentation truth surface by syncing README, website tooling/testing/cheatsheet docs, reference-backend docs, and the VS Code README to the verified `meshc fmt`, project-directory `meshc test`, honest `--coverage` contract, and JSON-RPC-proven LSP feature set. Full production-proof documentation promotion still belongs to S06.
 
 ### R009 — Mesh proves itself through a real reference backend that exercises the language as a backend platform instead of proving subsystems only in isolation.
 - Class: differentiator
@@ -160,6 +149,17 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: Validated by M028/S02 through live Postgres-backed compiler e2e coverage in `compiler/meshc/tests/e2e_reference_backend.rs`: `e2e_reference_backend_runtime_starts`, `e2e_reference_backend_migration_status_and_apply`, `e2e_reference_backend_job_flow_updates_health_and_db`, `e2e_reference_backend_claim_contention_is_not_failure`, and `e2e_reference_backend_multi_instance_claims_once` proving migration pending→applied truth, HTTP/DB/health agreement for job lifecycle state, and two-instance exact-once shared-DB processing without benign claim contention inflating `failed_jobs` or `last_error`.
 - Notes: S02 kept runtime-correctness proof on the canonical reference-backend harness and moved exact-once truth to direct `jobs` reads, cross-instance `/jobs/:id`, and per-instance processed-job logs while treating `/health.failed_jobs` + `/health.last_error` as the stable contention signal.
 
+### R006 — Diagnostics, formatter, LSP, tests, and the coverage story are credible enough that a backend engineer can use Mesh daily without fighting the toolchain.
+- Class: quality-attribute
+- Status: validated
+- Description: Diagnostics, formatter, LSP, tests, and the coverage story are credible enough that a backend engineer can use Mesh daily without fighting the toolchain.
+- Why it matters: Better DX is part of the explicit comparison target against Elixir, and weak tooling would erase gains from static typing or native binaries.
+- Source: user
+- Primary owning slice: M028/S03
+- Supporting slices: M030/S01 (provisional), M030/S02 (provisional)
+- Validation: S03 closure reran the full tooling trust gate on `reference-backend/`: `cargo test -p mesh-fmt -- --nocapture`, `cargo test -p meshc --test e2e_fmt -- --nocapture`, `cargo run -p meshc -- fmt --check reference-backend`, `cargo run -p meshc -- test reference-backend`, `! cargo run -p meshc -- test --coverage reference-backend`, `cargo test -p meshc --test tooling_e2e -- --nocapture`, `cargo test -p meshc --test e2e_lsp -- --nocapture`, `cargo test -p mesh-lsp -- --nocapture`, and the stale-string sweep over README/website/VS Code/reference-backend docs all passed.
+- Notes: The toolchain should be judged against the real reference backend, not only tiny fixtures.
+
 ## Deferred
 
 ### R020 — Mesh eventually offers a stronger debugger/profiler/trace surface suitable for deeper production diagnostics.
@@ -250,7 +250,7 @@ This file is the explicit capability and coverage contract for the project.
 | R003 | quality-attribute | validated | M028/S02 | M028/S06 | Validated by M028/S02 through live Postgres-backed compiler e2e coverage in `compiler/meshc/tests/e2e_reference_backend.rs`: `e2e_reference_backend_runtime_starts`, `e2e_reference_backend_migration_status_and_apply`, `e2e_reference_backend_job_flow_updates_health_and_db`, `e2e_reference_backend_claim_contention_is_not_failure`, and `e2e_reference_backend_multi_instance_claims_once` proving migration pending→applied truth, HTTP/DB/health agreement for job lifecycle state, and two-instance exact-once shared-DB processing without benign claim contention inflating `failed_jobs` or `last_error`. |
 | R004 | quality-attribute | active | M028/S05 | M028/S02, M028/S06 | mapped |
 | R005 | launchability | active | M028/S04 | M028/S06 | mapped |
-| R006 | quality-attribute | active | M028/S03 | M030/S01 (provisional), M030/S02 (provisional) | mapped |
+| R006 | quality-attribute | validated | M028/S03 | M030/S01 (provisional), M030/S02 (provisional) | S03 closure reran the full tooling trust gate on `reference-backend/`: `cargo test -p mesh-fmt -- --nocapture`, `cargo test -p meshc --test e2e_fmt -- --nocapture`, `cargo run -p meshc -- fmt --check reference-backend`, `cargo run -p meshc -- test reference-backend`, `! cargo run -p meshc -- test --coverage reference-backend`, `cargo test -p meshc --test tooling_e2e -- --nocapture`, `cargo test -p meshc --test e2e_lsp -- --nocapture`, `cargo test -p mesh-lsp -- --nocapture`, and the stale-string sweep over README/website/VS Code/reference-backend docs all passed. |
 | R007 | launchability | active | M030/S01 (provisional) | M030/S02 (provisional) | mapped |
 | R008 | launchability | active | M028/S06 | M028/S01, M028/S03, M028/S04, M028/S05 | mapped |
 | R009 | differentiator | active | M028/S06 | M028/S01, M028/S02, M028/S05 | mapped |
@@ -269,7 +269,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 11
-- Mapped to slices: 11
-- Validated: 3 (R001, R002, R003)
+- Active requirements: 10
+- Mapped to slices: 10
+- Validated: 4 (R001, R002, R003, R006)
 - Unmapped active requirements: 0

@@ -17,7 +17,7 @@ The repository already ships a broad backend-oriented language platform:
 - package and registry infrastructure plus a docs/website surface
 - dogfooded backend applications and benchmarks inside the repo
 
-The current gap is not feature count. The current gap is trust. M028/S01 and S02 now close the first two concrete proof gaps: the repo contains a working `reference-backend/` package that builds, starts, migrates, serves HTTP, persists jobs in Postgres, and lets a timer-driven worker move a durable row from `pending` to `processed`, and the compiler-facing Rust harness now proves migration truth, HTTP/DB/health job-state agreement, and two-instance exact-once processing without benign claim contention inflating worker failure signals. The remaining gaps are the follow-on trust layers: tooling credibility, boring deployment proof, supervision/recovery hardening, and final docs/examples promotion.
+The current gap is not feature count. The current gap is trust. M028/S01-S03 now close the first three concrete proof gaps: the repo contains a working `reference-backend/` package that builds, starts, migrates, serves HTTP, persists jobs in Postgres, and lets a timer-driven worker move a durable row from `pending` to `processed`; the compiler-facing Rust harness proves migration truth, HTTP/DB/health job-state agreement, and two-instance exact-once processing without benign claim contention inflating worker failure signals; and the same backend now has trustworthy formatter, test-runner, LSP, and doc/editor proof surfaces instead of toy-only tooling claims. The remaining gaps are the follow-on trust layers: boring deployment proof, supervision/recovery hardening, and final docs/examples promotion.
 
 ## Architecture / Key Patterns
 

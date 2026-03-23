@@ -57,7 +57,7 @@ This milestone is complete only when all are true:
 - [x] **S02: Runtime Correctness on the Golden Path** `risk:high` `depends:[S01]`
   > After this: the reference backend’s HTTP/DB/migration/job path is exercised by automated proof, and the most credibility-damaging blockers on that path are fixed.
 
-- [ ] **S03: Daily-Driver Tooling Trust** `risk:medium` `depends:[S01]`
+- [x] **S03: Daily-Driver Tooling Trust** `risk:medium` `depends:[S01]`
   > After this: the same backend can be developed with materially stronger fmt/diagnostics/test/LSP/coverage surfaces, so DX claims rest on a real workflow instead of toy files.
 
 - [ ] **S04: Boring Native Deployment** `risk:medium` `depends:[S01,S02]`
