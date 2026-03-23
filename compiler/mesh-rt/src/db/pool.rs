@@ -460,7 +460,11 @@ mod tests {
         let insert_result = mesh_pool_execute(pool, insert_sql, insert_params);
         let insert = unsafe { &*(insert_result as *const MeshResult) };
         assert_eq!(insert.tag, 0, "pool insert should succeed");
-        assert_eq!(unsafe { *(insert.value as *const i64) }, 1, "pool insert should affect one row");
+        assert_eq!(
+            unsafe { *(insert.value as *const i64) },
+            1,
+            "pool insert should affect one row"
+        );
 
         mesh_pool_close(pool);
     }

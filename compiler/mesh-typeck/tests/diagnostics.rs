@@ -110,10 +110,7 @@ fn test_diag_trait_not_satisfied() {
 fn test_render_errors_multiple() {
     let src = "x + y";
     let errors = render_all_errors(src);
-    assert!(
-        !errors.is_empty(),
-        "expected at least one rendered error"
-    );
+    assert!(!errors.is_empty(), "expected at least one rendered error");
     for e in &errors {
         assert!(
             e.contains("Error"),
@@ -167,9 +164,21 @@ fn test_diag_non_exhaustive_match_multiple() {
     };
     let output = render_diagnostic(&err, src, "test.mpl", &opts(), None);
     assert!(output.contains("E0012"), "expected E0012 code: {}", output);
-    assert!(output.contains("Rect"), "expected Rect in missing: {}", output);
-    assert!(output.contains("Point"), "expected Point in missing: {}", output);
-    assert!(output.contains("non-exhaustive"), "expected non-exhaustive message: {}", output);
+    assert!(
+        output.contains("Rect"),
+        "expected Rect in missing: {}",
+        output
+    );
+    assert!(
+        output.contains("Point"),
+        "expected Point in missing: {}",
+        output
+    );
+    assert!(
+        output.contains("non-exhaustive"),
+        "expected non-exhaustive message: {}",
+        output
+    );
 }
 
 #[test]
@@ -191,9 +200,17 @@ fn test_diag_redundant_arm_is_warning() {
         span: rowan::TextRange::new(18.into(), 27.into()),
     };
     let output = render_diagnostic(&err, src, "test.mpl", &opts(), None);
-    assert!(output.contains("Warning"), "expected Warning kind: {}", output);
+    assert!(
+        output.contains("Warning"),
+        "expected Warning kind: {}",
+        output
+    );
     assert!(output.contains("W0001"), "expected W0001 code: {}", output);
-    assert!(output.contains("unreachable"), "expected 'unreachable' label: {}", output);
+    assert!(
+        output.contains("unreachable"),
+        "expected 'unreachable' label: {}",
+        output
+    );
 }
 
 #[test]
@@ -216,7 +233,11 @@ fn test_diag_unknown_variant() {
     };
     let output = render_diagnostic(&err, src, "test.mpl", &opts(), None);
     assert!(output.contains("E0010"), "expected E0010 code: {}", output);
-    assert!(output.contains("Triangle"), "expected 'Triangle' in output: {}", output);
+    assert!(
+        output.contains("Triangle"),
+        "expected 'Triangle' in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -229,7 +250,11 @@ fn test_diag_or_pattern_binding_mismatch() {
     };
     let output = render_diagnostic(&err, src, "test.mpl", &opts(), None);
     assert!(output.contains("E0011"), "expected E0011 code: {}", output);
-    assert!(output.contains("bind"), "expected binding-related message: {}", output);
+    assert!(
+        output.contains("bind"),
+        "expected binding-related message: {}",
+        output
+    );
 }
 
 // ── Phase 6 Actor Diagnostic Tests ──────────────────────────────────
@@ -253,7 +278,11 @@ fn test_diag_self_outside_actor() {
     assert!(!result.errors.is_empty(), "expected SelfOutsideActor error");
     let output = render_diagnostic(&result.errors[0], src, "test.mpl", &opts(), None);
     assert!(output.contains("E0015"), "expected E0015 code: {}", output);
-    assert!(output.contains("self()"), "expected 'self()' in output: {}", output);
+    assert!(
+        output.contains("self()"),
+        "expected 'self()' in output: {}",
+        output
+    );
     insta::assert_snapshot!(output);
 }
 
@@ -266,7 +295,11 @@ fn test_diag_spawn_non_function() {
     };
     let output = render_diagnostic(&err, src, "test.mpl", &opts(), None);
     assert!(output.contains("E0016"), "expected E0016 code: {}", output);
-    assert!(output.contains("function"), "expected 'function' in output: {}", output);
+    assert!(
+        output.contains("function"),
+        "expected 'function' in output: {}",
+        output
+    );
     insta::assert_snapshot!(output);
 }
 
@@ -274,10 +307,17 @@ fn test_diag_spawn_non_function() {
 fn test_diag_receive_outside_actor() {
     let src = "receive do\nn -> n\nend";
     let result = check_source(src);
-    assert!(!result.errors.is_empty(), "expected ReceiveOutsideActor error");
+    assert!(
+        !result.errors.is_empty(),
+        "expected ReceiveOutsideActor error"
+    );
     let output = render_diagnostic(&result.errors[0], src, "test.mpl", &opts(), None);
     assert!(output.contains("E0017"), "expected E0017 code: {}", output);
-    assert!(output.contains("receive"), "expected 'receive' in output: {}", output);
+    assert!(
+        output.contains("receive"),
+        "expected 'receive' in output: {}",
+        output
+    );
     insta::assert_snapshot!(output);
 }
 
@@ -290,9 +330,21 @@ fn test_diag_send_type_mismatch_details() {
         span: rowan::TextRange::new(0.into(), 18.into()),
     };
     let output = render_diagnostic(&err, src, "test.mpl", &opts(), None);
-    assert!(output.contains("Int"), "expected 'Int' type in output: {}", output);
-    assert!(output.contains("String"), "expected 'String' type in output: {}", output);
-    assert!(output.contains("Pid"), "expected 'Pid' in help text: {}", output);
+    assert!(
+        output.contains("Int"),
+        "expected 'Int' type in output: {}",
+        output
+    );
+    assert!(
+        output.contains("String"),
+        "expected 'String' type in output: {}",
+        output
+    );
+    assert!(
+        output.contains("Pid"),
+        "expected 'Pid' in help text: {}",
+        output
+    );
 }
 
 // ── Phase 10 JSON + Multi-span Diagnostic Tests ────────────────────
@@ -319,7 +371,11 @@ fn test_json_one_line() {
     assert!(!result.errors.is_empty());
     let json_opts = DiagnosticOptions::json_mode();
     let output = render_diagnostic(&result.errors[0], src, "test.mpl", &json_opts, None);
-    assert!(!output.contains('\n'), "JSON output should be one line: {}", output);
+    assert!(
+        !output.contains('\n'),
+        "JSON output should be one line: {}",
+        output
+    );
 }
 
 #[test]

@@ -201,12 +201,10 @@ impl InferCtx {
             }
             Ty::Con(_) => false,
             Ty::Fun(params, ret) => {
-                params.iter().any(|p| self.occurs_in(var, p))
-                    || self.occurs_in(var, ret)
+                params.iter().any(|p| self.occurs_in(var, p)) || self.occurs_in(var, ret)
             }
             Ty::App(con, args) => {
-                self.occurs_in(var, con)
-                    || args.iter().any(|a| self.occurs_in(var, a))
+                self.occurs_in(var, con) || args.iter().any(|a| self.occurs_in(var, a))
             }
             Ty::Tuple(elems) => elems.iter().any(|e| self.occurs_in(var, e)),
             Ty::Never => false,
@@ -254,12 +252,7 @@ impl InferCtx {
     /// This is the core of HM inference. Both types are first resolved
     /// through the union-find table, then structurally compared. If they
     /// differ, a type error is recorded.
-    pub fn unify(
-        &mut self,
-        a: Ty,
-        b: Ty,
-        origin: ConstraintOrigin,
-    ) -> Result<(), TypeError> {
+    pub fn unify(&mut self, a: Ty, b: Ty, origin: ConstraintOrigin) -> Result<(), TypeError> {
         let a = self.resolve(a);
         let b = self.resolve(b);
 
@@ -278,24 +271,23 @@ impl InferCtx {
             // Variable meets concrete type -- bind the variable (with occurs check).
             (Ty::Var(v), ty) | (ty, Ty::Var(v)) => {
                 if self.occurs_in(v, &ty) {
-                    let err = TypeError::InfiniteType {
-                        var: v,
-                        ty,
-                        origin,
-                    };
+                    let err = TypeError::InfiniteType { var: v, ty, origin };
                     self.errors.push(err.clone());
                     Err(err)
                 } else {
-                    self.table
-                        .unify_var_value(v, Some(ty))
-                        .expect("binding a var to a concrete type after occurs check should not fail");
+                    self.table.unify_var_value(v, Some(ty)).expect(
+                        "binding a var to a concrete type after occurs check should not fail",
+                    );
                     Ok(())
                 }
             }
 
             // Concrete constructor meets concrete constructor -- names must match.
             (Ty::Con(c1), Ty::Con(c2)) => {
-                if c1 == c2 || Self::iterator_ptr_compatible(&c1, &c2) || Self::json_string_compatible(&c1, &c2) {
+                if c1 == c2
+                    || Self::iterator_ptr_compatible(&c1, &c2)
+                    || Self::json_string_compatible(&c1, &c2)
+                {
                     Ok(())
                 } else {
                     let err = TypeError::Mismatch {
@@ -328,10 +320,8 @@ impl InferCtx {
 
             // Pid escape hatch: untyped Pid (Con) unifies with typed Pid<M> (App).
             // This allows: let untyped :: Pid = typed_pid  (typed -> untyped).
-            (Ty::Con(ref c), Ty::App(ref con, _))
-            | (Ty::App(ref con, _), Ty::Con(ref c))
-                if c.name == "Pid"
-                    && matches!(con.as_ref(), Ty::Con(tc) if tc.name == "Pid") =>
+            (Ty::Con(ref c), Ty::App(ref con, _)) | (Ty::App(ref con, _), Ty::Con(ref c))
+                if c.name == "Pid" && matches!(con.as_ref(), Ty::Con(tc) if tc.name == "Pid") =>
             {
                 Ok(())
             }
@@ -369,8 +359,7 @@ impl InferCtx {
 
             // Tuple escape hatch: untyped Tuple (Con) unifies with any typed tuple (Ty::Tuple).
             // This allows Tuple.first/Tuple.second to accept concrete tuple types like (Int, String).
-            (Ty::Con(ref c), Ty::Tuple(_))
-            | (Ty::Tuple(_), Ty::Con(ref c))
+            (Ty::Con(ref c), Ty::Tuple(_)) | (Ty::Tuple(_), Ty::Con(ref c))
                 if c.name == "Tuple" =>
             {
                 Ok(())
@@ -456,11 +445,7 @@ impl InferCtx {
                 match probe {
                     Some(inner) => self.collect_generalizable_vars(&inner, out),
                     None => {
-                        let level = self
-                            .var_levels
-                            .get(v.0 as usize)
-                            .copied()
-                            .unwrap_or(0);
+                        let level = self.var_levels.get(v.0 as usize).copied().unwrap_or(0);
                         if level > self.current_level {
                             out.push(*v);
                         }
@@ -499,21 +484,14 @@ impl InferCtx {
             return scheme.ty.clone();
         }
 
-        let substitution: FxHashMap<TyVar, Ty> = scheme
-            .vars
-            .iter()
-            .map(|v| (*v, self.fresh_var()))
-            .collect();
+        let substitution: FxHashMap<TyVar, Ty> =
+            scheme.vars.iter().map(|v| (*v, self.fresh_var())).collect();
 
         self.apply_substitution(&scheme.ty, &substitution)
     }
 
     /// Apply a substitution map to a type.
-    fn apply_substitution(
-        &mut self,
-        ty: &Ty,
-        subst: &FxHashMap<TyVar, Ty>,
-    ) -> Ty {
+    fn apply_substitution(&mut self, ty: &Ty, subst: &FxHashMap<TyVar, Ty>) -> Ty {
         match ty {
             Ty::Var(v) => {
                 if let Some(replacement) = subst.get(v) {
@@ -711,9 +689,7 @@ mod tests {
 
         // Never unifies with any type.
         assert!(ctx.unify(Ty::Never, Ty::int(), builtin_origin()).is_ok());
-        assert!(ctx
-            .unify(Ty::string(), Ty::Never, builtin_origin())
-            .is_ok());
+        assert!(ctx.unify(Ty::string(), Ty::Never, builtin_origin()).is_ok());
     }
 
     #[test]
@@ -754,9 +730,7 @@ mod tests {
             .unify(con.clone(), app.clone(), builtin_origin())
             .is_ok());
         // Symmetric: App should also unify with Con
-        assert!(ctx
-            .unify(app, con, builtin_origin())
-            .is_ok());
+        assert!(ctx.unify(app, con, builtin_origin()).is_ok());
     }
 
     #[test]
@@ -765,9 +739,7 @@ mod tests {
         let con = Ty::Con(TyCon::new("List"));
         let app = Ty::App(Box::new(Ty::Con(TyCon::new("List"))), vec![Ty::int()]);
         // Con("List") should NOT unify with App(Con("List"), [Int]) -- different arities
-        assert!(ctx
-            .unify(con, app, builtin_origin())
-            .is_err());
+        assert!(ctx.unify(con, app, builtin_origin()).is_err());
     }
 
     #[test]

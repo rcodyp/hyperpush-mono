@@ -57,9 +57,7 @@ enum HeadCtor {
         arity: usize,
     },
     /// A list cons pattern (head :: tail).
-    ListCons {
-        elem_ty: MirType,
-    },
+    ListCons { elem_ty: MirType },
 }
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -199,8 +197,12 @@ fn compile_matrix(
     }
 
     // Step 3: Determine if we need a Switch (constructors), ListDecons, or Tests (literals).
-    let has_list_cons = head_ctors.iter().any(|c| matches!(c, HeadCtor::ListCons { .. }));
-    let has_constructors = head_ctors.iter().any(|c| matches!(c, HeadCtor::Constructor { .. }));
+    let has_list_cons = head_ctors
+        .iter()
+        .any(|c| matches!(c, HeadCtor::ListCons { .. }));
+    let has_constructors = head_ctors
+        .iter()
+        .any(|c| matches!(c, HeadCtor::Constructor { .. }));
 
     if has_list_cons {
         compile_list_cons(&matrix, col, &head_ctors, file, line, sum_type_defs)
@@ -533,11 +535,7 @@ fn specialize_for_constructor(
 
                 // Collect binding if it's a variable.
                 if let MirPattern::Var(name, ty) = pat {
-                    new_bindings.push((
-                        name.clone(),
-                        ty.clone(),
-                        matrix.column_paths[col].clone(),
-                    ));
+                    new_bindings.push((name.clone(), ty.clone(), matrix.column_paths[col].clone()));
                 }
 
                 // Add wildcard sub-patterns for each constructor field.
@@ -660,11 +658,7 @@ fn compile_list_cons(
 ///
 /// Rows with ListCons patterns have head/tail expanded as two new columns.
 /// Rows with wildcards/variables are kept with wildcard sub-patterns for head/tail.
-fn specialize_for_list_cons(
-    matrix: &PatMatrix,
-    col: usize,
-    elem_ty: &MirType,
-) -> PatMatrix {
+fn specialize_for_list_cons(matrix: &PatMatrix, col: usize, elem_ty: &MirType) -> PatMatrix {
     let mut new_rows = Vec::new();
     let parent_path = &matrix.column_paths[col];
 
@@ -697,11 +691,7 @@ fn specialize_for_list_cons(
                 let mut new_bindings = row.bindings.clone();
 
                 if let MirPattern::Var(name, ty) = pat {
-                    new_bindings.push((
-                        name.clone(),
-                        ty.clone(),
-                        matrix.column_paths[col].clone(),
-                    ));
+                    new_bindings.push((name.clone(), ty.clone(), matrix.column_paths[col].clone()));
                 }
 
                 // Add wildcard sub-patterns for head and tail.
@@ -800,11 +790,7 @@ fn compile_literal_tests(
 }
 
 /// Specialize the matrix for a specific literal value.
-fn specialize_for_literal(
-    matrix: &PatMatrix,
-    col: usize,
-    target_lit: &MirLiteral,
-) -> PatMatrix {
+fn specialize_for_literal(matrix: &PatMatrix, col: usize, target_lit: &MirLiteral) -> PatMatrix {
     let mut new_rows = Vec::new();
 
     for row in &matrix.rows {
@@ -831,11 +817,7 @@ fn specialize_for_literal(
                 let mut new_bindings = row.bindings.clone();
 
                 if let MirPattern::Var(name, ty) = pat {
-                    new_bindings.push((
-                        name.clone(),
-                        ty.clone(),
-                        matrix.column_paths[col].clone(),
-                    ));
+                    new_bindings.push((name.clone(), ty.clone(), matrix.column_paths[col].clone()));
                 }
 
                 for (i, p) in row.patterns.iter().enumerate() {
@@ -898,11 +880,7 @@ fn default_matrix(matrix: &PatMatrix, col: usize) -> PatMatrix {
             let mut new_bindings = row.bindings.clone();
 
             if let MirPattern::Var(name, ty) = pat {
-                new_bindings.push((
-                    name.clone(),
-                    ty.clone(),
-                    matrix.column_paths[col].clone(),
-                ));
+                new_bindings.push((name.clone(), ty.clone(), matrix.column_paths[col].clone()));
             }
 
             for (i, p) in row.patterns.iter().enumerate() {
@@ -946,11 +924,7 @@ fn remove_wildcard_column(matrix: &PatMatrix, col: usize) -> PatMatrix {
 
         // Collect binding if it's a variable.
         if let MirPattern::Var(name, ty) = &row.patterns[col] {
-            new_bindings.push((
-                name.clone(),
-                ty.clone(),
-                matrix.column_paths[col].clone(),
-            ));
+            new_bindings.push((name.clone(), ty.clone(), matrix.column_paths[col].clone()));
         }
 
         for (i, p) in row.patterns.iter().enumerate() {
@@ -987,9 +961,10 @@ fn remove_wildcard_column(matrix: &PatMatrix, col: usize) -> PatMatrix {
 
 /// Check if a column contains any tuple patterns.
 fn column_has_tuples(matrix: &PatMatrix, col: usize) -> bool {
-    matrix.rows.iter().any(|row| {
-        col < row.patterns.len() && matches!(&row.patterns[col], MirPattern::Tuple(_))
-    })
+    matrix
+        .rows
+        .iter()
+        .any(|row| col < row.patterns.len() && matches!(&row.patterns[col], MirPattern::Tuple(_)))
 }
 
 /// Expand a tuple column into its sub-columns.
@@ -1050,11 +1025,7 @@ fn expand_tuple_column(matrix: &PatMatrix, col: usize) -> PatMatrix {
             }
             MirPattern::Var(name, ty) => {
                 // Variable binding for the whole tuple -- bind and pad with wildcards.
-                new_bindings.push((
-                    name.clone(),
-                    ty.clone(),
-                    parent_path.clone(),
-                ));
+                new_bindings.push((name.clone(), ty.clone(), parent_path.clone()));
                 for _ in 0..arity {
                     new_pats.push(MirPattern::Wildcard);
                 }
@@ -1108,10 +1079,7 @@ fn expand_tuple_column(matrix: &PatMatrix, col: usize) -> PatMatrix {
 // ── Expression tree walking ─────────────────────────────────────────
 
 /// Recursively compile match expressions within an expression tree.
-fn compile_expr_patterns(
-    expr: &mut MirExpr,
-    sum_type_defs: &FxHashMap<String, MirSumTypeDef>,
-) {
+fn compile_expr_patterns(expr: &mut MirExpr, sum_type_defs: &FxHashMap<String, MirSumTypeDef>) {
     match expr {
         MirExpr::Match {
             scrutinee,
@@ -1179,7 +1147,9 @@ fn compile_expr_patterns(
                 compile_expr_patterns(field_expr, sum_type_defs);
             }
         }
-        MirExpr::StructUpdate { base, overrides, .. } => {
+        MirExpr::StructUpdate {
+            base, overrides, ..
+        } => {
             compile_expr_patterns(base, sum_type_defs);
             for (_, val) in overrides {
                 compile_expr_patterns(val, sum_type_defs);
@@ -1210,7 +1180,12 @@ fn compile_expr_patterns(
         | MirExpr::Panic { .. }
         | MirExpr::Unit => {}
         // Actor primitives -- recurse into sub-expressions.
-        MirExpr::ActorSpawn { func, args, terminate_callback, .. } => {
+        MirExpr::ActorSpawn {
+            func,
+            args,
+            terminate_callback,
+            ..
+        } => {
             compile_expr_patterns(func, sum_type_defs);
             for arg in args {
                 compile_expr_patterns(arg, sum_type_defs);
@@ -1219,11 +1194,18 @@ fn compile_expr_patterns(
                 compile_expr_patterns(cb, sum_type_defs);
             }
         }
-        MirExpr::ActorSend { target, message, .. } => {
+        MirExpr::ActorSend {
+            target, message, ..
+        } => {
             compile_expr_patterns(target, sum_type_defs);
             compile_expr_patterns(message, sum_type_defs);
         }
-        MirExpr::ActorReceive { arms, timeout_ms, timeout_body, .. } => {
+        MirExpr::ActorReceive {
+            arms,
+            timeout_ms,
+            timeout_body,
+            ..
+        } => {
             for arm in arms {
                 if let Some(guard) = &mut arm.guard {
                     compile_expr_patterns(guard, sum_type_defs);
@@ -1254,7 +1236,13 @@ fn compile_expr_patterns(
             compile_expr_patterns(body, sum_type_defs);
         }
         MirExpr::Break | MirExpr::Continue => {}
-        MirExpr::ForInRange { start, end, filter, body, .. } => {
+        MirExpr::ForInRange {
+            start,
+            end,
+            filter,
+            body,
+            ..
+        } => {
             compile_expr_patterns(start, sum_type_defs);
             compile_expr_patterns(end, sum_type_defs);
             if let Some(f) = filter {
@@ -1262,28 +1250,48 @@ fn compile_expr_patterns(
             }
             compile_expr_patterns(body, sum_type_defs);
         }
-        MirExpr::ForInList { collection, filter, body, .. } => {
+        MirExpr::ForInList {
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             compile_expr_patterns(collection, sum_type_defs);
             if let Some(f) = filter {
                 compile_expr_patterns(f, sum_type_defs);
             }
             compile_expr_patterns(body, sum_type_defs);
         }
-        MirExpr::ForInMap { collection, filter, body, .. } => {
+        MirExpr::ForInMap {
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             compile_expr_patterns(collection, sum_type_defs);
             if let Some(f) = filter {
                 compile_expr_patterns(f, sum_type_defs);
             }
             compile_expr_patterns(body, sum_type_defs);
         }
-        MirExpr::ForInSet { collection, filter, body, .. } => {
+        MirExpr::ForInSet {
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             compile_expr_patterns(collection, sum_type_defs);
             if let Some(f) = filter {
                 compile_expr_patterns(f, sum_type_defs);
             }
             compile_expr_patterns(body, sum_type_defs);
         }
-        MirExpr::ForInIterator { iterator, filter, body, .. } => {
+        MirExpr::ForInIterator {
+            iterator,
+            filter,
+            body,
+            ..
+        } => {
             compile_expr_patterns(iterator, sum_type_defs);
             if let Some(f) = filter {
                 compile_expr_patterns(f, sum_type_defs);
@@ -1413,10 +1421,7 @@ mod tests {
                 assert!(matches!(value, MirLiteral::Int(1)));
                 assert!(matches!(
                     success.as_ref(),
-                    DecisionTree::Leaf {
-                        arm_index: 0,
-                        ..
-                    }
+                    DecisionTree::Leaf { arm_index: 0, .. }
                 ));
                 // failure should be another Test for literal 2
                 match failure.as_ref() {
@@ -1430,17 +1435,11 @@ mod tests {
                         assert!(matches!(val2, MirLiteral::Int(2)));
                         assert!(matches!(
                             s2.as_ref(),
-                            DecisionTree::Leaf {
-                                arm_index: 1,
-                                ..
-                            }
+                            DecisionTree::Leaf { arm_index: 1, .. }
                         ));
                         assert!(matches!(
                             f2.as_ref(),
-                            DecisionTree::Leaf {
-                                arm_index: 2,
-                                ..
-                            }
+                            DecisionTree::Leaf { arm_index: 2, .. }
                         ));
                     }
                     other => panic!("Expected nested Test, got {:?}", other),
@@ -1484,10 +1483,7 @@ mod tests {
                 assert!(matches!(value, MirLiteral::Bool(true)));
                 assert!(matches!(
                     success.as_ref(),
-                    DecisionTree::Leaf {
-                        arm_index: 0,
-                        ..
-                    }
+                    DecisionTree::Leaf { arm_index: 0, .. }
                 ));
                 // Second Test for false literal
                 match failure.as_ref() {
@@ -1499,10 +1495,7 @@ mod tests {
                         assert!(matches!(v2, MirLiteral::Bool(false)));
                         assert!(matches!(
                             s2.as_ref(),
-                            DecisionTree::Leaf {
-                                arm_index: 1,
-                                ..
-                            }
+                            DecisionTree::Leaf { arm_index: 1, .. }
                         ));
                     }
                     other => panic!("Expected nested Test for false, got {:?}", other),
@@ -1548,7 +1541,13 @@ mod tests {
             ),
         ];
 
-        let tree = compile_match(&MirType::SumType("Shape".to_string()), &arms, "test.mpl", 1, &FxHashMap::default());
+        let tree = compile_match(
+            &MirType::SumType("Shape".to_string()),
+            &arms,
+            "test.mpl",
+            1,
+            &FxHashMap::default(),
+        );
 
         match &tree {
             DecisionTree::Switch {
@@ -1639,10 +1638,8 @@ mod tests {
             ),
         ];
 
-        let scrutinee_ty = MirType::Tuple(vec![
-            MirType::SumType("Option".to_string()),
-            MirType::Int,
-        ]);
+        let scrutinee_ty =
+            MirType::Tuple(vec![MirType::SumType("Option".to_string()), MirType::Int]);
         let tree = compile_match(&scrutinee_ty, &arms, "test.mpl", 1, &FxHashMap::default());
 
         // The tree should switch on TupleField(Root, 0) for constructor tag
@@ -1721,7 +1718,10 @@ mod tests {
         // Should be Test(Root, 1, Leaf(0), Test(Root, 2, Leaf(0), Leaf(1)))
         match &tree {
             DecisionTree::Test {
-                value, success, failure, ..
+                value,
+                success,
+                failure,
+                ..
             } => {
                 assert!(matches!(value, MirLiteral::Int(1)));
                 match success.as_ref() {
@@ -1834,10 +1834,7 @@ mod tests {
             } => {
                 assert!(matches!(
                     success.as_ref(),
-                    DecisionTree::Leaf {
-                        arm_index: 0,
-                        ..
-                    }
+                    DecisionTree::Leaf { arm_index: 0, .. }
                 ));
                 match failure.as_ref() {
                     DecisionTree::Fail { message, .. } => {
@@ -1997,7 +1994,13 @@ mod tests {
             make_arm(MirPattern::Wildcard, None, int_body(0)),
         ];
 
-        let tree = compile_match(&MirType::String, &arms, "test.mpl", 1, &FxHashMap::default());
+        let tree = compile_match(
+            &MirType::String,
+            &arms,
+            "test.mpl",
+            1,
+            &FxHashMap::default(),
+        );
 
         match &tree {
             DecisionTree::Test {
@@ -2059,10 +2062,7 @@ mod tests {
             } => {
                 assert!(matches!(
                     success.as_ref(),
-                    DecisionTree::Leaf {
-                        arm_index: 0,
-                        ..
-                    }
+                    DecisionTree::Leaf { arm_index: 0, .. }
                 ));
                 match first_failure.as_ref() {
                     DecisionTree::Guard {
@@ -2072,17 +2072,11 @@ mod tests {
                     } => {
                         assert!(matches!(
                             s2.as_ref(),
-                            DecisionTree::Leaf {
-                                arm_index: 1,
-                                ..
-                            }
+                            DecisionTree::Leaf { arm_index: 1, .. }
                         ));
                         assert!(matches!(
                             f2.as_ref(),
-                            DecisionTree::Leaf {
-                                arm_index: 2,
-                                ..
-                            }
+                            DecisionTree::Leaf { arm_index: 2, .. }
                         ));
                     }
                     other => panic!("Expected nested Guard, got {:?}", other),

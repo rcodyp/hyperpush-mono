@@ -249,8 +249,7 @@ fn load_file(path: &str, session: &mut ReplSession) -> CommandResult {
 
             let parse = mesh_parser::parse(&full_with_file);
             if !parse.ok() {
-                let errors: Vec<String> =
-                    parse.errors().iter().map(|e| format!("{}", e)).collect();
+                let errors: Vec<String> = parse.errors().iter().map(|e| format!("{}", e)).collect();
                 return CommandResult::Error(format!(
                     "Parse error in '{}': {}",
                     path,
@@ -625,10 +624,7 @@ mod tests {
             value: "Defined: add :: (Int, Int) -> Int".to_string(),
             ty: "Definition".to_string(),
         };
-        assert_eq!(
-            format_result(&result),
-            "Defined: add :: (Int, Int) -> Int"
-        );
+        assert_eq!(format_result(&result), "Defined: add :: (Int, Int) -> Int");
     }
 
     #[test]

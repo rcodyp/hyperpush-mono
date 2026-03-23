@@ -128,16 +128,23 @@ extern "C" fn job_entry(args: *const u8) {
 
     // Unpack: [u64 fn_ptr][u64 env_ptr][u64 caller_pid]
     let (fn_ptr, env_ptr, caller_pid) = unsafe {
-        let fn_ptr_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args, 8).try_into().unwrap(),
-        );
+        let fn_ptr_val =
+            u64::from_le_bytes(std::slice::from_raw_parts(args, 8).try_into().unwrap());
         let env_ptr_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args.add(8), 8).try_into().unwrap(),
+            std::slice::from_raw_parts(args.add(8), 8)
+                .try_into()
+                .unwrap(),
         );
         let caller_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args.add(16), 8).try_into().unwrap(),
+            std::slice::from_raw_parts(args.add(16), 8)
+                .try_into()
+                .unwrap(),
         );
-        (fn_ptr_val as *const u8, env_ptr_val as *const u8, caller_val)
+        (
+            fn_ptr_val as *const u8,
+            env_ptr_val as *const u8,
+            caller_val,
+        )
     };
 
     // Link to the caller (if valid).
@@ -146,8 +153,7 @@ extern "C" fn job_entry(args: *const u8) {
     }
 
     // Call the user function: fn(env_ptr) -> i64
-    let user_fn: extern "C" fn(*const u8) -> i64 =
-        unsafe { std::mem::transmute(fn_ptr) };
+    let user_fn: extern "C" fn(*const u8) -> i64 = unsafe { std::mem::transmute(fn_ptr) };
     let result = user_fn(env_ptr);
 
     // Send the result to the caller tagged with JOB_RESULT_TAG.
@@ -227,9 +233,8 @@ pub extern "C" fn mesh_job_await_timeout(_job_pid: u64, timeout_ms: i64) -> *con
 fn decode_job_message(msg_ptr: *const u8) -> *const u8 {
     unsafe {
         // Read type_tag (first 8 bytes).
-        let type_tag = u64::from_le_bytes(
-            std::slice::from_raw_parts(msg_ptr, 8).try_into().unwrap(),
-        );
+        let type_tag =
+            u64::from_le_bytes(std::slice::from_raw_parts(msg_ptr, 8).try_into().unwrap());
 
         if type_tag == JOB_RESULT_TAG {
             // Job completed successfully.
@@ -267,9 +272,10 @@ fn decode_job_message(msg_ptr: *const u8) -> *const u8 {
                                     .unwrap(),
                             ) as usize;
                             if data_len >= 17 + str_len {
-                                let reason_str = std::str::from_utf8(
-                                    std::slice::from_raw_parts(data_ptr.add(17), str_len),
-                                )
+                                let reason_str = std::str::from_utf8(std::slice::from_raw_parts(
+                                    data_ptr.add(17),
+                                    str_len,
+                                ))
                                 .unwrap_or("unknown error");
                                 err_result(reason_str) as *const u8
                             } else {
@@ -290,9 +296,10 @@ fn decode_job_message(msg_ptr: *const u8) -> *const u8 {
                                     .unwrap(),
                             ) as usize;
                             if data_len >= 17 + str_len {
-                                let reason_str = std::str::from_utf8(
-                                    std::slice::from_raw_parts(data_ptr.add(17), str_len),
-                                )
+                                let reason_str = std::str::from_utf8(std::slice::from_raw_parts(
+                                    data_ptr.add(17),
+                                    str_len,
+                                ))
                                 .unwrap_or("unknown error");
                                 err_result(reason_str) as *const u8
                             } else {
@@ -334,7 +341,9 @@ pub extern "C" fn mesh_job_map(
     fn_ptr: *const u8,
     env_ptr: *const u8,
 ) -> *const u8 {
-    use crate::collections::list::{mesh_list_append, mesh_list_get, mesh_list_length, mesh_list_new};
+    use crate::collections::list::{
+        mesh_list_append, mesh_list_get, mesh_list_length, mesh_list_new,
+    };
 
     if list_ptr.is_null() || fn_ptr.is_null() {
         return mesh_list_new() as *const u8;
@@ -407,17 +416,22 @@ extern "C" fn map_job_entry(args: *const u8) {
     }
 
     let (fn_ptr, env_ptr, element, caller_pid) = unsafe {
-        let fn_ptr_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args, 8).try_into().unwrap(),
-        );
+        let fn_ptr_val =
+            u64::from_le_bytes(std::slice::from_raw_parts(args, 8).try_into().unwrap());
         let env_ptr_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args.add(8), 8).try_into().unwrap(),
+            std::slice::from_raw_parts(args.add(8), 8)
+                .try_into()
+                .unwrap(),
         );
         let element_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args.add(16), 8).try_into().unwrap(),
+            std::slice::from_raw_parts(args.add(16), 8)
+                .try_into()
+                .unwrap(),
         );
         let caller_val = u64::from_le_bytes(
-            std::slice::from_raw_parts(args.add(24), 8).try_into().unwrap(),
+            std::slice::from_raw_parts(args.add(24), 8)
+                .try_into()
+                .unwrap(),
         );
         (fn_ptr_val, env_ptr_val, element_val, caller_val)
     };
@@ -532,7 +546,7 @@ mod tests {
         let result = result_ptr as *const MeshResult;
         unsafe {
             assert_eq!((*result).tag, 1); // Err
-            // Value should be a MeshString containing "normal"
+                                          // Value should be a MeshString containing "normal"
             assert!(!(*result).value.is_null());
         }
     }
@@ -542,7 +556,9 @@ mod tests {
         // Without GLOBAL_SCHEDULER, should return u64::MAX.
         // Note: the scheduler may be initialized by other tests, so
         // we just verify the function doesn't crash.
-        extern "C" fn dummy_fn(_env: *const u8) -> i64 { 42 }
+        extern "C" fn dummy_fn(_env: *const u8) -> i64 {
+            42
+        }
         let _pid = mesh_job_async(dummy_fn as *const u8, std::ptr::null());
         // If scheduler not initialized, returns u64::MAX.
         // If initialized (from other tests), returns a valid PID.

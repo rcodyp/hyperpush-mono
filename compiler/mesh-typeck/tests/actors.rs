@@ -146,9 +146,7 @@ fn test_self_outside_actor_error() {
 
 #[test]
 fn test_receive_outside_actor_error() {
-    let result = check_source(
-        "receive do\nn -> n\nend",
-    );
+    let result = check_source("receive do\nn -> n\nend");
     assert_has_error(
         &result,
         |e| matches!(e, TypeError::ReceiveOutsideActor { .. }),
@@ -190,8 +188,8 @@ fn test_link_returns_unit() {
 
 #[test]
 fn test_unify_pid_typed_with_untyped() {
-    use mesh_typeck::unify::InferCtx;
     use mesh_typeck::error::ConstraintOrigin;
+    use mesh_typeck::unify::InferCtx;
 
     let mut ctx = InferCtx::new();
 
@@ -206,8 +204,8 @@ fn test_unify_pid_typed_with_untyped() {
 
 #[test]
 fn test_unify_pid_typed_with_untyped_reverse() {
-    use mesh_typeck::unify::InferCtx;
     use mesh_typeck::error::ConstraintOrigin;
+    use mesh_typeck::unify::InferCtx;
 
     let mut ctx = InferCtx::new();
 
@@ -222,8 +220,8 @@ fn test_unify_pid_typed_with_untyped_reverse() {
 
 #[test]
 fn test_unify_pid_typed_same_msg() {
-    use mesh_typeck::unify::InferCtx;
     use mesh_typeck::error::ConstraintOrigin;
+    use mesh_typeck::unify::InferCtx;
 
     let mut ctx = InferCtx::new();
 
@@ -238,8 +236,8 @@ fn test_unify_pid_typed_same_msg() {
 
 #[test]
 fn test_unify_pid_typed_different_msg() {
-    use mesh_typeck::unify::InferCtx;
     use mesh_typeck::error::ConstraintOrigin;
+    use mesh_typeck::unify::InferCtx;
 
     let mut ctx = InferCtx::new();
 

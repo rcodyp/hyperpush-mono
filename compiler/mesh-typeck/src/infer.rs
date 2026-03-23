@@ -10,28 +10,28 @@
 //! - Compiler-known traits for operator dispatch (Add, Eq, Ord, etc.)
 //! - Struct definitions, struct literals, and field access (03-03)
 
-use rowan::TextRange;
 use mesh_parser::ast::expr::{
     BinaryExpr, BreakExpr, CallExpr, CaseExpr, ClosureExpr, ContinueExpr, Expr, FieldAccess,
     ForInExpr, IfExpr, JsonExpr, LinkExpr, ListLiteral, Literal, MapLiteral, NameRef, PipeExpr,
-    ReceiveExpr, ReturnExpr, SendExpr, SelfExpr, SlotPipeExpr, SpawnExpr, StructLiteral,
+    ReceiveExpr, ReturnExpr, SelfExpr, SendExpr, SlotPipeExpr, SpawnExpr, StructLiteral,
     StructUpdate, TryExpr, TupleExpr, UnaryExpr, WhileExpr,
 };
 use mesh_parser::ast::item::{
-    ActorDef, Block, FnDef, InterfaceDef, ImplDef as AstImplDef, Item, LetBinding, ServiceDef,
+    ActorDef, Block, FnDef, ImplDef as AstImplDef, InterfaceDef, Item, LetBinding, ServiceDef,
     StructDef, SumTypeDef, SupervisorDef, TypeAliasDef,
 };
 use mesh_parser::ast::pat::Pattern;
 use mesh_parser::ast::AstNode;
 use mesh_parser::syntax_kind::SyntaxKind;
 use mesh_parser::Parse;
+use rowan::TextRange;
 
 use crate::builtins;
 use crate::env::TypeEnv;
 use crate::error::{ConstraintOrigin, TypeError};
 use crate::exhaustiveness::{
-    self, Pat as AbsPat, LitKind as AbsLitKind, TypeInfo as AbsTypeInfo,
-    TypeRegistry as AbsTypeRegistry, ConstructorSig,
+    self, ConstructorSig, LitKind as AbsLitKind, Pat as AbsPat, TypeInfo as AbsTypeInfo,
+    TypeRegistry as AbsTypeRegistry,
 };
 use crate::traits::{
     AssocTypeDef as TraitAssocTypeDef, ImplDef as TraitImplDef, ImplMethodSig, TraitDef,
@@ -220,7 +220,10 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     );
     string_mod.insert(
         "slice".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::int(), Ty::int()], Ty::string())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::int(), Ty::int()],
+            Ty::string(),
+        )),
     );
     string_mod.insert(
         "contains".to_string(),
@@ -255,11 +258,17 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     );
     string_mod.insert(
         "split".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::list(Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string()],
+            Ty::list(Ty::string()),
+        )),
     );
     string_mod.insert(
         "join".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::list(Ty::string()), Ty::string()], Ty::string())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::list(Ty::string()), Ty::string()],
+            Ty::string(),
+        )),
     );
     string_mod.insert(
         "to_int".to_string(),
@@ -272,15 +281,19 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // Phase 77: String.from(T) -> String (polymorphic -- accepts Int, Float, Bool)
     {
         let from_input_var = TyVar(91100);
-        string_mod.insert("from".to_string(), Scheme {
-            vars: vec![from_input_var],
-            ty: Ty::fun(vec![Ty::Var(from_input_var)], Ty::string()),
-        });
+        string_mod.insert(
+            "from".to_string(),
+            Scheme {
+                vars: vec![from_input_var],
+                ty: Ty::fun(vec![Ty::Var(from_input_var)], Ty::string()),
+            },
+        );
     }
     // Phase 79: String.collect(iter) -> String
-    string_mod.insert("collect".to_string(), Scheme::mono(
-        Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::string())
-    ));
+    string_mod.insert(
+        "collect".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::string())),
+    );
     modules.insert("String".to_string(), string_mod);
 
     // ── IO module ──────────────────────────────────────────────────
@@ -319,27 +332,42 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // Regex.compile(pattern) -> Result<Regex, String>
     regex_mod.insert(
         "compile".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::Con(TyCon::new("Regex")), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::Con(TyCon::new("Regex")), Ty::string()),
+        )),
     );
     // Regex.is_match(rx, str) -> Bool
     regex_mod.insert(
         "is_match".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::bool())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string()],
+            Ty::bool(),
+        )),
     );
     // Regex.captures(rx, str) -> Option<List<String>>
     regex_mod.insert(
         "captures".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::option(Ty::list(Ty::string())))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string()],
+            Ty::option(Ty::list(Ty::string())),
+        )),
     );
     // Regex.replace(rx, str, replacement) -> String
     regex_mod.insert(
         "replace".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string(), Ty::string()], Ty::string())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string(), Ty::string()],
+            Ty::string(),
+        )),
     );
     // Regex.split(rx, str) -> List<String>
     regex_mod.insert(
         "split".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::list(Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string()],
+            Ty::list(Ty::string()),
+        )),
     );
     modules.insert("Regex".to_string(), regex_mod);
 
@@ -387,7 +415,10 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // Base64.decode(s) -> Result<String, String>
     base64_mod.insert(
         "decode".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
     );
     // Base64.encode_url(s) -> String
     base64_mod.insert(
@@ -397,7 +428,10 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // Base64.decode_url(s) -> Result<String, String>
     base64_mod.insert(
         "decode_url".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
     );
     modules.insert("Base64".to_string(), base64_mod);
 
@@ -411,7 +445,10 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // Hex.decode(s) -> Result<String, String>
     hex_mod.insert(
         "decode".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
     );
     modules.insert("Hex".to_string(), hex_mod);
 
@@ -419,35 +456,72 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let dt_t = Ty::Con(TyCon::new("DateTime"));
     let mut datetime_mod = HashMap::new();
 
-    datetime_mod.insert("utc_now".to_string(),
-        Scheme::mono(Ty::fun(vec![], dt_t.clone())));
-    datetime_mod.insert("from_iso8601".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(dt_t.clone(), Ty::string()))));
-    datetime_mod.insert("to_iso8601".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::string())));
-    datetime_mod.insert("from_unix_ms".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::result(dt_t.clone(), Ty::string()))));
-    datetime_mod.insert("to_unix_ms".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())));
-    datetime_mod.insert("from_unix_secs".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::result(dt_t.clone(), Ty::string()))));
-    datetime_mod.insert("to_unix_secs".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())));
+    datetime_mod.insert(
+        "utc_now".to_string(),
+        Scheme::mono(Ty::fun(vec![], dt_t.clone())),
+    );
+    datetime_mod.insert(
+        "from_iso8601".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(dt_t.clone(), Ty::string()),
+        )),
+    );
+    datetime_mod.insert(
+        "to_iso8601".to_string(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::string())),
+    );
+    datetime_mod.insert(
+        "from_unix_ms".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::int()],
+            Ty::result(dt_t.clone(), Ty::string()),
+        )),
+    );
+    datetime_mod.insert(
+        "to_unix_ms".to_string(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())),
+    );
+    datetime_mod.insert(
+        "from_unix_secs".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::int()],
+            Ty::result(dt_t.clone(), Ty::string()),
+        )),
+    );
+    datetime_mod.insert(
+        "to_unix_secs".to_string(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())),
+    );
     // The unit parameter uses Atom type (e.g. :day, :hour) — Atom resolves to String at MIR level.
     let atom_t = Ty::Con(TyCon::new("Atom"));
-    datetime_mod.insert("add".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), Ty::int(), atom_t.clone()], dt_t.clone())));
-    datetime_mod.insert("diff".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone(), atom_t], Ty::float())));
-    datetime_mod.insert("is_before".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())));
-    datetime_mod.insert("is_after".to_string(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())));
+    datetime_mod.insert(
+        "add".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![dt_t.clone(), Ty::int(), atom_t.clone()],
+            dt_t.clone(),
+        )),
+    );
+    datetime_mod.insert(
+        "diff".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![dt_t.clone(), dt_t.clone(), atom_t],
+            Ty::float(),
+        )),
+    );
+    datetime_mod.insert(
+        "is_before".to_string(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())),
+    );
+    datetime_mod.insert(
+        "is_after".to_string(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())),
+    );
 
     modules.insert("DateTime".to_string(), datetime_mod);
 
     // ── Http client module (Phase 137) ───────────────────────────────────────
-    let http_req_t = Ty::int();   // opaque handle — u64 ABI as Int
+    let http_req_t = Ty::int(); // opaque handle — u64 ABI as Int
     let http_resp_t = Ty::Con(TyCon::new("HttpResponse"));
     // Atom type for HTTP method (e.g. :get, :post) — lowered to String at MIR level.
     let http_method_atom_t = Ty::Con(TyCon::new("Atom"));
@@ -455,48 +529,95 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
     // Http.build(:method, url) -> Request
     // First arg is Atom — atoms are lowered to String at MIR/codegen level.
-    http_client_mod.insert("build".to_string(),
-        Scheme::mono(Ty::fun(vec![http_method_atom_t, Ty::string()], http_req_t.clone())));
-    http_client_mod.insert("header".to_string(),
-        Scheme::mono(Ty::fun(vec![http_req_t.clone(), Ty::string(), Ty::string()], http_req_t.clone())));
-    http_client_mod.insert("body".to_string(),
-        Scheme::mono(Ty::fun(vec![http_req_t.clone(), Ty::string()], http_req_t.clone())));
-    http_client_mod.insert("timeout".to_string(),
-        Scheme::mono(Ty::fun(vec![http_req_t.clone(), Ty::int()], http_req_t.clone())));
-    http_client_mod.insert("query".to_string(),
-        Scheme::mono(Ty::fun(vec![http_req_t.clone(), Ty::string(), Ty::string()], http_req_t.clone())));
-    http_client_mod.insert("json".to_string(),
-        Scheme::mono(Ty::fun(vec![http_req_t.clone(), Ty::string()], http_req_t.clone())));
-    http_client_mod.insert("send".to_string(),
-        Scheme::mono(Ty::fun(vec![http_req_t.clone()], Ty::result(http_resp_t.clone(), Ty::string()))));
+    http_client_mod.insert(
+        "build".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_method_atom_t, Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
+    http_client_mod.insert(
+        "header".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
+    http_client_mod.insert(
+        "body".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
+    http_client_mod.insert(
+        "timeout".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::int()],
+            http_req_t.clone(),
+        )),
+    );
+    http_client_mod.insert(
+        "query".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
+    http_client_mod.insert(
+        "json".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
+    http_client_mod.insert(
+        "send".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone()],
+            Ty::result(http_resp_t.clone(), Ty::string()),
+        )),
+    );
     // Http.stream(req, fn(String) -> String) -> Int (cancel handle)
     // Callback receives chunk as String, returns :continue or :stop (lowered to String)
     let stream_cb_t = Ty::fun(vec![Ty::string()], Ty::string());
-    http_client_mod.insert("stream".to_string(),
+    http_client_mod.insert(
+        "stream".to_string(),
         Scheme::mono(Ty::fun(
             vec![http_req_t.clone(), stream_cb_t.clone()],
-            Ty::int()  // cancel handle
-        )));
-    http_client_mod.insert("stream_bytes".to_string(),
+            Ty::int(), // cancel handle
+        )),
+    );
+    http_client_mod.insert(
+        "stream_bytes".to_string(),
         Scheme::mono(Ty::fun(
             vec![http_req_t.clone(), stream_cb_t],
-            Ty::int()  // cancel handle
-        )));
+            Ty::int(), // cancel handle
+        )),
+    );
     // Http.cancel(cancel_handle) -> ()
-    http_client_mod.insert("cancel".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))));
+    http_client_mod.insert(
+        "cancel".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))),
+    );
     // Http.client() -> Int (keep-alive Agent handle)
-    http_client_mod.insert("client".to_string(),
-        Scheme::mono(Ty::fun(vec![], Ty::int())));
+    http_client_mod.insert(
+        "client".to_string(),
+        Scheme::mono(Ty::fun(vec![], Ty::int())),
+    );
     // Http.send_with(client, req) -> Result<HttpResponse, String>
-    http_client_mod.insert("send_with".to_string(),
+    http_client_mod.insert(
+        "send_with".to_string(),
         Scheme::mono(Ty::fun(
             vec![Ty::int(), http_req_t.clone()],
-            Ty::result(http_resp_t.clone(), Ty::string())
-        )));
+            Ty::result(http_resp_t.clone(), Ty::string()),
+        )),
+    );
     // Http.client_close(client) -> ()
-    http_client_mod.insert("client_close".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))));
+    http_client_mod.insert(
+        "client_close".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))),
+    );
 
     modules.insert("Http".to_string(), http_client_mod);
 
@@ -511,7 +632,10 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     {
         let msg_cb_t = Ty::fun(vec![Ty::string()], Ty::string());
         let pid_t = Ty::untyped_pid();
-        test_mod.insert("mock_actor".to_string(), Scheme::mono(Ty::fun(vec![msg_cb_t], pid_t)));
+        test_mod.insert(
+            "mock_actor".to_string(),
+            Scheme::mono(Ty::fun(vec![msg_cb_t], pid_t)),
+        );
     }
     modules.insert("Test".to_string(), test_mod);
 
@@ -519,7 +643,10 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let mut file_mod = HashMap::new();
     file_mod.insert(
         "read".to_string(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
     );
     file_mod.insert(
         "write".to_string(),
@@ -562,38 +689,197 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let u_t_to_u = Ty::fun(vec![u.clone(), t.clone()], u.clone());
 
     let mut list_mod = HashMap::new();
-    list_mod.insert("new".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![], list_t.clone()) });
-    list_mod.insert("length".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], Ty::int()) });
-    list_mod.insert("append".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t.clone()], list_t.clone()) });
-    list_mod.insert("head".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], t.clone()) });
-    list_mod.insert("tail".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], list_t.clone()) });
-    list_mod.insert("get".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()) });
-    list_mod.insert("concat".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), list_t.clone()], list_t.clone()) });
-    list_mod.insert("reverse".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], list_t.clone()) });
-    list_mod.insert("map".to_string(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), t_to_u], list_u) });
-    list_mod.insert("filter".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], list_t.clone()) });
-    list_mod.insert("reduce".to_string(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), u.clone(), u_t_to_u], u) });
+    list_mod.insert(
+        "new".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "length".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone()], Ty::int()),
+        },
+    );
+    list_mod.insert(
+        "append".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), t.clone()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "head".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone()], t.clone()),
+        },
+    );
+    list_mod.insert(
+        "tail".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "get".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()),
+        },
+    );
+    list_mod.insert(
+        "concat".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), list_t.clone()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "reverse".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "map".to_string(),
+        Scheme {
+            vars: vec![t_var, u_var],
+            ty: Ty::fun(vec![list_t.clone(), t_to_u], list_u),
+        },
+    );
+    list_mod.insert(
+        "filter".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "reduce".to_string(),
+        Scheme {
+            vars: vec![t_var, u_var],
+            ty: Ty::fun(vec![list_t.clone(), u.clone(), u_t_to_u], u),
+        },
+    );
     // Phase 46: sort, find, any, all, contains
     let t_t_to_int = Ty::fun(vec![t.clone(), t.clone()], Ty::int());
-    list_mod.insert("sort".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_t_to_int], list_t.clone()) });
-    list_mod.insert("find".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::option(t.clone())) });
-    list_mod.insert("any".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()) });
-    list_mod.insert("all".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()) });
-    list_mod.insert("contains".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t.clone()], Ty::bool()) });
+    list_mod.insert(
+        "sort".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), t_t_to_int], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "find".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(
+                vec![list_t.clone(), t_to_bool.clone()],
+                Ty::option(t.clone()),
+            ),
+        },
+    );
+    list_mod.insert(
+        "any".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()),
+        },
+    );
+    list_mod.insert(
+        "all".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()),
+        },
+    );
+    list_mod.insert(
+        "contains".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), t.clone()], Ty::bool()),
+        },
+    );
     // Phase 47: zip, flat_map, flatten, enumerate, take, drop, last, nth
     let u = Ty::Var(u_var);
     let list_u2 = Ty::list(u.clone());
-    list_mod.insert("zip".to_string(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), list_u2.clone()], Ty::list(Ty::Tuple(vec![t.clone(), u.clone()]))) });
+    list_mod.insert(
+        "zip".to_string(),
+        Scheme {
+            vars: vec![t_var, u_var],
+            ty: Ty::fun(
+                vec![list_t.clone(), list_u2.clone()],
+                Ty::list(Ty::Tuple(vec![t.clone(), u.clone()])),
+            ),
+        },
+    );
     let t_to_list_u = Ty::fun(vec![t.clone()], list_u2.clone());
-    list_mod.insert("flat_map".to_string(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), t_to_list_u], list_u2.clone()) });
-    list_mod.insert("flatten".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![Ty::list(list_t.clone())], list_t.clone()) });
-    list_mod.insert("enumerate".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], Ty::list(Ty::Tuple(vec![Ty::int(), t.clone()]))) });
-    list_mod.insert("take".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()) });
-    list_mod.insert("drop".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()) });
-    list_mod.insert("last".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], t.clone()) });
-    list_mod.insert("nth".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()) });
+    list_mod.insert(
+        "flat_map".to_string(),
+        Scheme {
+            vars: vec![t_var, u_var],
+            ty: Ty::fun(vec![list_t.clone(), t_to_list_u], list_u2.clone()),
+        },
+    );
+    list_mod.insert(
+        "flatten".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![Ty::list(list_t.clone())], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "enumerate".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(
+                vec![list_t.clone()],
+                Ty::list(Ty::Tuple(vec![Ty::int(), t.clone()])),
+            ),
+        },
+    );
+    list_mod.insert(
+        "take".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "drop".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()),
+        },
+    );
+    list_mod.insert(
+        "last".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone()], t.clone()),
+        },
+    );
+    list_mod.insert(
+        "nth".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()),
+        },
+    );
     // Phase 79: List.collect(iter) -> List<T>
-    list_mod.insert("collect".to_string(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], list_t.clone()) });
+    list_mod.insert(
+        "collect".to_string(),
+        Scheme {
+            vars: vec![t_var],
+            ty: Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], list_t.clone()),
+        },
+    );
     modules.insert("List".to_string(), list_mod);
 
     // Map module -- polymorphic: Map<K, V> with type variables for key/value.
@@ -604,80 +890,278 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let map_kv = Ty::map(k.clone(), v.clone());
 
     let mut map_mod = HashMap::new();
-    map_mod.insert("new".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![], map_kv.clone()) });
-    map_mod.insert("put".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone(), v.clone()], map_kv.clone()) });
-    map_mod.insert("get".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone()], v.clone()) });
-    map_mod.insert("has_key".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone()], Ty::bool()) });
-    map_mod.insert("delete".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone()], map_kv.clone()) });
-    map_mod.insert("size".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::int()) });
-    map_mod.insert("keys".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::list(k.clone())) });
-    map_mod.insert("values".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::list(v.clone())) });
+    map_mod.insert(
+        "new".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![], map_kv.clone()),
+        },
+    );
+    map_mod.insert(
+        "put".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone(), k.clone(), v.clone()], map_kv.clone()),
+        },
+    );
+    map_mod.insert(
+        "get".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone(), k.clone()], v.clone()),
+        },
+    );
+    map_mod.insert(
+        "has_key".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone(), k.clone()], Ty::bool()),
+        },
+    );
+    map_mod.insert(
+        "delete".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone(), k.clone()], map_kv.clone()),
+        },
+    );
+    map_mod.insert(
+        "size".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone()], Ty::int()),
+        },
+    );
+    map_mod.insert(
+        "keys".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone()], Ty::list(k.clone())),
+        },
+    );
+    map_mod.insert(
+        "values".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone()], Ty::list(v.clone())),
+        },
+    );
     // Phase 47: merge, to_list, from_list
-    map_mod.insert("merge".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), map_kv.clone()], map_kv.clone()) });
-    map_mod.insert("to_list".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::list(Ty::Tuple(vec![k.clone(), v.clone()]))) });
-    map_mod.insert("from_list".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![Ty::list(Ty::Tuple(vec![k.clone(), v.clone()]))], map_kv.clone()) });
+    map_mod.insert(
+        "merge".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![map_kv.clone(), map_kv.clone()], map_kv.clone()),
+        },
+    );
+    map_mod.insert(
+        "to_list".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(
+                vec![map_kv.clone()],
+                Ty::list(Ty::Tuple(vec![k.clone(), v.clone()])),
+            ),
+        },
+    );
+    map_mod.insert(
+        "from_list".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(
+                vec![Ty::list(Ty::Tuple(vec![k.clone(), v.clone()]))],
+                map_kv.clone(),
+            ),
+        },
+    );
     // Phase 79: Map.collect(iter) -> Map<K, V>
-    map_mod.insert("collect".to_string(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], map_kv.clone()) });
+    map_mod.insert(
+        "collect".to_string(),
+        Scheme {
+            vars: vec![k_var, v_var],
+            ty: Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], map_kv.clone()),
+        },
+    );
     modules.insert("Map".to_string(), map_mod);
 
     let set_t = Ty::set_untyped();
     let mut set_mod = HashMap::new();
-    set_mod.insert("new".to_string(), Scheme::mono(Ty::fun(vec![], set_t.clone())));
-    set_mod.insert("add".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone(), Ty::int()], set_t.clone())));
-    set_mod.insert("remove".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone(), Ty::int()], set_t.clone())));
-    set_mod.insert("contains".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone(), Ty::int()], Ty::bool())));
-    set_mod.insert("size".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone()], Ty::int())));
-    set_mod.insert("union".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone(), set_t.clone()], set_t.clone())));
-    set_mod.insert("intersection".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone(), set_t.clone()], set_t.clone())));
+    set_mod.insert(
+        "new".to_string(),
+        Scheme::mono(Ty::fun(vec![], set_t.clone())),
+    );
+    set_mod.insert(
+        "add".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone(), Ty::int()], set_t.clone())),
+    );
+    set_mod.insert(
+        "remove".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone(), Ty::int()], set_t.clone())),
+    );
+    set_mod.insert(
+        "contains".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone(), Ty::int()], Ty::bool())),
+    );
+    set_mod.insert(
+        "size".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone()], Ty::int())),
+    );
+    set_mod.insert(
+        "union".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone(), set_t.clone()], set_t.clone())),
+    );
+    set_mod.insert(
+        "intersection".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone(), set_t.clone()], set_t.clone())),
+    );
     // Phase 47: difference, to_list, from_list
-    set_mod.insert("difference".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone(), set_t.clone()], set_t.clone())));
-    set_mod.insert("to_list".to_string(), Scheme::mono(Ty::fun(vec![set_t.clone()], Ty::list(Ty::int()))));
-    set_mod.insert("from_list".to_string(), Scheme::mono(Ty::fun(vec![Ty::list(Ty::int())], set_t.clone())));
+    set_mod.insert(
+        "difference".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone(), set_t.clone()], set_t.clone())),
+    );
+    set_mod.insert(
+        "to_list".to_string(),
+        Scheme::mono(Ty::fun(vec![set_t.clone()], Ty::list(Ty::int()))),
+    );
+    set_mod.insert(
+        "from_list".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::list(Ty::int())], set_t.clone())),
+    );
     // Phase 79: Set.collect(iter) -> Set
-    set_mod.insert("collect".to_string(), Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], set_t.clone())));
+    set_mod.insert(
+        "collect".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], set_t.clone())),
+    );
     modules.insert("Set".to_string(), set_mod);
 
     let mut tuple_mod = HashMap::new();
-    tuple_mod.insert("nth".to_string(), Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple")), Ty::int()], Ty::int())));
-    tuple_mod.insert("first".to_string(), Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple"))], Ty::int())));
-    tuple_mod.insert("second".to_string(), Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple"))], Ty::int())));
-    tuple_mod.insert("size".to_string(), Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple"))], Ty::int())));
+    tuple_mod.insert(
+        "nth".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Tuple")), Ty::int()],
+            Ty::int(),
+        )),
+    );
+    tuple_mod.insert(
+        "first".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple"))], Ty::int())),
+    );
+    tuple_mod.insert(
+        "second".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple"))], Ty::int())),
+    );
+    tuple_mod.insert(
+        "size".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple"))], Ty::int())),
+    );
     modules.insert("Tuple".to_string(), tuple_mod);
 
     let range_t = Ty::range();
     let mut range_mod = HashMap::new();
-    range_mod.insert("new".to_string(), Scheme::mono(Ty::fun(vec![Ty::int(), Ty::int()], range_t.clone())));
-    range_mod.insert("to_list".to_string(), Scheme::mono(Ty::fun(vec![range_t.clone()], Ty::list(Ty::int()))));
-    range_mod.insert("map".to_string(), Scheme::mono(Ty::fun(vec![range_t.clone(), Ty::fun(vec![Ty::int()], Ty::int())], Ty::list(Ty::int()))));
-    range_mod.insert("filter".to_string(), Scheme::mono(Ty::fun(vec![range_t.clone(), Ty::fun(vec![Ty::int()], Ty::bool())], Ty::list(Ty::int()))));
-    range_mod.insert("length".to_string(), Scheme::mono(Ty::fun(vec![range_t.clone()], Ty::int())));
+    range_mod.insert(
+        "new".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int(), Ty::int()], range_t.clone())),
+    );
+    range_mod.insert(
+        "to_list".to_string(),
+        Scheme::mono(Ty::fun(vec![range_t.clone()], Ty::list(Ty::int()))),
+    );
+    range_mod.insert(
+        "map".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![range_t.clone(), Ty::fun(vec![Ty::int()], Ty::int())],
+            Ty::list(Ty::int()),
+        )),
+    );
+    range_mod.insert(
+        "filter".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![range_t.clone(), Ty::fun(vec![Ty::int()], Ty::bool())],
+            Ty::list(Ty::int()),
+        )),
+    );
+    range_mod.insert(
+        "length".to_string(),
+        Scheme::mono(Ty::fun(vec![range_t.clone()], Ty::int())),
+    );
     modules.insert("Range".to_string(), range_mod);
 
     let queue_t = Ty::queue();
     let mut queue_mod = HashMap::new();
-    queue_mod.insert("new".to_string(), Scheme::mono(Ty::fun(vec![], queue_t.clone())));
-    queue_mod.insert("push".to_string(), Scheme::mono(Ty::fun(vec![queue_t.clone(), Ty::int()], queue_t.clone())));
-    queue_mod.insert("pop".to_string(), Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::Con(TyCon::new("Tuple")))));
-    queue_mod.insert("peek".to_string(), Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::int())));
-    queue_mod.insert("size".to_string(), Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::int())));
-    queue_mod.insert("is_empty".to_string(), Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::bool())));
+    queue_mod.insert(
+        "new".to_string(),
+        Scheme::mono(Ty::fun(vec![], queue_t.clone())),
+    );
+    queue_mod.insert(
+        "push".to_string(),
+        Scheme::mono(Ty::fun(vec![queue_t.clone(), Ty::int()], queue_t.clone())),
+    );
+    queue_mod.insert(
+        "pop".to_string(),
+        Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::Con(TyCon::new("Tuple")))),
+    );
+    queue_mod.insert(
+        "peek".to_string(),
+        Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::int())),
+    );
+    queue_mod.insert(
+        "size".to_string(),
+        Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::int())),
+    );
+    queue_mod.insert(
+        "is_empty".to_string(),
+        Scheme::mono(Ty::fun(vec![queue_t.clone()], Ty::bool())),
+    );
     modules.insert("Queue".to_string(), queue_mod);
 
     // ── JSON module (Phase 8 Plan 04) ─────────────────────────────────
     let json_t = Ty::Con(TyCon::new("Json"));
     let mut json_mod = HashMap::new();
-    json_mod.insert("parse".to_string(), Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(json_t.clone(), Ty::string()))));
-    json_mod.insert("encode".to_string(), Scheme::mono(Ty::fun(vec![json_t.clone()], Ty::string())));
-    json_mod.insert("encode_string".to_string(), Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
-    json_mod.insert("encode_int".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::string())));
-    json_mod.insert("encode_bool".to_string(), Scheme::mono(Ty::fun(vec![Ty::bool()], Ty::string())));
-    json_mod.insert("encode_map".to_string(), Scheme::mono(Ty::fun(vec![Ty::map_untyped()], Ty::string())));
-    json_mod.insert("encode_list".to_string(), Scheme::mono(Ty::fun(vec![Ty::list_untyped()], Ty::string())));
+    json_mod.insert(
+        "parse".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(json_t.clone(), Ty::string()),
+        )),
+    );
+    json_mod.insert(
+        "encode".to_string(),
+        Scheme::mono(Ty::fun(vec![json_t.clone()], Ty::string())),
+    );
+    json_mod.insert(
+        "encode_string".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    json_mod.insert(
+        "encode_int".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::string())),
+    );
+    json_mod.insert(
+        "encode_bool".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::bool()], Ty::string())),
+    );
+    json_mod.insert(
+        "encode_map".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::map_untyped()], Ty::string())),
+    );
+    json_mod.insert(
+        "encode_list".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::list_untyped()], Ty::string())),
+    );
     // Phase 103: JSON field extraction (no DB roundtrip)
     // Json.get(json_string, key) -> String
-    json_mod.insert("get".to_string(), Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())));
+    json_mod.insert(
+        "get".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())),
+    );
     // Json.get_nested(json_string, path1, path2) -> String
-    json_mod.insert("get_nested".to_string(), Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string(), Ty::string()], Ty::string())));
+    json_mod.insert(
+        "get_nested".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string(), Ty::string()],
+            Ty::string(),
+        )),
+    );
 
     modules.insert("JSON".to_string(), json_mod.clone());
 
@@ -687,10 +1171,13 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // dispatched at codegen time via ToJson__to_json__StructName).
     let json_encode_tv = TyVar(9999);
     let mut json_mod_alias = json_mod;
-    json_mod_alias.insert("encode".to_string(), Scheme {
-        vars: vec![json_encode_tv],
-        ty: Ty::fun(vec![Ty::Var(json_encode_tv)], Ty::string()),
-    });
+    json_mod_alias.insert(
+        "encode".to_string(),
+        Scheme {
+            vars: vec![json_encode_tv],
+            ty: Ty::fun(vec![Ty::Var(json_encode_tv)], Ty::string()),
+        },
+    );
     modules.insert("Json".to_string(), json_mod_alias);
 
     // ── HTTP module (Phase 8 Plan 05) ────────────────────────────────
@@ -699,15 +1186,40 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let router_t = Ty::Con(TyCon::new("Router"));
 
     let mut http_mod = HashMap::new();
-    http_mod.insert("router".to_string(), Scheme::mono(Ty::fun(vec![], router_t.clone())));
-    http_mod.insert("route".to_string(), Scheme::mono(Ty::fun(
-        vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
-        router_t.clone(),
-    )));
-    http_mod.insert("serve".to_string(), Scheme::mono(Ty::fun(vec![router_t.clone(), Ty::int()], Ty::Tuple(vec![]))));
+    http_mod.insert(
+        "router".to_string(),
+        Scheme::mono(Ty::fun(vec![], router_t.clone())),
+    );
+    http_mod.insert(
+        "route".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
+            router_t.clone(),
+        )),
+    );
+    http_mod.insert(
+        "serve".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![router_t.clone(), Ty::int()],
+            Ty::Tuple(vec![]),
+        )),
+    );
     // Phase 56: HTTPS TLS server
-    http_mod.insert("serve_tls".to_string(), Scheme::mono(Ty::fun(vec![router_t.clone(), Ty::int(), Ty::string(), Ty::string()], Ty::Tuple(vec![]))));
-    http_mod.insert("response".to_string(), Scheme::mono(Ty::fun(vec![Ty::int(), Ty::string()], response_t.clone())));
+    http_mod.insert(
+        "serve_tls".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![router_t.clone(), Ty::int(), Ty::string(), Ty::string()],
+            Ty::Tuple(vec![]),
+        )),
+    );
+    http_mod.insert(
+        "response".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int(), Ty::string()], response_t.clone())),
+    );
     // Phase 88: response_with_headers(Int, String, Map<K, V>) -> Response
     {
         let k_var = TyVar(92000);
@@ -715,73 +1227,137 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         let k = Ty::Var(k_var);
         let v = Ty::Var(v_var);
         let map_kv = Ty::map(k, v);
-        http_mod.insert("response_with_headers".to_string(), Scheme {
-            vars: vec![k_var, v_var],
-            ty: Ty::fun(vec![Ty::int(), Ty::string(), map_kv], response_t.clone()),
-        });
+        http_mod.insert(
+            "response_with_headers".to_string(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![Ty::int(), Ty::string(), map_kv], response_t.clone()),
+            },
+        );
     }
-    http_mod.insert("get".to_string(), Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
-    http_mod.insert("post".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::string()],
-        Ty::result(Ty::string(), Ty::string()),
-    )));
+    http_mod.insert(
+        "get".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
+    );
+    http_mod.insert(
+        "post".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
+    );
     // Phase 51: Method-specific routing
-    http_mod.insert("on_get".to_string(), Scheme::mono(Ty::fun(
-        vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
-        router_t.clone(),
-    )));
-    http_mod.insert("on_post".to_string(), Scheme::mono(Ty::fun(
-        vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
-        router_t.clone(),
-    )));
-    http_mod.insert("on_put".to_string(), Scheme::mono(Ty::fun(
-        vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
-        router_t.clone(),
-    )));
-    http_mod.insert("on_delete".to_string(), Scheme::mono(Ty::fun(
-        vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
-        router_t.clone(),
-    )));
-    // Phase 52: Middleware
-    http_mod.insert("use".to_string(), Scheme::mono(Ty::fun(
-        vec![
+    http_mod.insert(
+        "on_get".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
             router_t.clone(),
-            Ty::fun(
-                vec![request_t.clone(), Ty::fun(vec![request_t.clone()], response_t.clone())],
-                response_t.clone(),
-            ),
-        ],
-        router_t.clone(),
-    )));
+        )),
+    );
+    http_mod.insert(
+        "on_post".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
+            router_t.clone(),
+        )),
+    );
+    http_mod.insert(
+        "on_put".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
+            router_t.clone(),
+        )),
+    );
+    http_mod.insert(
+        "on_delete".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
+            router_t.clone(),
+        )),
+    );
+    // Phase 52: Middleware
+    http_mod.insert(
+        "use".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                router_t.clone(),
+                Ty::fun(
+                    vec![
+                        request_t.clone(),
+                        Ty::fun(vec![request_t.clone()], response_t.clone()),
+                    ],
+                    response_t.clone(),
+                ),
+            ],
+            router_t.clone(),
+        )),
+    );
     modules.insert("HTTP".to_string(), http_mod);
 
     // ── Request module (Phase 8 Plan 05) ─────────────────────────────
     let mut request_mod = HashMap::new();
-    request_mod.insert("method".to_string(), Scheme::mono(Ty::fun(vec![request_t.clone()], Ty::string())));
-    request_mod.insert("path".to_string(), Scheme::mono(Ty::fun(vec![request_t.clone()], Ty::string())));
-    request_mod.insert("body".to_string(), Scheme::mono(Ty::fun(vec![request_t.clone()], Ty::string())));
-    request_mod.insert("header".to_string(), Scheme::mono(Ty::fun(
-        vec![request_t.clone(), Ty::string()],
-        Ty::option(Ty::string()),
-    )));
-    request_mod.insert("query".to_string(), Scheme::mono(Ty::fun(
-        vec![request_t.clone(), Ty::string()],
-        Ty::option(Ty::string()),
-    )));
+    request_mod.insert(
+        "method".to_string(),
+        Scheme::mono(Ty::fun(vec![request_t.clone()], Ty::string())),
+    );
+    request_mod.insert(
+        "path".to_string(),
+        Scheme::mono(Ty::fun(vec![request_t.clone()], Ty::string())),
+    );
+    request_mod.insert(
+        "body".to_string(),
+        Scheme::mono(Ty::fun(vec![request_t.clone()], Ty::string())),
+    );
+    request_mod.insert(
+        "header".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![request_t.clone(), Ty::string()],
+            Ty::option(Ty::string()),
+        )),
+    );
+    request_mod.insert(
+        "query".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![request_t.clone(), Ty::string()],
+            Ty::option(Ty::string()),
+        )),
+    );
     // Phase 51: Path parameter accessor (returns Option<String> -- runtime returns MeshOption)
-    request_mod.insert("param".to_string(), Scheme::mono(Ty::fun(
-        vec![request_t.clone(), Ty::string()],
-        Ty::option(Ty::string()),
-    )));
+    request_mod.insert(
+        "param".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![request_t.clone(), Ty::string()],
+            Ty::option(Ty::string()),
+        )),
+    );
     modules.insert("Request".to_string(), request_mod);
 
     // ── Job module (Phase 9 Plan 02) ─────────────────────────────────
     // Job provides fire-and-forget async computation with Pid-based futures.
     // Uses synthetic TyVars for polymorphic type schemes -- these are replaced
     // with fresh vars during instantiation and never enter the unification table.
-    let job_t = TyVar(u32::MAX - 10);  // Synthetic type var T
-    let job_a = TyVar(u32::MAX - 11);  // Synthetic type var A
-    let job_b = TyVar(u32::MAX - 12);  // Synthetic type var B
+    let job_t = TyVar(u32::MAX - 10); // Synthetic type var T
+    let job_a = TyVar(u32::MAX - 11); // Synthetic type var A
+    let job_b = TyVar(u32::MAX - 12); // Synthetic type var B
     let ty_t = Ty::Var(job_t);
     let ty_a = Ty::Var(job_a);
     let ty_b = Ty::Var(job_b);
@@ -789,31 +1365,49 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let mut job_mod = HashMap::new();
 
     // Job.async: fn(fn() -> T) -> Pid<T>
-    job_mod.insert("async".to_string(), Scheme {
-        vars: vec![job_t],
-        ty: Ty::fun(vec![Ty::fun(vec![], ty_t.clone())], Ty::pid(ty_t.clone())),
-    });
+    job_mod.insert(
+        "async".to_string(),
+        Scheme {
+            vars: vec![job_t],
+            ty: Ty::fun(vec![Ty::fun(vec![], ty_t.clone())], Ty::pid(ty_t.clone())),
+        },
+    );
 
     // Job.await: fn(Pid<T>) -> Result<T, String>
-    job_mod.insert("await".to_string(), Scheme {
-        vars: vec![job_t],
-        ty: Ty::fun(vec![Ty::pid(ty_t.clone())], Ty::result(ty_t.clone(), Ty::string())),
-    });
+    job_mod.insert(
+        "await".to_string(),
+        Scheme {
+            vars: vec![job_t],
+            ty: Ty::fun(
+                vec![Ty::pid(ty_t.clone())],
+                Ty::result(ty_t.clone(), Ty::string()),
+            ),
+        },
+    );
 
     // Job.await_timeout: fn(Pid<T>, Int) -> Result<T, String>
-    job_mod.insert("await_timeout".to_string(), Scheme {
-        vars: vec![job_t],
-        ty: Ty::fun(vec![Ty::pid(ty_t.clone()), Ty::int()], Ty::result(ty_t, Ty::string())),
-    });
+    job_mod.insert(
+        "await_timeout".to_string(),
+        Scheme {
+            vars: vec![job_t],
+            ty: Ty::fun(
+                vec![Ty::pid(ty_t.clone()), Ty::int()],
+                Ty::result(ty_t, Ty::string()),
+            ),
+        },
+    );
 
     // Job.map: fn(List<A>, fn(A) -> B) -> List<Result<B, String>>
-    job_mod.insert("map".to_string(), Scheme {
-        vars: vec![job_a, job_b],
-        ty: Ty::fun(
-            vec![Ty::list(ty_a.clone()), Ty::fun(vec![ty_a], ty_b.clone())],
-            Ty::list(Ty::result(ty_b, Ty::string())),
-        ),
-    });
+    job_mod.insert(
+        "map".to_string(),
+        Scheme {
+            vars: vec![job_a, job_b],
+            ty: Ty::fun(
+                vec![Ty::list(ty_a.clone()), Ty::fun(vec![ty_a], ty_b.clone())],
+                Ty::list(Ty::result(ty_b, Ty::string())),
+            ),
+        },
+    );
 
     modules.insert("Job".to_string(), job_mod);
 
@@ -823,43 +1417,97 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     let math_t = Ty::Var(math_t_var);
 
     let mut math_mod = HashMap::new();
-    math_mod.insert("abs".to_string(), Scheme { vars: vec![math_t_var], ty: Ty::fun(vec![math_t.clone()], math_t.clone()) });
-    math_mod.insert("min".to_string(), Scheme { vars: vec![math_t_var], ty: Ty::fun(vec![math_t.clone(), math_t.clone()], math_t.clone()) });
-    math_mod.insert("max".to_string(), Scheme { vars: vec![math_t_var], ty: Ty::fun(vec![math_t.clone(), math_t.clone()], math_t.clone()) });
+    math_mod.insert(
+        "abs".to_string(),
+        Scheme {
+            vars: vec![math_t_var],
+            ty: Ty::fun(vec![math_t.clone()], math_t.clone()),
+        },
+    );
+    math_mod.insert(
+        "min".to_string(),
+        Scheme {
+            vars: vec![math_t_var],
+            ty: Ty::fun(vec![math_t.clone(), math_t.clone()], math_t.clone()),
+        },
+    );
+    math_mod.insert(
+        "max".to_string(),
+        Scheme {
+            vars: vec![math_t_var],
+            ty: Ty::fun(vec![math_t.clone(), math_t.clone()], math_t.clone()),
+        },
+    );
     math_mod.insert("pi".to_string(), Scheme::mono(Ty::float()));
     // ── pow/sqrt/floor/ceil/round (Phase 43 Plan 02) ──────────────────
-    math_mod.insert("pow".to_string(), Scheme::mono(Ty::fun(vec![Ty::float(), Ty::float()], Ty::float())));
-    math_mod.insert("sqrt".to_string(), Scheme::mono(Ty::fun(vec![Ty::float()], Ty::float())));
-    math_mod.insert("floor".to_string(), Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())));
-    math_mod.insert("ceil".to_string(), Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())));
-    math_mod.insert("round".to_string(), Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())));
+    math_mod.insert(
+        "pow".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::float(), Ty::float()], Ty::float())),
+    );
+    math_mod.insert(
+        "sqrt".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::float()], Ty::float())),
+    );
+    math_mod.insert(
+        "floor".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())),
+    );
+    math_mod.insert(
+        "ceil".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())),
+    );
+    math_mod.insert(
+        "round".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())),
+    );
     modules.insert("Math".to_string(), math_mod);
 
     // ── Int module (Phase 43 Plan 01) ──────────────────────────────────
     let mut int_mod = HashMap::new();
-    int_mod.insert("to_float".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::float())));
-    int_mod.insert("to_string".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::string())));
+    int_mod.insert(
+        "to_float".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::float())),
+    );
+    int_mod.insert(
+        "to_string".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::string())),
+    );
     modules.insert("Int".to_string(), int_mod);
 
     // ── Float module (Phase 43 Plan 01) ────────────────────────────────
     let mut float_mod = HashMap::new();
-    float_mod.insert("to_int".to_string(), Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())));
+    float_mod.insert(
+        "to_int".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::float()], Ty::int())),
+    );
     // Phase 77: Float.from(Int) -> Float
-    float_mod.insert("from".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::float())));
+    float_mod.insert(
+        "from".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::float())),
+    );
     modules.insert("Float".to_string(), float_mod);
 
     // ── Timer module (Phase 44 Plan 02) ───────────────────────────────
-    let timer_t_var = TyVar(u32::MAX - 20);  // Synthetic type var T for Timer
+    let timer_t_var = TyVar(u32::MAX - 20); // Synthetic type var T for Timer
     let timer_t = Ty::Var(timer_t_var);
 
     let mut timer_mod = HashMap::new();
     // Timer.sleep: fn(Int) -> Unit
-    timer_mod.insert("sleep".to_string(), Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))));
+    timer_mod.insert(
+        "sleep".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))),
+    );
     // Timer.send_after: fn(Pid<T>, Int, T) -> Unit
-    timer_mod.insert("send_after".to_string(), Scheme {
-        vars: vec![timer_t_var],
-        ty: Ty::fun(vec![Ty::pid(timer_t.clone()), Ty::int(), timer_t], Ty::Tuple(vec![])),
-    });
+    timer_mod.insert(
+        "send_after".to_string(),
+        Scheme {
+            vars: vec![timer_t_var],
+            ty: Ty::fun(
+                vec![Ty::pid(timer_t.clone()), Ty::int(), timer_t],
+                Ty::Tuple(vec![]),
+            ),
+        },
+    );
     modules.insert("Timer".to_string(), timer_mod);
 
     // ── Sqlite module (Phase 53) ──────────────────────────────────────
@@ -867,40 +1515,58 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
     let mut sqlite_mod = HashMap::new();
     // Sqlite.open: fn(String) -> Result<SqliteConn, String>
-    sqlite_mod.insert("open".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::result(sqlite_conn_t.clone(), Ty::string()),
-    )));
+    sqlite_mod.insert(
+        "open".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(sqlite_conn_t.clone(), Ty::string()),
+        )),
+    );
     // Sqlite.close: fn(SqliteConn) -> Unit
-    sqlite_mod.insert("close".to_string(), Scheme::mono(Ty::fun(
-        vec![sqlite_conn_t.clone()],
-        Ty::Tuple(vec![]),
-    )));
+    sqlite_mod.insert(
+        "close".to_string(),
+        Scheme::mono(Ty::fun(vec![sqlite_conn_t.clone()], Ty::Tuple(vec![]))),
+    );
     // Sqlite.execute: fn(SqliteConn, String, List<String>) -> Result<Int, String>
-    sqlite_mod.insert("execute".to_string(), Scheme::mono(Ty::fun(
-        vec![sqlite_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
-        Ty::result(Ty::int(), Ty::string()),
-    )));
+    sqlite_mod.insert(
+        "execute".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            Ty::result(Ty::int(), Ty::string()),
+        )),
+    );
     // Sqlite.query: fn(SqliteConn, String, List<String>) -> Result<List<Map<String, String>>, String>
-    sqlite_mod.insert("query".to_string(), Scheme::mono(Ty::fun(
-        vec![sqlite_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
-        Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
-    )));
+    sqlite_mod.insert(
+        "query".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
+        )),
+    );
     // Sqlite.begin: fn(SqliteConn) -> Result<Unit, String>
-    sqlite_mod.insert("begin".to_string(), Scheme::mono(Ty::fun(
-        vec![sqlite_conn_t.clone()],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    sqlite_mod.insert(
+        "begin".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     // Sqlite.commit: fn(SqliteConn) -> Result<Unit, String>
-    sqlite_mod.insert("commit".to_string(), Scheme::mono(Ty::fun(
-        vec![sqlite_conn_t.clone()],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    sqlite_mod.insert(
+        "commit".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     // Sqlite.rollback: fn(SqliteConn) -> Result<Unit, String>
-    sqlite_mod.insert("rollback".to_string(), Scheme::mono(Ty::fun(
-        vec![sqlite_conn_t.clone()],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    sqlite_mod.insert(
+        "rollback".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     modules.insert("Sqlite".to_string(), sqlite_mod);
 
     // ── Pg module (Phase 54) ──────────────────────────────────────────
@@ -908,55 +1574,96 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
     let mut pg_mod = HashMap::new();
     // Pg.connect: fn(String) -> Result<PgConn, String>
-    pg_mod.insert("connect".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::result(pg_conn_t.clone(), Ty::string()),
-    )));
+    pg_mod.insert(
+        "connect".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(pg_conn_t.clone(), Ty::string()),
+        )),
+    );
     // Pg.close: fn(PgConn) -> Unit
-    pg_mod.insert("close".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone()],
-        Ty::Tuple(vec![]),
-    )));
+    pg_mod.insert(
+        "close".to_string(),
+        Scheme::mono(Ty::fun(vec![pg_conn_t.clone()], Ty::Tuple(vec![]))),
+    );
     // Pg.execute: fn(PgConn, String, List<String>) -> Result<Int, String>
-    pg_mod.insert("execute".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
-        Ty::result(Ty::int(), Ty::string()),
-    )));
+    pg_mod.insert(
+        "execute".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            Ty::result(Ty::int(), Ty::string()),
+        )),
+    );
     // Pg.query: fn(PgConn, String, List<String>) -> Result<List<Map<String, String>>, String>
-    pg_mod.insert("query".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
-        Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
-    )));
+    pg_mod.insert(
+        "query".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
+        )),
+    );
     // Pg.begin: fn(PgConn) -> Result<Unit, String>
-    pg_mod.insert("begin".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone()],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    pg_mod.insert(
+        "begin".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     // Pg.commit: fn(PgConn) -> Result<Unit, String>
-    pg_mod.insert("commit".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone()],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    pg_mod.insert(
+        "commit".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     // Pg.rollback: fn(PgConn) -> Result<Unit, String>
-    pg_mod.insert("rollback".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone()],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    pg_mod.insert(
+        "rollback".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     // Pg.transaction: fn(PgConn, fn(PgConn) -> Result<Unit, String>) -> Result<Unit, String>
-    pg_mod.insert("transaction".to_string(), Scheme::mono(Ty::fun(
-        vec![pg_conn_t.clone(), Ty::fun(vec![pg_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))],
-        Ty::result(Ty::Tuple(vec![]), Ty::string()),
-    )));
+    pg_mod.insert(
+        "transaction".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                pg_conn_t.clone(),
+                Ty::fun(
+                    vec![pg_conn_t.clone()],
+                    Ty::result(Ty::Tuple(vec![]), Ty::string()),
+                ),
+            ],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
+    );
     // Pg.query_as: forall a. fn(PgConn, String, List<String>, fn(Map<String, String>) -> Result<a, String>) -> Result<List<Result<a, String>>, String>
     {
         let a = TyVar(99990);
         let a_ty = Ty::Var(a);
-        let from_row_fn = Ty::fun(vec![Ty::map(Ty::string(), Ty::string())], Ty::result(a_ty.clone(), Ty::string()));
+        let from_row_fn = Ty::fun(
+            vec![Ty::map(Ty::string(), Ty::string())],
+            Ty::result(a_ty.clone(), Ty::string()),
+        );
         let ret = Ty::result(Ty::list(Ty::result(a_ty, Ty::string())), Ty::string());
-        pg_mod.insert("query_as".to_string(), Scheme {
-            vars: vec![a],
-            ty: Ty::fun(vec![pg_conn_t.clone(), Ty::string(), Ty::list(Ty::string()), from_row_fn], ret),
-        });
+        pg_mod.insert(
+            "query_as".to_string(),
+            Scheme {
+                vars: vec![a],
+                ty: Ty::fun(
+                    vec![
+                        pg_conn_t.clone(),
+                        Ty::string(),
+                        Ty::list(Ty::string()),
+                        from_row_fn,
+                    ],
+                    ret,
+                ),
+            },
+        );
     }
     modules.insert("Pg".to_string(), pg_mod);
 
@@ -965,72 +1672,107 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
     let mut pool_mod = HashMap::new();
     // Pool.open: fn(String, Int, Int, Int) -> Result<PoolHandle, String>
-    pool_mod.insert("open".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::int(), Ty::int(), Ty::int()],
-        Ty::result(pool_handle_t.clone(), Ty::string()),
-    )));
+    pool_mod.insert(
+        "open".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::int(), Ty::int(), Ty::int()],
+            Ty::result(pool_handle_t.clone(), Ty::string()),
+        )),
+    );
     // Pool.close: fn(PoolHandle) -> Unit
-    pool_mod.insert("close".to_string(), Scheme::mono(Ty::fun(
-        vec![pool_handle_t.clone()],
-        Ty::Tuple(vec![]),
-    )));
+    pool_mod.insert(
+        "close".to_string(),
+        Scheme::mono(Ty::fun(vec![pool_handle_t.clone()], Ty::Tuple(vec![]))),
+    );
     // Pool.checkout: fn(PoolHandle) -> Result<PgConn, String>
-    pool_mod.insert("checkout".to_string(), Scheme::mono(Ty::fun(
-        vec![pool_handle_t.clone()],
-        Ty::result(pg_conn_t.clone(), Ty::string()),
-    )));
+    pool_mod.insert(
+        "checkout".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pool_handle_t.clone()],
+            Ty::result(pg_conn_t.clone(), Ty::string()),
+        )),
+    );
     // Pool.checkin: fn(PoolHandle, PgConn) -> Unit
-    pool_mod.insert("checkin".to_string(), Scheme::mono(Ty::fun(
-        vec![pool_handle_t.clone(), pg_conn_t.clone()],
-        Ty::Tuple(vec![]),
-    )));
+    pool_mod.insert(
+        "checkin".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pool_handle_t.clone(), pg_conn_t.clone()],
+            Ty::Tuple(vec![]),
+        )),
+    );
     // Pool.query: fn(PoolHandle, String, List<String>) -> Result<List<Map<String, String>>, String>
-    pool_mod.insert("query".to_string(), Scheme::mono(Ty::fun(
-        vec![pool_handle_t.clone(), Ty::string(), Ty::list(Ty::string())],
-        Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
-    )));
+    pool_mod.insert(
+        "query".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pool_handle_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
+        )),
+    );
     // Pool.execute: fn(PoolHandle, String, List<String>) -> Result<Int, String>
-    pool_mod.insert("execute".to_string(), Scheme::mono(Ty::fun(
-        vec![pool_handle_t.clone(), Ty::string(), Ty::list(Ty::string())],
-        Ty::result(Ty::int(), Ty::string()),
-    )));
+    pool_mod.insert(
+        "execute".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![pool_handle_t.clone(), Ty::string(), Ty::list(Ty::string())],
+            Ty::result(Ty::int(), Ty::string()),
+        )),
+    );
     // Pool.query_as: forall a. fn(PoolHandle, String, List<String>, fn(Map<String, String>) -> Result<a, String>) -> Result<List<Result<a, String>>, String>
     {
         let a = TyVar(99991);
         let a_ty = Ty::Var(a);
-        let from_row_fn = Ty::fun(vec![Ty::map(Ty::string(), Ty::string())], Ty::result(a_ty.clone(), Ty::string()));
+        let from_row_fn = Ty::fun(
+            vec![Ty::map(Ty::string(), Ty::string())],
+            Ty::result(a_ty.clone(), Ty::string()),
+        );
         let ret = Ty::result(Ty::list(Ty::result(a_ty, Ty::string())), Ty::string());
-        pool_mod.insert("query_as".to_string(), Scheme {
-            vars: vec![a],
-            ty: Ty::fun(vec![pool_handle_t.clone(), Ty::string(), Ty::list(Ty::string()), from_row_fn], ret),
-        });
+        pool_mod.insert(
+            "query_as".to_string(),
+            Scheme {
+                vars: vec![a],
+                ty: Ty::fun(
+                    vec![
+                        pool_handle_t.clone(),
+                        Ty::string(),
+                        Ty::list(Ty::string()),
+                        from_row_fn,
+                    ],
+                    ret,
+                ),
+            },
+        );
     }
     modules.insert("Pool".to_string(), pool_mod);
 
     // ── Node module (Phase 67) ──────────────────────────────────────
-    let node_spawn_t = TyVar(u32::MAX - 30);  // Synthetic type var T for Node.spawn
+    let node_spawn_t = TyVar(u32::MAX - 30); // Synthetic type var T for Node.spawn
     let _node_t = Ty::Var(node_spawn_t);
 
     let mut node_mod = HashMap::new();
     // Node.start: fn(String, String) -> Int  (name, cookie -> 0 on success)
-    node_mod.insert("start".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::string()],
-        Ty::int(),
-    )));
+    node_mod.insert(
+        "start".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::int())),
+    );
     // Node.connect: fn(String) -> Int  (node_name -> 0 on success)
-    node_mod.insert("connect".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::int(),
-    )));
+    node_mod.insert(
+        "connect".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::int())),
+    );
     // Node.self: fn() -> String  (returns node name)
-    node_mod.insert("self".to_string(), Scheme::mono(Ty::fun(vec![], Ty::string())));
+    node_mod.insert(
+        "self".to_string(),
+        Scheme::mono(Ty::fun(vec![], Ty::string())),
+    );
     // Node.list: fn() -> List<String>  (returns connected node names)
-    node_mod.insert("list".to_string(), Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+    node_mod.insert(
+        "list".to_string(),
+        Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+    );
     // Node.monitor: fn(String) -> Int  (node_name -> monitor ref)
-    node_mod.insert("monitor".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::int(),
-    )));
+    node_mod.insert(
+        "monitor".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::int())),
+    );
     // Node.spawn/spawn_link are NOT defined here because they are variadic
     // (node_name, func_ref, args...). The type checker handles them specially
     // in infer_field_access by returning a fresh function type that matches
@@ -1040,86 +1782,101 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     // ── Process module (Phase 67) ───────────────────────────────────
     let mut process_mod = HashMap::new();
     // Process.monitor: fn(Int) -> Int  (target_pid -> monitor ref)
-    process_mod.insert("monitor".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::int()],
-        Ty::int(),
-    )));
+    process_mod.insert(
+        "monitor".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::int())),
+    );
     // Process.demonitor: fn(Int) -> Int  (monitor_ref -> 0 on success)
-    process_mod.insert("demonitor".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::int()],
-        Ty::int(),
-    )));
+    process_mod.insert(
+        "demonitor".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::int())),
+    );
     // Process.register: fn(String, Pid<()>) -> Int  (name, pid -> 0 success, 1 error)
-    process_mod.insert("register".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::Con(TyCon::new("Pid"))],
-        Ty::int(),
-    )));
+    process_mod.insert(
+        "register".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::Con(TyCon::new("Pid"))],
+            Ty::int(),
+        )),
+    );
     // Process.whereis: fn(String) -> Pid<()>  (name -> pid, 0 if not found)
-    process_mod.insert("whereis".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::Con(TyCon::new("Pid")),
-    )));
+    process_mod.insert(
+        "whereis".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::Con(TyCon::new("Pid")))),
+    );
     modules.insert("Process".to_string(), process_mod);
 
     // ── Global module (Phase 68) ─────────────────────────────────────
     let mut global_mod = HashMap::new();
     // Global.register: fn(String, Pid<()>) -> Int  (name, pid -> 0 success, 1 error)
     // Pid type matches Process.register for consistency; runtime treats Pid as u64.
-    global_mod.insert("register".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::Con(TyCon::new("Pid"))],
-        Ty::int(),
-    )));
+    global_mod.insert(
+        "register".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::Con(TyCon::new("Pid"))],
+            Ty::int(),
+        )),
+    );
     // Global.whereis: fn(String) -> Pid<()>  (name -> pid, 0 if not found)
     // Pid type matches Process.whereis for consistency; runtime treats Pid as u64.
-    global_mod.insert("whereis".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::Con(TyCon::new("Pid")),
-    )));
+    global_mod.insert(
+        "whereis".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::Con(TyCon::new("Pid")))),
+    );
     // Global.unregister: fn(String) -> Int  (name -> 0 success, 1 not found)
-    global_mod.insert("unregister".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string()],
-        Ty::int(),
-    )));
+    global_mod.insert(
+        "unregister".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::int())),
+    );
     modules.insert("Global".to_string(), global_mod);
 
     // ── Ws (WebSocket) module (Phase 88) ─────────────────────────
     let mut ws_mod = HashMap::new();
     // Ws.send: fn(Int, String) -> Int  (conn_handle, message -> 0 success)
-    ws_mod.insert("send".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::int(), Ty::string()],
-        Ty::int(),
-    )));
+    ws_mod.insert(
+        "send".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int(), Ty::string()], Ty::int())),
+    );
     // Ws.serve: fn(fn(Int, String, Map<String,String>) -> Int, fn(Int, String) -> (), fn(Int, Int, String) -> (), Int) -> ()
-    ws_mod.insert("serve".to_string(), Scheme::mono(Ty::fun(
-        vec![
-            Ty::fun(vec![Ty::int(), Ty::string(), Ty::map(Ty::string(), Ty::string())], Ty::int()),
-            Ty::fun(vec![Ty::int(), Ty::string()], Ty::Tuple(vec![])),
-            Ty::fun(vec![Ty::int(), Ty::int(), Ty::string()], Ty::Tuple(vec![])),
-            Ty::int(),
-        ],
-        Ty::Tuple(vec![]),
-    )));
+    ws_mod.insert(
+        "serve".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![
+                Ty::fun(
+                    vec![Ty::int(), Ty::string(), Ty::map(Ty::string(), Ty::string())],
+                    Ty::int(),
+                ),
+                Ty::fun(vec![Ty::int(), Ty::string()], Ty::Tuple(vec![])),
+                Ty::fun(vec![Ty::int(), Ty::int(), Ty::string()], Ty::Tuple(vec![])),
+                Ty::int(),
+            ],
+            Ty::Tuple(vec![]),
+        )),
+    );
     // ── WebSocket Room functions (Phase 90) ────────────────────────
     // Ws.join: fn(Int, String) -> Int  (conn_handle, room_name -> 0 success)
-    ws_mod.insert("join".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::int(), Ty::string()],
-        Ty::int(),
-    )));
+    ws_mod.insert(
+        "join".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int(), Ty::string()], Ty::int())),
+    );
     // Ws.leave: fn(Int, String) -> Int  (conn_handle, room_name -> 0 success)
-    ws_mod.insert("leave".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::int(), Ty::string()],
-        Ty::int(),
-    )));
+    ws_mod.insert(
+        "leave".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::int(), Ty::string()], Ty::int())),
+    );
     // Ws.broadcast: fn(String, String) -> Int  (room_name, message -> failure_count)
-    ws_mod.insert("broadcast".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::string()],
-        Ty::int(),
-    )));
+    ws_mod.insert(
+        "broadcast".to_string(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::int())),
+    );
     // Ws.broadcast_except: fn(String, String, Int) -> Int  (room, msg, except_conn -> failure_count)
-    ws_mod.insert("broadcast_except".to_string(), Scheme::mono(Ty::fun(
-        vec![Ty::string(), Ty::string(), Ty::int()],
-        Ty::int(),
-    )));
+    ws_mod.insert(
+        "broadcast_except".to_string(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string(), Ty::int()],
+            Ty::int(),
+        )),
+    );
     modules.insert("Ws".to_string(), ws_mod);
 
     // ── Iter module (Phase 76 + Phase 78) ──────────────────────────
@@ -1128,105 +1885,162 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         let iter_t = Ty::Var(iter_t_var);
         let mut iter_mod = HashMap::new();
         // Iter.from: fn(List<T>) -> ListIterator (polymorphic over element type)
-        iter_mod.insert("from".to_string(), Scheme {
-            vars: vec![iter_t_var],
-            ty: Ty::fun(vec![Ty::list(iter_t)], Ty::Con(TyCon::new("ListIterator"))),
-        });
+        iter_mod.insert(
+            "from".to_string(),
+            Scheme {
+                vars: vec![iter_t_var],
+                ty: Ty::fun(vec![Ty::list(iter_t)], Ty::Con(TyCon::new("ListIterator"))),
+            },
+        );
 
         // ── Phase 78: Lazy Combinators ──────────────────────────────
         // Iter.map: fn(Ptr, fn(T) -> U) -> Ptr
         {
             let t = TyVar(91201);
             let u = TyVar(91202);
-            iter_mod.insert("map".to_string(), Scheme {
-                vars: vec![t, u],
-                ty: Ty::fun(vec![
-                    Ty::Con(TyCon::new("Ptr")),
-                    Ty::fun(vec![Ty::Var(t)], Ty::Var(u)),
-                ], Ty::Con(TyCon::new("Ptr"))),
-            });
+            iter_mod.insert(
+                "map".to_string(),
+                Scheme {
+                    vars: vec![t, u],
+                    ty: Ty::fun(
+                        vec![
+                            Ty::Con(TyCon::new("Ptr")),
+                            Ty::fun(vec![Ty::Var(t)], Ty::Var(u)),
+                        ],
+                        Ty::Con(TyCon::new("Ptr")),
+                    ),
+                },
+            );
         }
         // Iter.filter: fn(Ptr, fn(T) -> Bool) -> Ptr
         {
             let t = TyVar(91203);
-            iter_mod.insert("filter".to_string(), Scheme {
-                vars: vec![t],
-                ty: Ty::fun(vec![
-                    Ty::Con(TyCon::new("Ptr")),
-                    Ty::fun(vec![Ty::Var(t)], Ty::bool()),
-                ], Ty::Con(TyCon::new("Ptr"))),
-            });
+            iter_mod.insert(
+                "filter".to_string(),
+                Scheme {
+                    vars: vec![t],
+                    ty: Ty::fun(
+                        vec![
+                            Ty::Con(TyCon::new("Ptr")),
+                            Ty::fun(vec![Ty::Var(t)], Ty::bool()),
+                        ],
+                        Ty::Con(TyCon::new("Ptr")),
+                    ),
+                },
+            );
         }
         // Iter.take: fn(Ptr, Int) -> Ptr
-        iter_mod.insert("take".to_string(), Scheme::mono(
-            Ty::fun(vec![Ty::Con(TyCon::new("Ptr")), Ty::int()], Ty::Con(TyCon::new("Ptr")))
-        ));
+        iter_mod.insert(
+            "take".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::Con(TyCon::new("Ptr")), Ty::int()],
+                Ty::Con(TyCon::new("Ptr")),
+            )),
+        );
         // Iter.skip: fn(Ptr, Int) -> Ptr
-        iter_mod.insert("skip".to_string(), Scheme::mono(
-            Ty::fun(vec![Ty::Con(TyCon::new("Ptr")), Ty::int()], Ty::Con(TyCon::new("Ptr")))
-        ));
+        iter_mod.insert(
+            "skip".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::Con(TyCon::new("Ptr")), Ty::int()],
+                Ty::Con(TyCon::new("Ptr")),
+            )),
+        );
         // Iter.enumerate: fn(Ptr) -> Ptr
-        iter_mod.insert("enumerate".to_string(), Scheme::mono(
-            Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::Con(TyCon::new("Ptr")))
-        ));
+        iter_mod.insert(
+            "enumerate".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::Con(TyCon::new("Ptr"))],
+                Ty::Con(TyCon::new("Ptr")),
+            )),
+        );
         // Iter.zip: fn(Ptr, Ptr) -> Ptr
-        iter_mod.insert("zip".to_string(), Scheme::mono(
-            Ty::fun(vec![Ty::Con(TyCon::new("Ptr")), Ty::Con(TyCon::new("Ptr"))], Ty::Con(TyCon::new("Ptr")))
-        ));
+        iter_mod.insert(
+            "zip".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::Con(TyCon::new("Ptr")), Ty::Con(TyCon::new("Ptr"))],
+                Ty::Con(TyCon::new("Ptr")),
+            )),
+        );
 
         // ── Phase 78: Terminals ─────────────────────────────────────
         // Iter.count: fn(Ptr) -> Int
-        iter_mod.insert("count".to_string(), Scheme::mono(
-            Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::int())
-        ));
+        iter_mod.insert(
+            "count".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::int())),
+        );
         // Iter.sum: fn(Ptr) -> Int
-        iter_mod.insert("sum".to_string(), Scheme::mono(
-            Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::int())
-        ));
+        iter_mod.insert(
+            "sum".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Ptr"))], Ty::int())),
+        );
         // Iter.any: fn(Ptr, fn(T) -> Bool) -> Bool
         {
             let t = TyVar(91204);
-            iter_mod.insert("any".to_string(), Scheme {
-                vars: vec![t],
-                ty: Ty::fun(vec![
-                    Ty::Con(TyCon::new("Ptr")),
-                    Ty::fun(vec![Ty::Var(t)], Ty::bool()),
-                ], Ty::bool()),
-            });
+            iter_mod.insert(
+                "any".to_string(),
+                Scheme {
+                    vars: vec![t],
+                    ty: Ty::fun(
+                        vec![
+                            Ty::Con(TyCon::new("Ptr")),
+                            Ty::fun(vec![Ty::Var(t)], Ty::bool()),
+                        ],
+                        Ty::bool(),
+                    ),
+                },
+            );
         }
         // Iter.all: fn(Ptr, fn(T) -> Bool) -> Bool
         {
             let t = TyVar(91205);
-            iter_mod.insert("all".to_string(), Scheme {
-                vars: vec![t],
-                ty: Ty::fun(vec![
-                    Ty::Con(TyCon::new("Ptr")),
-                    Ty::fun(vec![Ty::Var(t)], Ty::bool()),
-                ], Ty::bool()),
-            });
+            iter_mod.insert(
+                "all".to_string(),
+                Scheme {
+                    vars: vec![t],
+                    ty: Ty::fun(
+                        vec![
+                            Ty::Con(TyCon::new("Ptr")),
+                            Ty::fun(vec![Ty::Var(t)], Ty::bool()),
+                        ],
+                        Ty::bool(),
+                    ),
+                },
+            );
         }
         // Iter.find: fn(Ptr, fn(T) -> Bool) -> Ptr (MeshOption at runtime)
         {
             let t = TyVar(91206);
-            iter_mod.insert("find".to_string(), Scheme {
-                vars: vec![t],
-                ty: Ty::fun(vec![
-                    Ty::Con(TyCon::new("Ptr")),
-                    Ty::fun(vec![Ty::Var(t)], Ty::bool()),
-                ], Ty::Con(TyCon::new("Ptr"))),
-            });
+            iter_mod.insert(
+                "find".to_string(),
+                Scheme {
+                    vars: vec![t],
+                    ty: Ty::fun(
+                        vec![
+                            Ty::Con(TyCon::new("Ptr")),
+                            Ty::fun(vec![Ty::Var(t)], Ty::bool()),
+                        ],
+                        Ty::Con(TyCon::new("Ptr")),
+                    ),
+                },
+            );
         }
         // Iter.reduce: fn(Ptr, T, fn(T, T) -> T) -> T
         {
             let t = TyVar(91207);
-            iter_mod.insert("reduce".to_string(), Scheme {
-                vars: vec![t],
-                ty: Ty::fun(vec![
-                    Ty::Con(TyCon::new("Ptr")),
-                    Ty::Var(t),
-                    Ty::fun(vec![Ty::Var(t), Ty::Var(t)], Ty::Var(t)),
-                ], Ty::Var(t)),
-            });
+            iter_mod.insert(
+                "reduce".to_string(),
+                Scheme {
+                    vars: vec![t],
+                    ty: Ty::fun(
+                        vec![
+                            Ty::Con(TyCon::new("Ptr")),
+                            Ty::Var(t),
+                            Ty::fun(vec![Ty::Var(t), Ty::Var(t)], Ty::Var(t)),
+                        ],
+                        Ty::Var(t),
+                    ),
+                },
+            );
         }
 
         modules.insert("Iter".to_string(), iter_mod);
@@ -1236,25 +2050,49 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
     {
         let mut orm_mod = HashMap::new();
         // Orm.build_select: fn(String, List<String>, List<String>, List<String>, Int, Int) -> String
-        orm_mod.insert("build_select".to_string(), Scheme::mono(Ty::fun(
-            vec![Ty::string(), Ty::list(Ty::string()), Ty::list(Ty::string()), Ty::list(Ty::string()), Ty::int(), Ty::int()],
-            Ty::string(),
-        )));
+        orm_mod.insert(
+            "build_select".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    Ty::string(),
+                    Ty::list(Ty::string()),
+                    Ty::list(Ty::string()),
+                    Ty::list(Ty::string()),
+                    Ty::int(),
+                    Ty::int(),
+                ],
+                Ty::string(),
+            )),
+        );
         // Orm.build_insert: fn(String, List<String>, List<String>) -> String
-        orm_mod.insert("build_insert".to_string(), Scheme::mono(Ty::fun(
-            vec![Ty::string(), Ty::list(Ty::string()), Ty::list(Ty::string())],
-            Ty::string(),
-        )));
+        orm_mod.insert(
+            "build_insert".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::string(), Ty::list(Ty::string()), Ty::list(Ty::string())],
+                Ty::string(),
+            )),
+        );
         // Orm.build_update: fn(String, List<String>, List<String>, List<String>) -> String
-        orm_mod.insert("build_update".to_string(), Scheme::mono(Ty::fun(
-            vec![Ty::string(), Ty::list(Ty::string()), Ty::list(Ty::string()), Ty::list(Ty::string())],
-            Ty::string(),
-        )));
+        orm_mod.insert(
+            "build_update".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    Ty::string(),
+                    Ty::list(Ty::string()),
+                    Ty::list(Ty::string()),
+                    Ty::list(Ty::string()),
+                ],
+                Ty::string(),
+            )),
+        );
         // Orm.build_delete: fn(String, List<String>, List<String>) -> String
-        orm_mod.insert("build_delete".to_string(), Scheme::mono(Ty::fun(
-            vec![Ty::string(), Ty::list(Ty::string()), Ty::list(Ty::string())],
-            Ty::string(),
-        )));
+        orm_mod.insert(
+            "build_delete".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::string(), Ty::list(Ty::string()), Ty::list(Ty::string())],
+                Ty::string(),
+            )),
+        );
         modules.insert("Orm".to_string(), orm_mod);
     }
 
@@ -1264,152 +2102,207 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         let atom_t = Ty::Con(TyCon::new("Atom"));
         let mut query_mod = HashMap::new();
         // Query.from(String) -> Ptr
-        query_mod.insert("from".to_string(), Scheme::mono(Ty::fun(
-            vec![Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "from".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::string()], ptr_t.clone())),
+        );
         // Query.where(Ptr, Atom, String) -> Ptr  (3-arg equality: field = value)
-        query_mod.insert("where".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), Ty::string()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.where_op(Ptr, Atom, Atom, String) -> Ptr  (4-arg operator: field op value)
-        query_mod.insert("where_op".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), atom_t.clone(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_op".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), atom_t.clone(), Ty::string()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.where_in(Ptr, Atom, Ptr) -> Ptr  (field IN values_list)
-        query_mod.insert("where_in".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_in".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.where_null(Ptr, Atom) -> Ptr  (field IS NULL)
-        query_mod.insert("where_null".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_null".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.where_not_null(Ptr, Atom) -> Ptr  (field IS NOT NULL)
-        query_mod.insert("where_not_null".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_not_null".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.where_not_in(Ptr, Atom, List<String>) -> Ptr  (field NOT IN (values...))
-        query_mod.insert("where_not_in".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_not_in".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), Ty::list(Ty::string())],
+                ptr_t.clone(),
+            )),
+        );
         // Query.where_between(Ptr, Atom, String, String) -> Ptr  (field BETWEEN low AND high)
-        query_mod.insert("where_between".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::string(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_between".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), Ty::string(), Ty::string()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.where_or(Ptr, List<Atom>, List<String>) -> Ptr  ((field1 = $N OR field2 = $M))
-        query_mod.insert("where_or".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::list(atom_t.clone()), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_or".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    ptr_t.clone(),
+                    Ty::list(atom_t.clone()),
+                    Ty::list(Ty::string()),
+                ],
+                ptr_t.clone(),
+            )),
+        );
         // Query.select(Ptr, List<String>) -> Ptr  (select fields list)
-        query_mod.insert("select".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), Ty::list(Ty::string())],
+                ptr_t.clone(),
+            )),
+        );
         // Query.order_by(Ptr, Atom, Atom) -> Ptr  (field atom, direction atom)
-        query_mod.insert("order_by".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "order_by".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), atom_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.limit(Ptr, Int) -> Ptr
-        query_mod.insert("limit".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::int()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "limit".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), Ty::int()], ptr_t.clone())),
+        );
         // Query.offset(Ptr, Int) -> Ptr
-        query_mod.insert("offset".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::int()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "offset".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), Ty::int()], ptr_t.clone())),
+        );
         // Query.join(Ptr, Atom, String, String) -> Ptr  (type atom, table, on_clause)
-        query_mod.insert("join".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::string(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "join".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), Ty::string(), Ty::string()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.join_as(Ptr, Atom, String, String, String) -> Ptr  (type atom, table, alias, on_clause)
-        query_mod.insert("join_as".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::string(), Ty::string(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "join_as".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    ptr_t.clone(),
+                    atom_t.clone(),
+                    Ty::string(),
+                    Ty::string(),
+                    Ty::string(),
+                ],
+                ptr_t.clone(),
+            )),
+        );
         // Query.group_by(Ptr, Atom) -> Ptr  (field atom)
-        query_mod.insert("group_by".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "group_by".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.having(Ptr, String, String) -> Ptr  (clause, value)
-        query_mod.insert("having".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::string(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "having".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), Ty::string(), Ty::string()],
+                ptr_t.clone(),
+            )),
+        );
         // Query.fragment(Ptr, String, List<String>) -> Ptr  (raw sql, params list)
-        query_mod.insert("fragment".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::string(), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "fragment".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), Ty::string(), Ty::list(Ty::string())],
+                ptr_t.clone(),
+            )),
+        );
         // Query.select_raw(Ptr, List<String>) -> Ptr  (raw SQL expressions list)
-        query_mod.insert("select_raw".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_raw".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), Ty::list(Ty::string())],
+                ptr_t.clone(),
+            )),
+        );
         // Query.where_raw(Ptr, String, List<String>) -> Ptr  (raw clause, params list)
-        query_mod.insert("where_raw".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::string(), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_raw".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), Ty::string(), Ty::list(Ty::string())],
+                ptr_t.clone(),
+            )),
+        );
         // Query.order_by_raw(Ptr, String) -> Ptr  (raw ORDER BY expression)
-        query_mod.insert("order_by_raw".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "order_by_raw".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), Ty::string()], ptr_t.clone())),
+        );
         // Query.group_by_raw(Ptr, String) -> Ptr  (raw GROUP BY expression)
-        query_mod.insert("group_by_raw".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "group_by_raw".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), Ty::string()], ptr_t.clone())),
+        );
         // ── Phase 108: Aggregate SELECT functions ─────────────────────────
         // Query.select_count(Ptr) -> Ptr  (count all rows)
-        query_mod.insert("select_count".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_count".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone()], ptr_t.clone())),
+        );
         // Query.select_count_field(Ptr, Atom) -> Ptr  (count specific field)
-        query_mod.insert("select_count_field".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_count_field".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.select_sum(Ptr, Atom) -> Ptr
-        query_mod.insert("select_sum".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_sum".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.select_avg(Ptr, Atom) -> Ptr
-        query_mod.insert("select_avg".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_avg".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.select_min(Ptr, Atom) -> Ptr
-        query_mod.insert("select_min".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_min".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // Query.select_max(Ptr, Atom) -> Ptr
-        query_mod.insert("select_max".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "select_max".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], ptr_t.clone())),
+        );
         // ── Phase 109: Subquery WHERE ─────────────────────────────────────
         // Query.where_sub(Ptr, Atom, Ptr) -> Ptr  (query, field, sub_query)
-        query_mod.insert("where_sub".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        query_mod.insert(
+            "where_sub".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         modules.insert("Query".to_string(), query_mod);
     }
 
@@ -1419,106 +2312,169 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         let pool_t = Ty::Con(TyCon::new("PoolHandle"));
         let mut repo_mod = HashMap::new();
         // Repo.all(PoolHandle, Ptr) -> Result<List<Map<String,String>>, String>  (pool, query)
-        repo_mod.insert("all".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), ptr_t.clone()],
-            Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
-        )));
+        repo_mod.insert(
+            "all".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), ptr_t.clone()],
+                Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
+            )),
+        );
         // Repo.one(PoolHandle, Ptr) -> Ptr  (pool, query -> Result<Map<String,String>, String>)
-        repo_mod.insert("one".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "one".to_string(),
+            Scheme::mono(Ty::fun(vec![pool_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
         // Repo.get(PoolHandle, String, String) -> Result<Map<String,String>, String>  (pool, table, id)
-        repo_mod.insert("get".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string()],
-            Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
-        )));
+        repo_mod.insert(
+            "get".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string()],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
+            )),
+        );
         // Repo.get_by(PoolHandle, String, String, String) -> Result<Map<String,String>, String>  (pool, table, field, value)
-        repo_mod.insert("get_by".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string(), Ty::string()],
-            Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
-        )));
+        repo_mod.insert(
+            "get_by".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string(), Ty::string()],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
+            )),
+        );
         // Repo.count(PoolHandle, Ptr) -> Ptr  (pool, query -> Result<Int, String>)
-        repo_mod.insert("count".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "count".to_string(),
+            Scheme::mono(Ty::fun(vec![pool_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
         // Repo.exists(PoolHandle, Ptr) -> Ptr  (pool, query -> Result<Bool, String>)
-        repo_mod.insert("exists".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "exists".to_string(),
+            Scheme::mono(Ty::fun(vec![pool_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
         // Repo.insert(PoolHandle, String, Map<String,String>) -> Result<Map<String,String>, String>  (pool, table, fields_map)
-        repo_mod.insert("insert".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::map(Ty::string(), Ty::string())],
-            Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
-        )));
+        repo_mod.insert(
+            "insert".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    pool_t.clone(),
+                    Ty::string(),
+                    Ty::map(Ty::string(), Ty::string()),
+                ],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
+            )),
+        );
         // Repo.update(PoolHandle, String, String, Ptr) -> Ptr  (pool, table, id, fields_map -> Result<Map<String,String>, String>)
-        repo_mod.insert("update".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "update".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Repo.delete(PoolHandle, String, String) -> Result<Map<String,String>, String>  (pool, table, id)
-        repo_mod.insert("delete".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string()],
-            Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
-        )));
+        repo_mod.insert(
+            "delete".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string()],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
+            )),
+        );
         // Repo.transaction(PoolHandle, fn(Ptr) -> Ptr) -> Ptr  (pool, callback -> Result<Ptr, String>)
         // Closure calling convention: MIR lowerer splits closure into (fn_ptr, env_ptr)
-        repo_mod.insert("transaction".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::fun(vec![ptr_t.clone()], ptr_t.clone())],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "transaction".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::fun(vec![ptr_t.clone()], ptr_t.clone())],
+                ptr_t.clone(),
+            )),
+        );
         // ── Phase 103: Extended Repo Write Operations ────────────────────
         // Repo.update_where(PoolHandle, String, Map<String,String>, Ptr) -> Result<Map<String,String>, String>  (pool, table, fields_map, query)
-        repo_mod.insert("update_where".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::map(Ty::string(), Ty::string()), ptr_t.clone()],
-            Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
-        )));
+        repo_mod.insert(
+            "update_where".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    pool_t.clone(),
+                    Ty::string(),
+                    Ty::map(Ty::string(), Ty::string()),
+                    ptr_t.clone(),
+                ],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
+            )),
+        );
         // Repo.delete_where(PoolHandle, String, Ptr) -> Result<Int, String>  (pool, table, query)
-        repo_mod.insert("delete_where".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), ptr_t.clone()],
-            Ty::result(Ty::int(), Ty::string()),
-        )));
+        repo_mod.insert(
+            "delete_where".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), ptr_t.clone()],
+                Ty::result(Ty::int(), Ty::string()),
+            )),
+        );
         // Repo.query_raw(PoolHandle, String, List<String>) -> Result<List<Map<String,String>>, String>
-        repo_mod.insert("query_raw".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
-            Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
-        )));
+        repo_mod.insert(
+            "query_raw".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
+                Ty::result(Ty::list(Ty::map(Ty::string(), Ty::string())), Ty::string()),
+            )),
+        );
         // Repo.execute_raw(PoolHandle, String, List<String>) -> Result<Int, String>
-        repo_mod.insert("execute_raw".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
-            Ty::result(Ty::int(), Ty::string()),
-        )));
+        repo_mod.insert(
+            "execute_raw".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
+                Ty::result(Ty::int(), Ty::string()),
+            )),
+        );
         // ── Phase 109: Upsert, RETURNING, Subquery ────────────────────────
         // Repo.insert_or_update(PoolHandle, String, Map<String,String>, List<String>, List<String>) -> Ptr
-        repo_mod.insert("insert_or_update".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::map(Ty::string(), Ty::string()), Ty::list(Ty::string()), Ty::list(Ty::string())],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "insert_or_update".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    pool_t.clone(),
+                    Ty::string(),
+                    Ty::map(Ty::string(), Ty::string()),
+                    Ty::list(Ty::string()),
+                    Ty::list(Ty::string()),
+                ],
+                ptr_t.clone(),
+            )),
+        );
         // Repo.delete_where_returning(PoolHandle, String, Ptr) -> Ptr
-        repo_mod.insert("delete_where_returning".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "delete_where_returning".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // ── Phase 99: Repo Changeset Operations ────────────────────────
         // Repo.insert_changeset(PoolHandle, String, Ptr) -> Ptr  (pool, table, changeset -> Result<Map, Changeset>)
-        repo_mod.insert("insert_changeset".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "insert_changeset".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Repo.update_changeset(PoolHandle, String, String, Ptr) -> Ptr  (pool, table, id, changeset -> Result<Map, Changeset>)
-        repo_mod.insert("update_changeset".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "update_changeset".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // ── Phase 100: Repo Preloading ───────────────────────────────────
         // Repo.preload(PoolHandle, Ptr, Ptr, Ptr) -> Ptr
         // (pool, rows: List<Map>, associations: List<String>, rel_meta: List<String>) -> Result<List<Map>, String>
-        repo_mod.insert("preload".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), ptr_t.clone(), ptr_t.clone(), ptr_t.clone()],
-            ptr_t.clone(),
-        )));
+        repo_mod.insert(
+            "preload".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), ptr_t.clone(), ptr_t.clone(), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
         modules.insert("Repo".to_string(), repo_mod);
     }
 
@@ -1532,67 +2488,100 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         let mut cs_mod = HashMap::new();
 
         // Changeset.cast(Map<String,String>, Map<String,String>, List<Atom>) -> Ptr
-        cs_mod.insert("cast".to_string(), Scheme::mono(Ty::fun(
-            vec![map_ss.clone(), map_ss.clone(), list_atom.clone()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "cast".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![map_ss.clone(), map_ss.clone(), list_atom.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Changeset.cast_with_types(Map<String,String>, Map<String,String>, List<Atom>, List<String>) -> Ptr
-        cs_mod.insert("cast_with_types".to_string(), Scheme::mono(Ty::fun(
-            vec![map_ss.clone(), map_ss.clone(), list_atom.clone(), list_str.clone()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "cast_with_types".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    map_ss.clone(),
+                    map_ss.clone(),
+                    list_atom.clone(),
+                    list_str.clone(),
+                ],
+                ptr_t.clone(),
+            )),
+        );
 
         // Changeset.validate_required(Ptr, List<Atom>) -> Ptr
-        cs_mod.insert("validate_required".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), list_atom.clone()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "validate_required".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), list_atom.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Changeset.validate_length(Ptr, Atom, Int, Int) -> Ptr
-        cs_mod.insert("validate_length".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::int(), Ty::int()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "validate_length".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), Ty::int(), Ty::int()],
+                ptr_t.clone(),
+            )),
+        );
         // Changeset.validate_format(Ptr, Atom, String) -> Ptr
-        cs_mod.insert("validate_format".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::string()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "validate_format".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), Ty::string()],
+                ptr_t.clone(),
+            )),
+        );
         // Changeset.validate_inclusion(Ptr, Atom, List<String>) -> Ptr
-        cs_mod.insert("validate_inclusion".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), list_str.clone()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "validate_inclusion".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![ptr_t.clone(), atom_t.clone(), list_str.clone()],
+                ptr_t.clone(),
+            )),
+        );
         // Changeset.validate_number(Ptr, Atom, Int, Int, Int, Int) -> Ptr
-        cs_mod.insert("validate_number".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone(), Ty::int(), Ty::int(), Ty::int(), Ty::int()],
-            ptr_t.clone(),
-        )));
+        cs_mod.insert(
+            "validate_number".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    ptr_t.clone(),
+                    atom_t.clone(),
+                    Ty::int(),
+                    Ty::int(),
+                    Ty::int(),
+                    Ty::int(),
+                ],
+                ptr_t.clone(),
+            )),
+        );
 
         // Changeset.valid(Ptr) -> Bool
-        cs_mod.insert("valid".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone()],
-            Ty::bool(),
-        )));
+        cs_mod.insert(
+            "valid".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone()], Ty::bool())),
+        );
         // Changeset.errors(Ptr) -> Map<String,String>
-        cs_mod.insert("errors".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone()],
-            map_ss.clone(),
-        )));
+        cs_mod.insert(
+            "errors".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone()], map_ss.clone())),
+        );
         // Changeset.changes(Ptr) -> Map<String,String>
-        cs_mod.insert("changes".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone()],
-            map_ss.clone(),
-        )));
+        cs_mod.insert(
+            "changes".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone()], map_ss.clone())),
+        );
         // Changeset.get_change(Ptr, Atom) -> String
-        cs_mod.insert("get_change".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            Ty::string(),
-        )));
+        cs_mod.insert(
+            "get_change".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], Ty::string())),
+        );
         // Changeset.get_error(Ptr, Atom) -> String
-        cs_mod.insert("get_error".to_string(), Scheme::mono(Ty::fun(
-            vec![ptr_t.clone(), atom_t.clone()],
-            Ty::string(),
-        )));
+        cs_mod.insert(
+            "get_error".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), atom_t.clone()], Ty::string())),
+        );
 
         modules.insert("Changeset".to_string(), cs_mod);
     }
@@ -1604,45 +2593,74 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         let mut migration_mod = HashMap::new();
 
         // Migration.create_table: fn(PoolHandle, String, List<String>) -> Result<Int, String>
-        migration_mod.insert("create_table".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "create_table".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
+                result_t.clone(),
+            )),
+        );
         // Migration.drop_table: fn(PoolHandle, String) -> Result<Int, String>
-        migration_mod.insert("drop_table".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string()],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "drop_table".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string()],
+                result_t.clone(),
+            )),
+        );
         // Migration.add_column: fn(PoolHandle, String, String) -> Result<Int, String>
-        migration_mod.insert("add_column".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string()],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "add_column".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string()],
+                result_t.clone(),
+            )),
+        );
         // Migration.drop_column: fn(PoolHandle, String, String) -> Result<Int, String>
-        migration_mod.insert("drop_column".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string()],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "drop_column".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string()],
+                result_t.clone(),
+            )),
+        );
         // Migration.rename_column: fn(PoolHandle, String, String, String) -> Result<Int, String>
-        migration_mod.insert("rename_column".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::string(), Ty::string()],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "rename_column".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::string(), Ty::string()],
+                result_t.clone(),
+            )),
+        );
         // Migration.create_index: fn(PoolHandle, String, List<String>, String) -> Result<Int, String>
-        migration_mod.insert("create_index".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string()), Ty::string()],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "create_index".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    pool_t.clone(),
+                    Ty::string(),
+                    Ty::list(Ty::string()),
+                    Ty::string(),
+                ],
+                result_t.clone(),
+            )),
+        );
         // Migration.drop_index: fn(PoolHandle, String, List<String>) -> Result<Int, String>
-        migration_mod.insert("drop_index".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "drop_index".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string(), Ty::list(Ty::string())],
+                result_t.clone(),
+            )),
+        );
         // Migration.execute: fn(PoolHandle, String) -> Result<Int, String>
-        migration_mod.insert("execute".to_string(), Scheme::mono(Ty::fun(
-            vec![pool_t.clone(), Ty::string()],
-            result_t.clone(),
-        )));
+        migration_mod.insert(
+            "execute".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![pool_t.clone(), Ty::string()],
+                result_t.clone(),
+            )),
+        );
 
         modules.insert("Migration".to_string(), migration_mod);
     }
@@ -1652,21 +2670,42 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
 
 /// Set of module names recognized by the stdlib for qualified access.
 const STDLIB_MODULE_NAMES: &[&str] = &[
-    "String", "IO", "Env", "File", "List", "Map", "Set", "Tuple", "Range", "Queue", "HTTP", "JSON", "Json", "Request", "Job",
-    "Math", "Int", "Float", "Timer", "Sqlite", "Pg", "Pool",
-    "Node", "Process",  // Phase 67
-    "Global",  // Phase 68
-    "Iter",  // Phase 76
-    "Ws",  // Phase 88
-    "Orm",  // Phase 97
-    "Query",  // Phase 98
-    "Repo",  // Phase 98
-    "Changeset",  // Phase 99
-    "Migration",  // Phase 101
-    "Regex",  // Phase 119
-    "Crypto",  // Phase 135
-    "Base64",  // Phase 135
-    "Hex",     // Phase 135
+    "String",
+    "IO",
+    "Env",
+    "File",
+    "List",
+    "Map",
+    "Set",
+    "Tuple",
+    "Range",
+    "Queue",
+    "HTTP",
+    "JSON",
+    "Json",
+    "Request",
+    "Job",
+    "Math",
+    "Int",
+    "Float",
+    "Timer",
+    "Sqlite",
+    "Pg",
+    "Pool",
+    "Node",
+    "Process",   // Phase 67
+    "Global",    // Phase 68
+    "Iter",      // Phase 76
+    "Ws",        // Phase 88
+    "Orm",       // Phase 97
+    "Query",     // Phase 98
+    "Repo",      // Phase 98
+    "Changeset", // Phase 99
+    "Migration", // Phase 101
+    "Regex",     // Phase 119
+    "Crypto",    // Phase 135
+    "Base64",    // Phase 135
+    "Hex",       // Phase 135
     "DateTime",  // Phase 136
     "Http",      // Phase 137
     "Test",      // Phase 138
@@ -1728,8 +2767,11 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
             let struct_ty = if struct_def.generic_params.is_empty() {
                 Ty::App(Box::new(Ty::Con(tycon)), vec![])
             } else {
-                let type_args: Vec<Ty> = struct_def.generic_params.iter()
-                    .map(|_| ctx.fresh_var()).collect();
+                let type_args: Vec<Ty> = struct_def
+                    .generic_params
+                    .iter()
+                    .map(|_| ctx.fresh_var())
+                    .collect();
                 Ty::App(Box::new(Ty::Con(tycon)), type_args)
             };
             env.insert(name.clone(), Scheme::mono(struct_ty));
@@ -1741,7 +2783,8 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
         for (_name, sum_type_def) in &mod_exports.sum_type_defs {
             type_registry.register_sum_type(sum_type_def.clone());
             register_variant_constructors(
-                &mut ctx, &mut env,
+                &mut ctx,
+                &mut env,
                 &sum_type_def.name,
                 &sum_type_def.generic_params,
                 &sum_type_def.variants,
@@ -1856,8 +2899,13 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
                     fn_.visibility().is_some(),
                 ),
                 GroupedItem::MultiClause { clauses } => (
-                    clauses.first().and_then(|f| f.name().and_then(|n| n.text())),
-                    clauses.first().map(|f| f.visibility().is_some()).unwrap_or(false),
+                    clauses
+                        .first()
+                        .and_then(|f| f.name().and_then(|n| n.text())),
+                    clauses
+                        .first()
+                        .map(|f| f.visibility().is_some())
+                        .unwrap_or(false),
                 ),
                 _ => (None, false),
             };
@@ -2014,11 +3062,10 @@ pub fn infer_with_imports(parse: &Parse, import_ctx: &ImportContext) -> TypeckRe
     let resolved_result = result_type.map(|ty| ctx.resolve(ty));
 
     // Extract qualified module function names for the MIR lowerer.
-    let qualified_modules_for_codegen: FxHashMap<String, Vec<String>> = ctx.qualified_modules
+    let qualified_modules_for_codegen: FxHashMap<String, Vec<String>> = ctx
+        .qualified_modules
         .iter()
-        .map(|(mod_name, functions)| {
-            (mod_name.clone(), functions.keys().cloned().collect())
-        })
+        .map(|(mod_name, functions)| (mod_name.clone(), functions.keys().cloned().collect()))
         .collect();
 
     TypeckResult {
@@ -2077,13 +3124,7 @@ fn register_builtin_sum_types(
         variants: option_variants.clone(),
     });
 
-    register_variant_constructors(
-        ctx,
-        env,
-        "Option",
-        &option_generic_params,
-        &option_variants,
-    );
+    register_variant_constructors(ctx, env, "Option", &option_generic_params, &option_variants);
 
     // ── Result<T, E> ───────────────────────────────────────────────────
     //
@@ -2110,13 +3151,7 @@ fn register_builtin_sum_types(
         variants: result_variants.clone(),
     });
 
-    register_variant_constructors(
-        ctx,
-        env,
-        "Result",
-        &result_generic_params,
-        &result_variants,
-    );
+    register_variant_constructors(ctx, env, "Result", &result_generic_params, &result_variants);
 
     // ── Ordering (Less | Equal | Greater) ────────────────────────────────
     //
@@ -2254,8 +3289,7 @@ fn group_multi_clause_fns(items: Vec<Item>) -> Vec<GroupedItem> {
                 let mut j = i + 1;
                 while j < items.len() {
                     if let Item::FnDef(next_fn) = &items[j] {
-                        let next_name =
-                            next_fn.name().and_then(|n| n.text()).unwrap_or_default();
+                        let next_name = next_fn.name().and_then(|n| n.text()).unwrap_or_default();
                         let next_arity = next_fn
                             .param_list()
                             .map(|pl| pl.params().count())
@@ -2532,9 +3566,7 @@ fn infer_multi_clause_fn(
         }
         // Use full annotation resolution for generic/sugar types.
         resolve_type_annotation(ctx, &ann, type_registry)
-            .or_else(|| {
-                resolve_type_name_str(&ann).map(|name| name_to_type(&name))
-            })
+            .or_else(|| resolve_type_name_str(&ann).map(|name| name_to_type(&name)))
     });
 
     // Store fn constraints if any.
@@ -2768,13 +3800,26 @@ fn infer_item(
     import_ctx: &ImportContext,
 ) -> Option<Ty> {
     match item {
-        Item::LetBinding(let_) => {
-            infer_let_binding(ctx, env, let_, types, type_registry, trait_registry, fn_constraints)
-                .ok()
-        }
-        Item::FnDef(fn_) => {
-            infer_fn_def(ctx, env, fn_, types, type_registry, trait_registry, fn_constraints).ok()
-        }
+        Item::LetBinding(let_) => infer_let_binding(
+            ctx,
+            env,
+            let_,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )
+        .ok(),
+        Item::FnDef(fn_) => infer_fn_def(
+            ctx,
+            env,
+            fn_,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )
+        .ok(),
         Item::StructDef(struct_def) => {
             register_struct_def(ctx, env, struct_def, type_registry, trait_registry);
             None
@@ -2788,7 +3833,15 @@ fn infer_item(
             None
         }
         Item::ImplDef(impl_) => {
-            infer_impl_def(ctx, env, impl_, types, type_registry, trait_registry, fn_constraints);
+            infer_impl_def(
+                ctx,
+                env,
+                impl_,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            );
             None
         }
         // Module declarations -- skip module def, handle imports.
@@ -2803,18 +3856,23 @@ fn infer_item(
                 // Check user-defined modules via ImportContext
                 if let Some(mod_exports) = import_ctx.module_exports.get(&last_segment) {
                     // Register the module namespace for qualified access
-                    ctx.qualified_modules.insert(last_segment.clone(), mod_exports.functions.clone());
+                    ctx.qualified_modules
+                        .insert(last_segment.clone(), mod_exports.functions.clone());
                     // Also register struct constructor types for qualified access
                     for (name, struct_def) in &mod_exports.struct_defs {
                         let tycon = TyCon::with_module(name, last_segment.as_str());
                         let struct_ty = if struct_def.generic_params.is_empty() {
                             Ty::App(Box::new(Ty::Con(tycon)), vec![])
                         } else {
-                            let type_args: Vec<Ty> = struct_def.generic_params.iter()
-                                .map(|_| ctx.fresh_var()).collect();
+                            let type_args: Vec<Ty> = struct_def
+                                .generic_params
+                                .iter()
+                                .map(|_| ctx.fresh_var())
+                                .collect();
                             Ty::App(Box::new(Ty::Con(tycon)), type_args)
                         };
-                        ctx.qualified_modules.entry(last_segment.clone())
+                        ctx.qualified_modules
+                            .entry(last_segment.clone())
                             .or_default()
                             .insert(name.clone(), Scheme::mono(struct_ty));
                     }
@@ -2828,17 +3886,19 @@ fn infer_item(
                             let qualified = format!("{}.{}", service_name, method_name);
                             env.insert(qualified, scheme.clone());
                             // Also add to qualified_modules for MIR lowering
-                            ctx.qualified_modules.entry(service_name.clone())
+                            ctx.qualified_modules
+                                .entry(service_name.clone())
                                 .or_default()
                                 .insert(method_name.clone(), scheme.clone());
                         }
                         // Register the service name as a type constructor for field access
-                        env.insert(service_name.clone(), Scheme::mono(Ty::Con(TyCon::new(service_name))));
-                        // Register method mappings for MIR lowering
-                        ctx.imported_service_methods.insert(
+                        env.insert(
                             service_name.clone(),
-                            service_info.methods.clone(),
+                            Scheme::mono(Ty::Con(TyCon::new(service_name))),
                         );
+                        // Register method mappings for MIR lowering
+                        ctx.imported_service_methods
+                            .insert(service_name.clone(), service_info.methods.clone());
                     }
                 } else if is_stdlib_module(&last_segment) {
                     // Stdlib module -- already handled in infer_field_access.
@@ -2878,7 +3938,9 @@ fn infer_item(
                                     let prefix = format!("{}__", name);
                                     for (key, scheme) in mod_exports.functions.iter() {
                                         if key.starts_with(&prefix)
-                                            && key[prefix.len()..].chars().all(|c| c.is_ascii_digit())
+                                            && key[prefix.len()..]
+                                                .chars()
+                                                .all(|c| c.is_ascii_digit())
                                         {
                                             env.insert(key.clone(), scheme.clone());
                                             ctx.imported_functions.push(key.clone());
@@ -2886,13 +3948,17 @@ fn infer_item(
                                     }
                                 }
                                 // Check struct constructors
-                                else if let Some(struct_def) = mod_exports.struct_defs.get(&name) {
+                                else if let Some(struct_def) = mod_exports.struct_defs.get(&name)
+                                {
                                     let tycon = TyCon::with_module(&name, last_segment.as_str());
                                     let struct_ty = if struct_def.generic_params.is_empty() {
                                         Ty::App(Box::new(Ty::Con(tycon)), vec![])
                                     } else {
-                                        let type_args: Vec<Ty> = struct_def.generic_params.iter()
-                                            .map(|_| ctx.fresh_var()).collect();
+                                        let type_args: Vec<Ty> = struct_def
+                                            .generic_params
+                                            .iter()
+                                            .map(|_| ctx.fresh_var())
+                                            .collect();
                                         Ty::App(Box::new(Ty::Con(tycon)), type_args)
                                     };
                                     env.insert(name.clone(), Scheme::mono(struct_ty));
@@ -2908,20 +3974,41 @@ fn infer_item(
                                     });
                                     if has_schema {
                                         // __table__ :: () -> String
-                                        env.insert(format!("{}.__table__", name), Scheme::mono(Ty::fun(vec![], Ty::string())));
+                                        env.insert(
+                                            format!("{}.__table__", name),
+                                            Scheme::mono(Ty::fun(vec![], Ty::string())),
+                                        );
                                         // __fields__ :: () -> List<String>
-                                        env.insert(format!("{}.__fields__", name), Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+                                        env.insert(
+                                            format!("{}.__fields__", name),
+                                            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+                                        );
                                         // __primary_key__ :: () -> String
-                                        env.insert(format!("{}.__primary_key__", name), Scheme::mono(Ty::fun(vec![], Ty::string())));
+                                        env.insert(
+                                            format!("{}.__primary_key__", name),
+                                            Scheme::mono(Ty::fun(vec![], Ty::string())),
+                                        );
                                         // __relationships__ :: () -> List<String>
-                                        env.insert(format!("{}.__relationships__", name), Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+                                        env.insert(
+                                            format!("{}.__relationships__", name),
+                                            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+                                        );
                                         // __field_types__ :: () -> List<String>
-                                        env.insert(format!("{}.__field_types__", name), Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+                                        env.insert(
+                                            format!("{}.__field_types__", name),
+                                            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+                                        );
                                         // __relationship_meta__ :: () -> List<String>
-                                        env.insert(format!("{}.__relationship_meta__", name), Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+                                        env.insert(
+                                            format!("{}.__relationship_meta__", name),
+                                            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+                                        );
                                         // Per-field column accessors: __{field}_col__ :: () -> String
                                         for (field_name, _) in &struct_def.fields {
-                                            env.insert(format!("{}.__{}_col__", name, field_name), Scheme::mono(Ty::fun(vec![], Ty::string())));
+                                            env.insert(
+                                                format!("{}.__{}_col__", name, field_name),
+                                                Scheme::mono(Ty::fun(vec![], Ty::string())),
+                                            );
                                         }
                                     }
                                 }
@@ -2929,7 +4016,8 @@ fn infer_item(
                                 else if let Some(sum_def) = mod_exports.sum_type_defs.get(&name) {
                                     type_registry.register_sum_type(sum_def.clone());
                                     register_variant_constructors(
-                                        ctx, env,
+                                        ctx,
+                                        env,
                                         &sum_def.name,
                                         &sum_def.generic_params,
                                         &sum_def.variants,
@@ -2941,22 +4029,26 @@ fn infer_item(
                                     ctx.imported_functions.push(name.clone());
                                 }
                                 // Check service definitions (importing a service brings its helpers)
-                                else if let Some(service_info) = mod_exports.service_defs.get(&name) {
+                                else if let Some(service_info) =
+                                    mod_exports.service_defs.get(&name)
+                                {
                                     // Register each helper function type in the environment
                                     for (method_name, scheme) in &service_info.helpers {
                                         let qualified = format!("{}.{}", name, method_name);
                                         env.insert(qualified, scheme.clone());
-                                        ctx.qualified_modules.entry(name.clone())
+                                        ctx.qualified_modules
+                                            .entry(name.clone())
                                             .or_default()
                                             .insert(method_name.clone(), scheme.clone());
                                     }
                                     // Register the service name as a type constructor
-                                    env.insert(name.clone(), Scheme::mono(Ty::Con(TyCon::new(&name))));
-                                    // Register method mappings for MIR lowering
-                                    ctx.imported_service_methods.insert(
+                                    env.insert(
                                         name.clone(),
-                                        service_info.methods.clone(),
+                                        Scheme::mono(Ty::Con(TyCon::new(&name))),
                                     );
+                                    // Register method mappings for MIR lowering
+                                    ctx.imported_service_methods
+                                        .insert(name.clone(), service_info.methods.clone());
                                 }
                                 // Check type aliases (ALIAS-03: importing a pub type alias
                                 // by name is valid; the alias is already pre-registered in
@@ -2965,8 +4057,7 @@ fn infer_item(
                                 else if mod_exports.type_aliases.contains_key(&name) {
                                     // Type alias already pre-registered in type_registry;
                                     // silently accept the import name.
-                                }
-                                else {
+                                } else {
                                     // Check if item exists but is private (VIS-03)
                                     if mod_exports.private_names.contains(&name) {
                                         ctx.errors.push(TypeError::PrivateItem {
@@ -2976,7 +4067,9 @@ fn infer_item(
                                         });
                                     } else {
                                         // IMPORT-07: Name not found in module
-                                        let available: Vec<String> = mod_exports.functions.keys()
+                                        let available: Vec<String> = mod_exports
+                                            .functions
+                                            .keys()
                                             .chain(mod_exports.struct_defs.keys())
                                             .chain(mod_exports.sum_type_defs.keys())
                                             .chain(mod_exports.service_defs.keys())
@@ -3032,15 +4125,36 @@ fn infer_item(
             register_sum_type_def(ctx, env, sum_def, type_registry, trait_registry);
             None
         }
-        Item::ActorDef(actor_def) => {
-            infer_actor_def(ctx, env, actor_def, types, type_registry, trait_registry, fn_constraints).ok()
-        }
-        Item::ServiceDef(service_def) => {
-            infer_service_def(ctx, env, &service_def, types, type_registry, trait_registry, fn_constraints).ok()
-        }
-        Item::SupervisorDef(sup_def) => {
-            infer_supervisor_def(ctx, env, sup_def, types, type_registry, trait_registry, fn_constraints).ok()
-        }
+        Item::ActorDef(actor_def) => infer_actor_def(
+            ctx,
+            env,
+            actor_def,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )
+        .ok(),
+        Item::ServiceDef(service_def) => infer_service_def(
+            ctx,
+            env,
+            &service_def,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )
+        .ok(),
+        Item::SupervisorDef(sup_def) => infer_supervisor_def(
+            ctx,
+            env,
+            sup_def,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )
+        .ok(),
     }
 }
 
@@ -3112,7 +4226,9 @@ fn register_struct_def(
     let derive_all = !has_deriving; // no clause = derive all defaults
 
     // Validate derive trait names.
-    let valid_derives = ["Eq", "Ord", "Display", "Debug", "Hash", "Json", "Row", "Schema"];
+    let valid_derives = [
+        "Eq", "Ord", "Display", "Debug", "Hash", "Json", "Row", "Schema",
+    ];
     for trait_name in &derive_list {
         if !valid_derives.contains(&trait_name.as_str()) {
             ctx.errors.push(TypeError::UnsupportedDerive {
@@ -3123,7 +4239,10 @@ fn register_struct_def(
     }
 
     // Check trait dependencies: Ord requires Eq.
-    if has_deriving && derive_list.iter().any(|t| t == "Ord") && !derive_list.iter().any(|t| t == "Eq") {
+    if has_deriving
+        && derive_list.iter().any(|t| t == "Ord")
+        && !derive_list.iter().any(|t| t == "Eq")
+    {
         ctx.errors.push(TypeError::MissingDerivePrerequisite {
             trait_name: "Ord".to_string(),
             requires: "Eq".to_string(),
@@ -3144,7 +4263,10 @@ fn register_struct_def(
         Ty::Con(TyCon::new(&name))
     } else {
         let base_ty = Ty::Con(TyCon::new(&name));
-        let param_tys: Vec<Ty> = generic_params.iter().map(|p| Ty::Con(TyCon::new(p))).collect();
+        let param_tys: Vec<Ty> = generic_params
+            .iter()
+            .map(|p| Ty::Con(TyCon::new(p)))
+            .collect();
         Ty::App(Box::new(base_ty), param_tys)
     };
 
@@ -3158,7 +4280,10 @@ fn register_struct_def(
 
         // __fields__ :: () -> List<String>
         let fields_fn_name = format!("{}.__fields__", name);
-        env.insert(fields_fn_name, Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+        env.insert(
+            fields_fn_name,
+            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+        );
 
         // __primary_key__ :: () -> String
         let pk_fn_name = format!("{}.__primary_key__", name);
@@ -3167,17 +4292,26 @@ fn register_struct_def(
         // __relationships__ :: () -> List<String>
         // Each relationship encoded as "kind:name:target" string.
         let rels_fn_name = format!("{}.__relationships__", name);
-        env.insert(rels_fn_name, Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+        env.insert(
+            rels_fn_name,
+            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+        );
 
         // __field_types__ :: () -> List<String>
         // Each entry is "field_name:SQL_TYPE".
         let ft_fn_name = format!("{}.__field_types__", name);
-        env.insert(ft_fn_name, Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+        env.insert(
+            ft_fn_name,
+            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+        );
 
         // __relationship_meta__ :: () -> List<String>
         // Each relationship encoded as "kind:name:target:fk:target_table" string.
         let meta_fn_name = format!("{}.__relationship_meta__", name);
-        env.insert(meta_fn_name, Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))));
+        env.insert(
+            meta_fn_name,
+            Scheme::mono(Ty::fun(vec![], Ty::list(Ty::string()))),
+        );
 
         // Per-field column accessor functions: __{field}_col__ :: () -> String
         for field in struct_def.fields() {
@@ -3346,10 +4480,7 @@ fn register_struct_def(
                 ImplMethodSig {
                     has_self: false,
                     param_count: 1,
-                    return_type: Some(Ty::result(
-                        Ty::Con(TyCon::new(&name)),
-                        Ty::string(),
-                    )),
+                    return_type: Some(Ty::result(Ty::Con(TyCon::new(&name)), Ty::string())),
                 },
             );
             let _ = trait_registry.register_impl(TraitImplDef {
@@ -3384,10 +4515,7 @@ fn register_struct_def(
                 ImplMethodSig {
                     has_self: false,
                     param_count: 1, // takes a Map<String, String>
-                    return_type: Some(Ty::result(
-                        Ty::Con(TyCon::new(&name)),
-                        Ty::string(),
-                    )),
+                    return_type: Some(Ty::result(Ty::Con(TyCon::new(&name)), Ty::string())),
                 },
             );
             let _ = trait_registry.register_impl(TraitImplDef {
@@ -3412,7 +4540,11 @@ fn register_struct_def(
 /// Serializable types: Int, Float, Bool, String, structs with ToJson impl,
 /// Option<T> where T is serializable, List<T> where T is serializable,
 /// Map<String, V> where V is serializable.
-fn is_json_serializable(ty: &Ty, _type_registry: &TypeRegistry, trait_registry: &TraitRegistry) -> bool {
+fn is_json_serializable(
+    ty: &Ty,
+    _type_registry: &TypeRegistry,
+    trait_registry: &TraitRegistry,
+) -> bool {
     match ty {
         Ty::Con(con) => match con.name.as_str() {
             "Int" | "Float" | "Bool" | "String" => true,
@@ -3420,7 +4552,12 @@ fn is_json_serializable(ty: &Ty, _type_registry: &TypeRegistry, trait_registry: 
                 // Generic type params (single uppercase letter like T, U, V, K, A, B)
                 // are treated as serializable at definition time. Invalid instantiations
                 // will fail at link time with missing ToJson__to_json__<Type> errors.
-                if name.len() == 1 && name.chars().next().map_or(false, |c| c.is_ascii_uppercase()) {
+                if name.len() == 1
+                    && name
+                        .chars()
+                        .next()
+                        .map_or(false, |c| c.is_ascii_uppercase())
+                {
                     return true;
                 }
                 // Check if this type has a ToJson impl registered
@@ -3431,14 +4568,20 @@ fn is_json_serializable(ty: &Ty, _type_registry: &TypeRegistry, trait_registry: 
         Ty::App(base, args) => {
             if let Ty::Con(con) = base.as_ref() {
                 match con.name.as_str() {
-                    "Option" => args.first().map_or(false, |t| is_json_serializable(t, _type_registry, trait_registry)),
-                    "List" => args.first().map_or(false, |t| is_json_serializable(t, _type_registry, trait_registry)),
+                    "Option" => args.first().map_or(false, |t| {
+                        is_json_serializable(t, _type_registry, trait_registry)
+                    }),
+                    "List" => args.first().map_or(false, |t| {
+                        is_json_serializable(t, _type_registry, trait_registry)
+                    }),
                     "Map" => {
                         // Map key must be String for JSON objects
-                        let key_ok = args.first().map_or(false, |t| {
-                            matches!(t, Ty::Con(c) if c.name == "String")
+                        let key_ok = args
+                            .first()
+                            .map_or(false, |t| matches!(t, Ty::Con(c) if c.name == "String"));
+                        let val_ok = args.get(1).map_or(false, |t| {
+                            is_json_serializable(t, _type_registry, trait_registry)
                         });
-                        let val_ok = args.get(1).map_or(false, |t| is_json_serializable(t, _type_registry, trait_registry));
                         key_ok && val_ok
                     }
                     _ => false,
@@ -3446,7 +4589,7 @@ fn is_json_serializable(ty: &Ty, _type_registry: &TypeRegistry, trait_registry: 
             } else {
                 false
             }
-        },
+        }
         _ => false, // Type variables, functions, etc. are not serializable
     }
 }
@@ -3517,9 +4660,14 @@ fn parse_alias_type(node: &mesh_parser::SyntaxNode, _generic_params: &[String]) 
                 }
                 if past_eq {
                     match kind {
-                        SyntaxKind::IDENT | SyntaxKind::LT | SyntaxKind::GT
-                        | SyntaxKind::COMMA | SyntaxKind::QUESTION | SyntaxKind::BANG
-                        | SyntaxKind::L_PAREN | SyntaxKind::R_PAREN
+                        SyntaxKind::IDENT
+                        | SyntaxKind::LT
+                        | SyntaxKind::GT
+                        | SyntaxKind::COMMA
+                        | SyntaxKind::QUESTION
+                        | SyntaxKind::BANG
+                        | SyntaxKind::L_PAREN
+                        | SyntaxKind::R_PAREN
                         | SyntaxKind::ARROW => {
                             tokens.push((kind, t.text().to_string()));
                         }
@@ -3551,8 +4699,22 @@ fn is_known_type(name: &str, type_registry: &TypeRegistry) -> bool {
     // Known primitive and builtin types
     matches!(
         name,
-        "Int" | "Float" | "String" | "Bool" | "Unit" | "Option" | "Result" | "List" | "Map"
-            | "Set" | "Range" | "Queue" | "Pid" | "Atom" | "Regex" | "Never"
+        "Int"
+            | "Float"
+            | "String"
+            | "Bool"
+            | "Unit"
+            | "Option"
+            | "Result"
+            | "List"
+            | "Map"
+            | "Set"
+            | "Range"
+            | "Queue"
+            | "Pid"
+            | "Atom"
+            | "Regex"
+            | "Never"
     ) || type_registry.struct_defs.contains_key(name)
         || type_registry.sum_type_defs.contains_key(name)
         || type_registry.type_aliases.contains_key(name)
@@ -3660,9 +4822,8 @@ fn register_sum_type_def(
         } else {
             // Positional types (TYPE_ANNOTATION children directly under VARIANT_DEF).
             for type_ann in variant_def.positional_types() {
-                let field_ty =
-                    resolve_type_annotation(ctx, &type_ann, type_registry)
-                        .unwrap_or_else(|| ctx.fresh_var());
+                let field_ty = resolve_type_annotation(ctx, &type_ann, type_registry)
+                    .unwrap_or_else(|| ctx.fresh_var());
                 fields.push(VariantFieldInfo::Positional(field_ty));
             }
         }
@@ -3692,7 +4853,9 @@ fn register_sum_type_def(
     let derive_all = !has_deriving; // no clause = derive all defaults
 
     // Validate derive trait names.
-    let valid_derives = ["Eq", "Ord", "Display", "Debug", "Hash", "Json", "Row", "Schema"];
+    let valid_derives = [
+        "Eq", "Ord", "Display", "Debug", "Hash", "Json", "Row", "Schema",
+    ];
     for trait_name in &derive_list {
         if !valid_derives.contains(&trait_name.as_str()) {
             ctx.errors.push(TypeError::UnsupportedDerive {
@@ -3711,7 +4874,10 @@ fn register_sum_type_def(
     }
 
     // Check trait dependencies: Ord requires Eq.
-    if has_deriving && derive_list.iter().any(|t| t == "Ord") && !derive_list.iter().any(|t| t == "Eq") {
+    if has_deriving
+        && derive_list.iter().any(|t| t == "Ord")
+        && !derive_list.iter().any(|t| t == "Eq")
+    {
         ctx.errors.push(TypeError::MissingDerivePrerequisite {
             trait_name: "Ord".to_string(),
             requires: "Eq".to_string(),
@@ -3727,7 +4893,10 @@ fn register_sum_type_def(
         Ty::Con(TyCon::new(&name))
     } else {
         let base_ty = Ty::Con(TyCon::new(&name));
-        let param_tys: Vec<Ty> = generic_params.iter().map(|p| Ty::Con(TyCon::new(p))).collect();
+        let param_tys: Vec<Ty> = generic_params
+            .iter()
+            .map(|p| Ty::Con(TyCon::new(p)))
+            .collect();
         Ty::App(Box::new(base_ty), param_tys)
     };
 
@@ -3848,7 +5017,9 @@ fn register_sum_type_def(
                 };
                 if !is_json_serializable(field_ty, type_registry, trait_registry) {
                     let field_ident = match field {
-                        VariantFieldInfo::Positional(_) => format!("{}::{}", variant.name, field_idx),
+                        VariantFieldInfo::Positional(_) => {
+                            format!("{}::{}", variant.name, field_idx)
+                        }
                         VariantFieldInfo::Named(fname, _) => format!("{}::{}", variant.name, fname),
                     };
                     ctx.errors.push(TypeError::NonSerializableField {
@@ -3886,10 +5057,7 @@ fn register_sum_type_def(
                 ImplMethodSig {
                     has_self: false,
                     param_count: 1,
-                    return_type: Some(Ty::result(
-                        Ty::Con(TyCon::new(&name)),
-                        Ty::string(),
-                    )),
+                    return_type: Some(Ty::result(Ty::Con(TyCon::new(&name)), Ty::string())),
                 },
             );
             let _ = trait_registry.register_impl(TraitImplDef {
@@ -3932,14 +5100,11 @@ fn infer_interface_def(
 
         if let Some(param_list) = method.param_list() {
             for param in param_list.params() {
-                let is_self = param
-                    .syntax()
-                    .children_with_tokens()
-                    .any(|tok| {
-                        tok.as_token()
-                            .map(|t| t.kind() == SyntaxKind::SELF_KW)
-                            .unwrap_or(false)
-                    });
+                let is_self = param.syntax().children_with_tokens().any(|tok| {
+                    tok.as_token()
+                        .map(|t| t.kind() == SyntaxKind::SELF_KW)
+                        .unwrap_or(false)
+                });
                 if is_self {
                     has_self = true;
                 } else {
@@ -4006,10 +5171,16 @@ fn resolve_assoc_type_binding(
                 }
                 if past_eq {
                     match kind {
-                        SyntaxKind::IDENT | SyntaxKind::LT | SyntaxKind::GT
-                        | SyntaxKind::COMMA | SyntaxKind::QUESTION | SyntaxKind::BANG
-                        | SyntaxKind::L_PAREN | SyntaxKind::R_PAREN
-                        | SyntaxKind::ARROW | SyntaxKind::DOT => {
+                        SyntaxKind::IDENT
+                        | SyntaxKind::LT
+                        | SyntaxKind::GT
+                        | SyntaxKind::COMMA
+                        | SyntaxKind::QUESTION
+                        | SyntaxKind::BANG
+                        | SyntaxKind::L_PAREN
+                        | SyntaxKind::R_PAREN
+                        | SyntaxKind::ARROW
+                        | SyntaxKind::DOT => {
                             tokens.push((kind, t.text().to_string()));
                         }
                         _ => {}
@@ -4153,14 +5324,11 @@ fn infer_impl_def(
 
         if let Some(param_list) = method.param_list() {
             for param in param_list.params() {
-                let is_self = param
-                    .syntax()
-                    .children_with_tokens()
-                    .any(|tok| {
-                        tok.as_token()
-                            .map(|t| t.kind() == SyntaxKind::SELF_KW)
-                            .unwrap_or(false)
-                    });
+                let is_self = param.syntax().children_with_tokens().any(|tok| {
+                    tok.as_token()
+                        .map(|t| t.kind() == SyntaxKind::SELF_KW)
+                        .unwrap_or(false)
+                });
                 if is_self {
                     has_self = true;
                 } else {
@@ -4202,14 +5370,11 @@ fn infer_impl_def(
 
         if let Some(param_list) = method.param_list() {
             for param in param_list.params() {
-                let is_self = param
-                    .syntax()
-                    .children_with_tokens()
-                    .any(|tok| {
-                        tok.as_token()
-                            .map(|t| t.kind() == SyntaxKind::SELF_KW)
-                            .unwrap_or(false)
-                    });
+                let is_self = param.syntax().children_with_tokens().any(|tok| {
+                    tok.as_token()
+                        .map(|t| t.kind() == SyntaxKind::SELF_KW)
+                        .unwrap_or(false)
+                });
                 if !is_self {
                     if let Some(name_tok) = param.name() {
                         let name_text = name_tok.text().to_string();
@@ -4297,7 +5462,15 @@ fn infer_let_binding(
         err
     })?;
 
-    let init_ty = infer_expr(ctx, env, &init_expr, types, type_registry, trait_registry, fn_constraints)?;
+    let init_ty = infer_expr(
+        ctx,
+        env,
+        &init_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
 
     // If there is a type annotation, resolve and unify with the inferred type.
     // When annotation is present and unification succeeds, use the annotation
@@ -4374,9 +5547,13 @@ fn infer_fn_def(
     } else {
         fn_name.clone()
     };
-    let pre_registered = env
-        .lookup(&pre_registered_key)
-        .and_then(|s| if s.vars.is_empty() { Some(s.ty.clone()) } else { None });
+    let pre_registered = env.lookup(&pre_registered_key).and_then(|s| {
+        if s.vars.is_empty() {
+            Some(s.ty.clone())
+        } else {
+            None
+        }
+    });
 
     ctx.enter_level();
 
@@ -4482,14 +5659,20 @@ fn infer_fn_def(
         }
         // Use full annotation resolution for generic/sugar types.
         resolve_type_annotation(ctx, &ann, type_registry)
-            .or_else(|| {
-                resolve_type_name_str(&ann).map(|name| name_to_type(&name))
-            })
+            .or_else(|| resolve_type_name_str(&ann).map(|name| name_to_type(&name)))
     });
 
     ctx.push_fn_return_type(return_type_annotation.clone());
     let body_ty = if let Some(body) = fn_.body() {
-        infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+        infer_block(
+            ctx,
+            env,
+            &body,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         Ty::Tuple(vec![])
     };
@@ -4544,36 +5727,96 @@ fn infer_expr(
     let ty = match expr {
         Expr::Literal(lit) => infer_literal(lit),
         Expr::NameRef(name_ref) => infer_name_ref(ctx, env, name_ref)?,
-        Expr::BinaryExpr(bin) => {
-            infer_binary(ctx, env, bin, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::UnaryExpr(un) => {
-            infer_unary(ctx, env, un, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::CallExpr(call) => {
-            infer_call(ctx, env, call, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::PipeExpr(pipe) => {
-            infer_pipe(ctx, env, pipe, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::IfExpr(if_) => {
-            infer_if(ctx, env, if_, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::ClosureExpr(closure) => {
-            infer_closure(ctx, env, closure, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::Block(block) => {
-            infer_block(ctx, env, block, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::TupleExpr(tuple) => {
-            infer_tuple(ctx, env, tuple, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::CaseExpr(case) => {
-            infer_case(ctx, env, case, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::ReturnExpr(ret) => {
-            infer_return(ctx, env, ret, types, type_registry, trait_registry, fn_constraints)?
-        }
+        Expr::BinaryExpr(bin) => infer_binary(
+            ctx,
+            env,
+            bin,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::UnaryExpr(un) => infer_unary(
+            ctx,
+            env,
+            un,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::CallExpr(call) => infer_call(
+            ctx,
+            env,
+            call,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::PipeExpr(pipe) => infer_pipe(
+            ctx,
+            env,
+            pipe,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::IfExpr(if_) => infer_if(
+            ctx,
+            env,
+            if_,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::ClosureExpr(closure) => infer_closure(
+            ctx,
+            env,
+            closure,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::Block(block) => infer_block(
+            ctx,
+            env,
+            block,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::TupleExpr(tuple) => infer_tuple(
+            ctx,
+            env,
+            tuple,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::CaseExpr(case) => infer_case(
+            ctx,
+            env,
+            case,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::ReturnExpr(ret) => infer_return(
+            ctx,
+            env,
+            ret,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
         Expr::StringExpr(se) => {
             // Recurse into interpolation expressions so their types are recorded.
             for child in se.syntax().children() {
@@ -4595,51 +5838,112 @@ fn infer_expr(
             }
             Ty::string()
         }
-        Expr::FieldAccess(fa) => {
-            infer_field_access(ctx, env, fa, types, type_registry, trait_registry, fn_constraints, false)?
-        }
-        Expr::StructLiteral(sl) => {
-            infer_struct_literal(ctx, env, sl, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::MapLiteral(map_lit) => {
-            infer_map_literal(ctx, env, map_lit, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::ListLiteral(lit) => {
-            infer_list_literal(ctx, env, &lit, types, type_registry, trait_registry, fn_constraints)?
-        }
+        Expr::FieldAccess(fa) => infer_field_access(
+            ctx,
+            env,
+            fa,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+            false,
+        )?,
+        Expr::StructLiteral(sl) => infer_struct_literal(
+            ctx,
+            env,
+            sl,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::MapLiteral(map_lit) => infer_map_literal(
+            ctx,
+            env,
+            map_lit,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::ListLiteral(lit) => infer_list_literal(
+            ctx,
+            env,
+            &lit,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
         Expr::IndexExpr(_) => ctx.fresh_var(),
         // Loop expressions.
-        Expr::WhileExpr(w) => {
-            infer_while(ctx, env, w, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::BreakExpr(b) => {
-            infer_break(ctx, b)?
-        }
-        Expr::ContinueExpr(c) => {
-            infer_continue(ctx, c)?
-        }
-        Expr::ForInExpr(for_in) => {
-            infer_for_in(ctx, env, &for_in, types, type_registry, trait_registry, fn_constraints)?
-        }
+        Expr::WhileExpr(w) => infer_while(
+            ctx,
+            env,
+            w,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::BreakExpr(b) => infer_break(ctx, b)?,
+        Expr::ContinueExpr(c) => infer_continue(ctx, c)?,
+        Expr::ForInExpr(for_in) => infer_for_in(
+            ctx,
+            env,
+            &for_in,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
         // Actor expressions.
-        Expr::SpawnExpr(spawn) => {
-            infer_spawn(ctx, env, spawn, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::SendExpr(send) => {
-            infer_send(ctx, env, send, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::ReceiveExpr(recv) => {
-            infer_receive(ctx, env, recv, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::SelfExpr(self_expr) => {
-            infer_self_expr(ctx, env, self_expr)?
-        }
-        Expr::LinkExpr(link) => {
-            infer_link(ctx, env, link, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::TryExpr(try_expr) => {
-            infer_try_expr(ctx, env, try_expr, types, type_registry, trait_registry, fn_constraints)?
-        }
+        Expr::SpawnExpr(spawn) => infer_spawn(
+            ctx,
+            env,
+            spawn,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::SendExpr(send) => infer_send(
+            ctx,
+            env,
+            send,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::ReceiveExpr(recv) => infer_receive(
+            ctx,
+            env,
+            recv,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::SelfExpr(self_expr) => infer_self_expr(ctx, env, self_expr)?,
+        Expr::LinkExpr(link) => infer_link(
+            ctx,
+            env,
+            link,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::TryExpr(try_expr) => infer_try_expr(
+            ctx,
+            env,
+            try_expr,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
         Expr::AtomLiteral(_atom) => {
             // Atoms have a distinct type from String -- they are opaque typed values.
             Ty::Con(TyCon::new("Atom"))
@@ -4649,15 +5953,33 @@ fn infer_expr(
             // The runtime represents a compiled regex as an opaque pointer.
             Ty::Con(TyCon::new("Regex"))
         }
-        Expr::StructUpdate(update) => {
-            infer_struct_update(ctx, env, update, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::SlotPipeExpr(pipe) => {
-            infer_slot_pipe(ctx, env, pipe, types, type_registry, trait_registry, fn_constraints)?
-        }
-        Expr::JsonExpr(json_expr) => {
-            infer_json_expr(ctx, env, json_expr, types, type_registry, trait_registry, fn_constraints)?
-        }
+        Expr::StructUpdate(update) => infer_struct_update(
+            ctx,
+            env,
+            update,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::SlotPipeExpr(pipe) => infer_slot_pipe(
+            ctx,
+            env,
+            pipe,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
+        Expr::JsonExpr(json_expr) => infer_json_expr(
+            ctx,
+            env,
+            json_expr,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?,
     };
 
     let resolved = ctx.resolve(ty.clone());
@@ -4683,14 +6005,8 @@ fn infer_literal(lit: &Literal) -> Ty {
 }
 
 /// Infer the type of a name reference (variable lookup).
-fn infer_name_ref(
-    ctx: &mut InferCtx,
-    env: &TypeEnv,
-    name_ref: &NameRef,
-) -> Result<Ty, TypeError> {
-    let name = name_ref
-        .text()
-        .unwrap_or_else(|| "<unknown>".to_string());
+fn infer_name_ref(ctx: &mut InferCtx, env: &TypeEnv, name_ref: &NameRef) -> Result<Ty, TypeError> {
+    let name = name_ref.text().unwrap_or_else(|| "<unknown>".to_string());
 
     match env.lookup(&name) {
         Some(scheme) => Ok(ctx.instantiate(scheme)),
@@ -4734,8 +6050,24 @@ fn infer_binary(
         err
     })?;
 
-    let lhs_ty = infer_expr(ctx, env, &lhs_expr, types, type_registry, trait_registry, fn_constraints)?;
-    let rhs_ty = infer_expr(ctx, env, &rhs_expr, types, type_registry, trait_registry, fn_constraints)?;
+    let lhs_ty = infer_expr(
+        ctx,
+        env,
+        &lhs_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
+    let rhs_ty = infer_expr(
+        ctx,
+        env,
+        &rhs_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
 
     let op = bin.op();
     let op_kind = op.as_ref().map(|t| t.kind());
@@ -4838,7 +6170,9 @@ fn infer_trait_binary_op(
         // Resolve the Output associated type for the result type.
         // For Int + Int, Output = Int; for Float * Float, Output = Float.
         // Falls back to the operand type if no Output is defined (backward compat).
-        if let Some(output_ty) = trait_registry.resolve_associated_type(trait_name, "Output", &resolved) {
+        if let Some(output_ty) =
+            trait_registry.resolve_associated_type(trait_name, "Output", &resolved)
+        {
             Ok(output_ty)
         } else {
             Ok(resolved)
@@ -4874,7 +6208,15 @@ fn infer_unary(
         err
     })?;
 
-    let operand_ty = infer_expr(ctx, env, &operand, types, type_registry, trait_registry, fn_constraints)?;
+    let operand_ty = infer_expr(
+        ctx,
+        env,
+        &operand,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
 
     let op_kind = un.op().map(|t| t.kind());
 
@@ -4894,7 +6236,9 @@ fn infer_unary(
 
             // User type: check Neg trait.
             if trait_registry.has_impl("Neg", &resolved) {
-                if let Some(output_ty) = trait_registry.resolve_associated_type("Neg", "Output", &resolved) {
+                if let Some(output_ty) =
+                    trait_registry.resolve_associated_type("Neg", "Output", &resolved)
+                {
                     Ok(output_ty)
                 } else {
                     Ok(resolved)
@@ -4950,7 +6294,8 @@ fn infer_call(
             if let Some(scheme) = env.lookup(&mangled) {
                 let scheme = scheme.clone();
                 let ty = ctx.instantiate(&scheme);
-                ctx.overloaded_call_targets.insert(call.syntax().text_range(), mangled);
+                ctx.overloaded_call_targets
+                    .insert(call.syntax().text_range(), mangled);
                 arity_dispatched_ty = Some(ty);
             }
         }
@@ -4964,13 +6309,15 @@ fn infer_call(
                     if let Some(mod_name) = nr.text() {
                         if let Some(field_name) = fa.field().map(|f| f.text().to_string()) {
                             let mangled = format!("{}__{}", field_name, arg_count);
-                            let scheme_opt = ctx.qualified_modules
+                            let scheme_opt = ctx
+                                .qualified_modules
                                 .get(&mod_name)
                                 .and_then(|m| m.get(&mangled))
                                 .cloned();
                             if let Some(scheme) = scheme_opt {
                                 let ty = ctx.instantiate(&scheme);
-                                ctx.overloaded_call_targets.insert(call.syntax().text_range(), mangled);
+                                ctx.overloaded_call_targets
+                                    .insert(call.syntax().text_range(), mangled);
                                 arity_dispatched_ty = Some(ty);
                             }
                         }
@@ -4986,63 +6333,106 @@ fn infer_call(
     let callee_ty = if let Some(ty) = arity_dispatched_ty {
         ty
     } else {
-    match infer_expr(ctx, env, &callee_expr, types, type_registry, trait_registry, fn_constraints) {
-        Ok(ty) => ty,
-        Err(first_err) => {
-            // If callee is a FieldAccess and normal inference failed, try method resolution.
-            if let Expr::FieldAccess(ref fa) = callee_expr {
-                // Remove the error that was pushed during the failed attempt.
-                // The failed infer_field_access(false) pushed a NoSuchField error.
-                if let Some(pos) = ctx.errors.iter().rposition(|e| {
-                    matches!(e, TypeError::NoSuchField { .. })
-                }) {
-                    ctx.errors.remove(pos);
-                }
-
-                // Try method-call context.
-                match infer_field_access(ctx, env, fa, types, type_registry, trait_registry, fn_constraints, true) {
-                    Ok(callee_ty) => {
-                        // Method resolved! Build expected function type with receiver.
-                        let mut arg_types = Vec::new();
-                        // Infer the receiver type (base expression of the FieldAccess).
-                        if let Some(base) = fa.base() {
-                            let receiver_ty = infer_expr(ctx, env, &base, types, type_registry, trait_registry, fn_constraints)?;
-                            arg_types.push(receiver_ty);
-                        }
-                        // Infer explicit argument types.
-                        if let Some(arg_list) = call.arg_list() {
-                            for arg in arg_list.args() {
-                                let arg_ty = infer_expr(ctx, env, &arg, types, type_registry, trait_registry, fn_constraints)?;
-                                arg_types.push(arg_ty);
-                            }
-                        }
-
-                        let ret_var = ctx.fresh_var();
-                        let expected_fn_ty = Ty::Fun(arg_types, Box::new(ret_var.clone()));
-
-                        let origin = ConstraintOrigin::FnArg {
-                            call_site: call.syntax().text_range(),
-                            param_idx: 0,
-                        };
-                        ctx.unify(callee_ty, expected_fn_ty, origin)?;
-
-                        let result = ctx.resolve(ret_var);
-                        types.insert(call.syntax().text_range(), result.clone());
-                        return Ok(result);
+        match infer_expr(
+            ctx,
+            env,
+            &callee_expr,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        ) {
+            Ok(ty) => ty,
+            Err(first_err) => {
+                // If callee is a FieldAccess and normal inference failed, try method resolution.
+                if let Expr::FieldAccess(ref fa) = callee_expr {
+                    // Remove the error that was pushed during the failed attempt.
+                    // The failed infer_field_access(false) pushed a NoSuchField error.
+                    if let Some(pos) = ctx
+                        .errors
+                        .iter()
+                        .rposition(|e| matches!(e, TypeError::NoSuchField { .. }))
+                    {
+                        ctx.errors.remove(pos);
                     }
-                    Err(method_err) => return Err(method_err),
+
+                    // Try method-call context.
+                    match infer_field_access(
+                        ctx,
+                        env,
+                        fa,
+                        types,
+                        type_registry,
+                        trait_registry,
+                        fn_constraints,
+                        true,
+                    ) {
+                        Ok(callee_ty) => {
+                            // Method resolved! Build expected function type with receiver.
+                            let mut arg_types = Vec::new();
+                            // Infer the receiver type (base expression of the FieldAccess).
+                            if let Some(base) = fa.base() {
+                                let receiver_ty = infer_expr(
+                                    ctx,
+                                    env,
+                                    &base,
+                                    types,
+                                    type_registry,
+                                    trait_registry,
+                                    fn_constraints,
+                                )?;
+                                arg_types.push(receiver_ty);
+                            }
+                            // Infer explicit argument types.
+                            if let Some(arg_list) = call.arg_list() {
+                                for arg in arg_list.args() {
+                                    let arg_ty = infer_expr(
+                                        ctx,
+                                        env,
+                                        &arg,
+                                        types,
+                                        type_registry,
+                                        trait_registry,
+                                        fn_constraints,
+                                    )?;
+                                    arg_types.push(arg_ty);
+                                }
+                            }
+
+                            let ret_var = ctx.fresh_var();
+                            let expected_fn_ty = Ty::Fun(arg_types, Box::new(ret_var.clone()));
+
+                            let origin = ConstraintOrigin::FnArg {
+                                call_site: call.syntax().text_range(),
+                                param_idx: 0,
+                            };
+                            ctx.unify(callee_ty, expected_fn_ty, origin)?;
+
+                            let result = ctx.resolve(ret_var);
+                            types.insert(call.syntax().text_range(), result.clone());
+                            return Ok(result);
+                        }
+                        Err(method_err) => return Err(method_err),
+                    }
+                } else {
+                    return Err(first_err);
                 }
-            } else {
-                return Err(first_err);
             }
         }
-    }
     }; // close else { match ... } and the let binding
 
     let mut arg_types = Vec::new();
     if let Some(arg_list) = call.arg_list() {
         for arg in arg_list.args() {
-            let arg_ty = infer_expr(ctx, env, &arg, types, type_registry, trait_registry, fn_constraints)?;
+            let arg_ty = infer_expr(
+                ctx,
+                env,
+                &arg,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             arg_types.push(arg_ty);
         }
     }
@@ -5108,15 +6498,20 @@ fn infer_call(
             if let Expr::NameRef(ref name_ref) = arg {
                 if let Some(arg_fn_name) = name_ref.text() {
                     if let Some(arg_constraints) = fn_constraints.get(&arg_fn_name) {
-                        if !arg_constraints.where_constraints.is_empty() && arg_idx < arg_types.len() {
+                        if !arg_constraints.where_constraints.is_empty()
+                            && arg_idx < arg_types.len()
+                        {
                             // Resolve the argument's type (a function type after unification)
                             let resolved_arg_ty = ctx.resolve(arg_types[arg_idx].clone());
 
                             if let Ty::Fun(ref param_tys, _) = resolved_arg_ty {
-                                let mut resolved_type_args: FxHashMap<String, Ty> = FxHashMap::default();
+                                let mut resolved_type_args: FxHashMap<String, Ty> =
+                                    FxHashMap::default();
 
                                 // Map parameter positions to type param names, resolve types
-                                for (j, tp_name_opt) in arg_constraints.param_type_param_names.iter().enumerate() {
+                                for (j, tp_name_opt) in
+                                    arg_constraints.param_type_param_names.iter().enumerate()
+                                {
                                     if let Some(tp_name) = tp_name_opt {
                                         if j < param_tys.len() {
                                             let resolved = ctx.resolve(param_tys[j].clone());
@@ -5134,10 +6529,12 @@ fn infer_call(
                                 }
 
                                 // Only check constraints where type resolved to concrete (not Ty::Var)
-                                let checkable: Vec<(String, String)> = arg_constraints.where_constraints
+                                let checkable: Vec<(String, String)> = arg_constraints
+                                    .where_constraints
                                     .iter()
                                     .filter(|(pn, _)| {
-                                        resolved_type_args.get(pn)
+                                        resolved_type_args
+                                            .get(pn)
                                             .map(|ty| !matches!(ty, Ty::Var(_)))
                                             .unwrap_or(false)
                                     })
@@ -5192,7 +6589,15 @@ fn infer_pipe(
         err
     })?;
 
-    let lhs_ty = infer_expr(ctx, env, &lhs, types, type_registry, trait_registry, fn_constraints)?;
+    let lhs_ty = infer_expr(
+        ctx,
+        env,
+        &lhs,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
 
     let ret_var = ctx.fresh_var();
 
@@ -5211,13 +6616,29 @@ fn infer_pipe(
                 err
             })?;
 
-            let callee_ty = infer_expr(ctx, env, &callee_expr, types, type_registry, trait_registry, fn_constraints)?;
+            let callee_ty = infer_expr(
+                ctx,
+                env,
+                &callee_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
 
             // Infer explicit argument types from the call's arg list.
             let mut arg_types = Vec::new();
             if let Some(arg_list) = call.arg_list() {
                 for arg in arg_list.args() {
-                    let arg_ty = infer_expr(ctx, env, &arg, types, type_registry, trait_registry, fn_constraints)?;
+                    let arg_ty = infer_expr(
+                        ctx,
+                        env,
+                        &arg,
+                        types,
+                        type_registry,
+                        trait_registry,
+                        fn_constraints,
+                    )?;
                     arg_types.push(arg_ty);
                 }
             }
@@ -5243,11 +6664,14 @@ fn infer_pipe(
                 if let Some(fn_name) = name_ref.text() {
                     if let Some(constraints) = fn_constraints.get(&fn_name) {
                         if !constraints.where_constraints.is_empty() {
-                            let mut resolved_type_args: FxHashMap<String, Ty> = FxHashMap::default();
+                            let mut resolved_type_args: FxHashMap<String, Ty> =
+                                FxHashMap::default();
 
                             // Build type param -> resolved type mapping from full arg list
                             // (including the piped argument at position 0).
-                            for (i, tp_name_opt) in constraints.param_type_param_names.iter().enumerate() {
+                            for (i, tp_name_opt) in
+                                constraints.param_type_param_names.iter().enumerate()
+                            {
                                 if let Some(tp_name) = tp_name_opt {
                                     if i < full_args.len() {
                                         let resolved = ctx.resolve(full_args[i].clone());
@@ -5287,17 +6711,26 @@ fn infer_pipe(
                     if let Expr::NameRef(ref name_ref) = arg {
                         if let Some(arg_fn_name) = name_ref.text() {
                             if let Some(arg_constraints) = fn_constraints.get(&arg_fn_name) {
-                                if !arg_constraints.where_constraints.is_empty() && arg_idx < arg_types.len() {
+                                if !arg_constraints.where_constraints.is_empty()
+                                    && arg_idx < arg_types.len()
+                                {
                                     let resolved_arg_ty = ctx.resolve(arg_types[arg_idx].clone());
 
                                     if let Ty::Fun(ref param_tys, _) = resolved_arg_ty {
-                                        let mut resolved_type_args: FxHashMap<String, Ty> = FxHashMap::default();
+                                        let mut resolved_type_args: FxHashMap<String, Ty> =
+                                            FxHashMap::default();
 
-                                        for (j, tp_name_opt) in arg_constraints.param_type_param_names.iter().enumerate() {
+                                        for (j, tp_name_opt) in arg_constraints
+                                            .param_type_param_names
+                                            .iter()
+                                            .enumerate()
+                                        {
                                             if let Some(tp_name) = tp_name_opt {
                                                 if j < param_tys.len() {
-                                                    let resolved = ctx.resolve(param_tys[j].clone());
-                                                    resolved_type_args.insert(tp_name.clone(), resolved);
+                                                    let resolved =
+                                                        ctx.resolve(param_tys[j].clone());
+                                                    resolved_type_args
+                                                        .insert(tp_name.clone(), resolved);
                                                 }
                                             }
                                         }
@@ -5305,14 +6738,17 @@ fn infer_pipe(
                                         for (param_name, param_ty) in &arg_constraints.type_params {
                                             if !resolved_type_args.contains_key(param_name) {
                                                 let resolved = ctx.resolve(param_ty.clone());
-                                                resolved_type_args.insert(param_name.clone(), resolved);
+                                                resolved_type_args
+                                                    .insert(param_name.clone(), resolved);
                                             }
                                         }
 
-                                        let checkable: Vec<(String, String)> = arg_constraints.where_constraints
+                                        let checkable: Vec<(String, String)> = arg_constraints
+                                            .where_constraints
                                             .iter()
                                             .filter(|(pn, _)| {
-                                                resolved_type_args.get(pn)
+                                                resolved_type_args
+                                                    .get(pn)
                                                     .map(|ty| !matches!(ty, Ty::Var(_)))
                                                     .unwrap_or(false)
                                             })
@@ -5337,7 +6773,15 @@ fn infer_pipe(
         }
         _ => {
             // Existing behavior: infer rhs as function, unify with Fun([lhs_ty], ret).
-            let rhs_ty = infer_expr(ctx, env, &rhs, types, type_registry, trait_registry, fn_constraints)?;
+            let rhs_ty = infer_expr(
+                ctx,
+                env,
+                &rhs,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             let expected_fn = Ty::Fun(vec![lhs_ty], Box::new(ret_var.clone()));
             ctx.unify(rhs_ty, expected_fn, ConstraintOrigin::Builtin)?;
         }
@@ -5381,7 +6825,15 @@ fn infer_slot_pipe(
     let slot = pipe.slot().unwrap_or(2); // 1-indexed, >= 2 by parse guarantee
     let insert_idx = (slot - 1) as usize; // 0-indexed insert position in the final arg list
 
-    let lhs_ty = infer_expr(ctx, env, &lhs, types, type_registry, trait_registry, fn_constraints)?;
+    let lhs_ty = infer_expr(
+        ctx,
+        env,
+        &lhs,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
     let ret_var = ctx.fresh_var();
 
     match &rhs {
@@ -5396,13 +6848,29 @@ fn infer_slot_pipe(
                 err
             })?;
 
-            let callee_ty = infer_expr(ctx, env, &callee_expr, types, type_registry, trait_registry, fn_constraints)?;
+            let callee_ty = infer_expr(
+                ctx,
+                env,
+                &callee_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
 
             // Infer explicit argument types
             let mut explicit_arg_types: Vec<Ty> = Vec::new();
             if let Some(arg_list) = call.arg_list() {
                 for arg in arg_list.args() {
-                    let arg_ty = infer_expr(ctx, env, &arg, types, type_registry, trait_registry, fn_constraints)?;
+                    let arg_ty = infer_expr(
+                        ctx,
+                        env,
+                        &arg,
+                        types,
+                        type_registry,
+                        trait_registry,
+                        fn_constraints,
+                    )?;
                     explicit_arg_types.push(arg_ty);
                 }
             }
@@ -5451,17 +6919,24 @@ fn infer_slot_pipe(
                 if let Some(fn_name) = name_ref.text() {
                     if let Some(constraints) = fn_constraints.get(&fn_name) {
                         if !constraints.where_constraints.is_empty() {
-                            let mut resolved_type_args: FxHashMap<String, Ty> = FxHashMap::default();
-                            for (i, tp_name_opt) in constraints.param_type_param_names.iter().enumerate() {
+                            let mut resolved_type_args: FxHashMap<String, Ty> =
+                                FxHashMap::default();
+                            for (i, tp_name_opt) in
+                                constraints.param_type_param_names.iter().enumerate()
+                            {
                                 if let Some(tp_name) = tp_name_opt {
                                     if i < full_args.len() {
-                                        resolved_type_args.insert(tp_name.clone(), ctx.resolve(full_args[i].clone()));
+                                        resolved_type_args.insert(
+                                            tp_name.clone(),
+                                            ctx.resolve(full_args[i].clone()),
+                                        );
                                     }
                                 }
                             }
                             for (param_name, param_ty) in &constraints.type_params {
                                 if !resolved_type_args.contains_key(param_name) {
-                                    resolved_type_args.insert(param_name.clone(), ctx.resolve(param_ty.clone()));
+                                    resolved_type_args
+                                        .insert(param_name.clone(), ctx.resolve(param_ty.clone()));
                                 }
                             }
                             let errors = trait_registry.check_where_constraints(
@@ -5480,7 +6955,15 @@ fn infer_slot_pipe(
         }
         _ => {
             // Bare function reference: treat like regular pipe (insert lhs at position 0)
-            let rhs_ty = infer_expr(ctx, env, &rhs, types, type_registry, trait_registry, fn_constraints)?;
+            let rhs_ty = infer_expr(
+                ctx,
+                env,
+                &rhs,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             let expected_fn = Ty::Fun(vec![lhs_ty], Box::new(ret_var.clone()));
             ctx.unify(rhs_ty, expected_fn, ConstraintOrigin::Builtin)?;
         }
@@ -5500,21 +6983,53 @@ fn infer_if(
     fn_constraints: &FxHashMap<String, FnConstraints>,
 ) -> Result<Ty, TypeError> {
     if let Some(cond) = if_.condition() {
-        let cond_ty = infer_expr(ctx, env, &cond, types, type_registry, trait_registry, fn_constraints)?;
+        let cond_ty = infer_expr(
+            ctx,
+            env,
+            &cond,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
         ctx.unify(cond_ty, Ty::bool(), ConstraintOrigin::Builtin)?;
     }
 
     let then_ty = if let Some(then_block) = if_.then_branch() {
-        infer_block(ctx, env, &then_block, types, type_registry, trait_registry, fn_constraints)?
+        infer_block(
+            ctx,
+            env,
+            &then_block,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         Ty::Tuple(vec![])
     };
 
     if let Some(else_branch) = if_.else_branch() {
         let else_ty = if let Some(else_if) = else_branch.if_expr() {
-            infer_if(ctx, env, &else_if, types, type_registry, trait_registry, fn_constraints)?
+            infer_if(
+                ctx,
+                env,
+                &else_if,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?
         } else if let Some(else_block) = else_branch.block() {
-            infer_block(ctx, env, &else_block, types, type_registry, trait_registry, fn_constraints)?
+            infer_block(
+                ctx,
+                env,
+                &else_block,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?
         } else {
             Ty::Tuple(vec![])
         };
@@ -5550,14 +7065,30 @@ fn infer_while(
 ) -> Result<Ty, TypeError> {
     // Infer and unify condition with Bool.
     if let Some(cond) = w.condition() {
-        let cond_ty = infer_expr(ctx, env, &cond, types, type_registry, trait_registry, fn_constraints)?;
+        let cond_ty = infer_expr(
+            ctx,
+            env,
+            &cond,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
         ctx.unify(cond_ty, Ty::bool(), ConstraintOrigin::Builtin)?;
     }
 
     // Infer body with incremented loop_depth.
     ctx.enter_loop();
     if let Some(body) = w.body() {
-        let _ = infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?;
+        let _ = infer_block(
+            ctx,
+            env,
+            &body,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
     }
     ctx.exit_loop();
 
@@ -5569,10 +7100,7 @@ fn infer_while(
 ///
 /// Break is a control flow transfer -- type is Never.
 /// Produces BreakOutsideLoop error if not inside a loop (BRKC-04).
-fn infer_break(
-    ctx: &mut InferCtx,
-    b: &BreakExpr,
-) -> Result<Ty, TypeError> {
+fn infer_break(ctx: &mut InferCtx, b: &BreakExpr) -> Result<Ty, TypeError> {
     if !ctx.in_loop() {
         let span = b.syntax().text_range();
         ctx.errors.push(TypeError::BreakOutsideLoop { span });
@@ -5584,10 +7112,7 @@ fn infer_break(
 ///
 /// Continue is a control flow transfer -- type is Never.
 /// Produces ContinueOutsideLoop error if not inside a loop (BRKC-04).
-fn infer_continue(
-    ctx: &mut InferCtx,
-    c: &ContinueExpr,
-) -> Result<Ty, TypeError> {
+fn infer_continue(ctx: &mut InferCtx, c: &ContinueExpr) -> Result<Ty, TypeError> {
     if !ctx.in_loop() {
         let span = c.syntax().text_range();
         ctx.errors.push(TypeError::ContinueOutsideLoop { span });
@@ -5611,7 +7136,15 @@ fn infer_for_in(
 ) -> Result<Ty, TypeError> {
     // Infer the iterable expression.
     let iter_ty = if let Some(iterable) = for_in.iterable() {
-        let ty = infer_expr(ctx, env, &iterable, types, type_registry, trait_registry, fn_constraints)?;
+        let ty = infer_expr(
+            ctx,
+            env,
+            &iterable,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
         ctx.resolve(ty)
     } else {
         return Ok(Ty::Tuple(vec![]));
@@ -5700,7 +7233,9 @@ fn infer_for_in(
 
                 // Check if the type implements Iterable (collection -> iterator).
                 if trait_registry.has_impl("Iterable", &iter_ty) {
-                    if let Some(item_ty) = trait_registry.resolve_associated_type("Iterable", "Item", &iter_ty) {
+                    if let Some(item_ty) =
+                        trait_registry.resolve_associated_type("Iterable", "Item", &iter_ty)
+                    {
                         env.insert(var_name, Scheme::mono(item_ty));
                     } else {
                         // Iterable impl exists but no Item type resolved -- fallback to Int
@@ -5709,7 +7244,9 @@ fn infer_for_in(
                 }
                 // Check if the type directly implements Iterator (type IS an iterator).
                 else if trait_registry.has_impl("Iterator", &iter_ty) {
-                    if let Some(item_ty) = trait_registry.resolve_associated_type("Iterator", "Item", &iter_ty) {
+                    if let Some(item_ty) =
+                        trait_registry.resolve_associated_type("Iterator", "Item", &iter_ty)
+                    {
                         env.insert(var_name, Scheme::mono(item_ty));
                     } else {
                         env.insert(var_name, Scheme::mono(Ty::int()));
@@ -5745,7 +7282,15 @@ fn infer_for_in(
 
     // Infer body -- its type becomes the List element type.
     let body_ty = if let Some(body) = for_in.body() {
-        infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+        infer_block(
+            ctx,
+            env,
+            &body,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         Ty::Tuple(vec![])
     };
@@ -5774,7 +7319,9 @@ fn extract_collection_elem_type(ty: &Ty) -> CollectionType {
             if let Ty::Con(ref tc) = **con {
                 match tc.name.as_str() {
                     "List" if !args.is_empty() => CollectionType::List(args[0].clone()),
-                    "Map" if args.len() >= 2 => CollectionType::Map(args[0].clone(), args[1].clone()),
+                    "Map" if args.len() >= 2 => {
+                        CollectionType::Map(args[0].clone(), args[1].clone())
+                    }
                     "Set" if !args.is_empty() => CollectionType::Set(args[0].clone()),
                     _ => CollectionType::Unknown,
                 }
@@ -5810,7 +7357,13 @@ fn infer_closure(
     // Check if this is a multi-clause closure.
     if closure.is_multi_clause() {
         return infer_multi_clause_closure(
-            ctx, env, closure, types, type_registry, trait_registry, fn_constraints,
+            ctx,
+            env,
+            closure,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
         );
     }
 
@@ -5842,7 +7395,15 @@ fn infer_closure(
     let saved_loop_depth = ctx.enter_closure();
     ctx.push_fn_return_type(None); // Closure return type is inferred
     let body_ty = if let Some(body) = closure.body() {
-        infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+        infer_block(
+            ctx,
+            env,
+            &body,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         Ty::Tuple(vec![])
     };
@@ -5890,7 +7451,11 @@ fn infer_multi_clause_closure(
             if let Some(pat) = param.pattern() {
                 // Pattern parameter: infer type and unify with param position.
                 let pat_ty = infer_pattern(ctx, env, &pat, types, type_registry)?;
-                ctx.unify(pat_ty, param_types[param_idx].clone(), ConstraintOrigin::Builtin)?;
+                ctx.unify(
+                    pat_ty,
+                    param_types[param_idx].clone(),
+                    ConstraintOrigin::Builtin,
+                )?;
             } else if let Some(name_tok) = param.name() {
                 // Regular named parameter: bind as wildcard.
                 let name_text = name_tok.text().to_string();
@@ -5903,7 +7468,13 @@ fn infer_multi_clause_closure(
     if let Some(guard_clause) = closure.guard() {
         if let Some(guard_expr) = guard_clause.expr() {
             let guard_ty = infer_expr(
-                ctx, env, &guard_expr, types, type_registry, trait_registry, fn_constraints,
+                ctx,
+                env,
+                &guard_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
             )?;
             let _ = ctx.unify(guard_ty, Ty::bool(), ConstraintOrigin::Builtin);
         }
@@ -5913,7 +7484,15 @@ fn infer_multi_clause_closure(
     let saved_loop_depth = ctx.enter_closure();
     ctx.push_fn_return_type(None); // Multi-clause closure return type is inferred
     let first_body_ty = if let Some(body) = closure.body() {
-        infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+        infer_block(
+            ctx,
+            env,
+            &body,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         Ty::Tuple(vec![])
     };
@@ -5935,7 +7514,11 @@ fn infer_multi_clause_closure(
                 }
                 if let Some(pat) = param.pattern() {
                     let pat_ty = infer_pattern(ctx, env, &pat, types, type_registry)?;
-                    ctx.unify(pat_ty, param_types[param_idx].clone(), ConstraintOrigin::Builtin)?;
+                    ctx.unify(
+                        pat_ty,
+                        param_types[param_idx].clone(),
+                        ConstraintOrigin::Builtin,
+                    )?;
                 } else if let Some(name_tok) = param.name() {
                     let name_text = name_tok.text().to_string();
                     env.insert(name_text, Scheme::mono(param_types[param_idx].clone()));
@@ -5947,7 +7530,13 @@ fn infer_multi_clause_closure(
         if let Some(guard_clause) = clause.guard() {
             if let Some(guard_expr) = guard_clause.expr() {
                 let guard_ty = infer_expr(
-                    ctx, env, &guard_expr, types, type_registry, trait_registry, fn_constraints,
+                    ctx,
+                    env,
+                    &guard_expr,
+                    types,
+                    type_registry,
+                    trait_registry,
+                    fn_constraints,
                 )?;
                 let _ = ctx.unify(guard_ty, Ty::bool(), ConstraintOrigin::Builtin);
             }
@@ -5957,7 +7546,15 @@ fn infer_multi_clause_closure(
         let saved_loop_depth = ctx.enter_closure();
         ctx.push_fn_return_type(None); // Multi-clause closure return type is inferred
         let body_ty = if let Some(body) = clause.body() {
-            infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+            infer_block(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?
         } else {
             Ty::Tuple(vec![])
         };
@@ -6041,7 +7638,8 @@ fn infer_block(
         }
     }
 
-    let mut block_processed_grouped: rustc_hash::FxHashSet<usize> = rustc_hash::FxHashSet::default();
+    let mut block_processed_grouped: rustc_hash::FxHashSet<usize> =
+        rustc_hash::FxHashSet::default();
 
     for (range, child_kind) in &block_children {
         match child_kind {
@@ -6107,7 +7705,15 @@ fn infer_block(
             BlockChildKind::ExprNode(child_node) => {
                 if let Some(expr) = Expr::cast(child_node.clone()) {
                     processed_ranges.push(*range);
-                    match infer_expr(ctx, env, &expr, types, type_registry, trait_registry, &local_fn_constraints) {
+                    match infer_expr(
+                        ctx,
+                        env,
+                        &expr,
+                        types,
+                        type_registry,
+                        trait_registry,
+                        &local_fn_constraints,
+                    ) {
                         Ok(ty) => {
                             last_ty = ty;
                         }
@@ -6125,7 +7731,15 @@ fn infer_block(
         let already_processed = processed_ranges.iter().any(|r| *r == tail_range);
 
         if !already_processed {
-            match infer_expr(ctx, env, &tail, types, type_registry, trait_registry, &local_fn_constraints) {
+            match infer_expr(
+                ctx,
+                env,
+                &tail,
+                types,
+                type_registry,
+                trait_registry,
+                &local_fn_constraints,
+            ) {
                 Ok(ty) => {
                     last_ty = ty;
                 }
@@ -6155,7 +7769,15 @@ fn infer_tuple(
 ) -> Result<Ty, TypeError> {
     let mut elem_types = Vec::new();
     for elem in tuple.elements() {
-        let ty = infer_expr(ctx, env, &elem, types, type_registry, trait_registry, fn_constraints)?;
+        let ty = infer_expr(
+            ctx,
+            env,
+            &elem,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
         elem_types.push(ty);
     }
 
@@ -6172,11 +7794,7 @@ fn infer_tuple(
 ///
 /// Variable bindings become wildcards (they match anything). Literals, constructors,
 /// and or-patterns are mapped directly to their abstract equivalents.
-fn ast_pattern_to_abstract(
-    pat: &Pattern,
-    env: &TypeEnv,
-    type_registry: &TypeRegistry,
-) -> AbsPat {
+fn ast_pattern_to_abstract(pat: &Pattern, env: &TypeEnv, type_registry: &TypeRegistry) -> AbsPat {
     match pat {
         Pattern::Wildcard(_) => AbsPat::Wildcard,
         Pattern::Ident(ident) => {
@@ -6449,10 +8067,7 @@ fn validate_guard_expr(expr: &Expr) -> Result<(), String> {
                     | SyntaxKind::AMP_AMP
                     | SyntaxKind::PIPE_PIPE => {}
                     _ => {
-                        return Err(format!(
-                            "operator `{}` not allowed in guard",
-                            op.text()
-                        ));
+                        return Err(format!("operator `{}` not allowed in guard", op.text()));
                     }
                 }
             }
@@ -6470,10 +8085,7 @@ fn validate_guard_expr(expr: &Expr) -> Result<(), String> {
                 match op.kind() {
                     SyntaxKind::BANG | SyntaxKind::NOT_KW => {}
                     _ => {
-                        return Err(format!(
-                            "operator `{}` not allowed in guard",
-                            op.text()
-                        ));
+                        return Err(format!("operator `{}` not allowed in guard", op.text()));
                     }
                 }
             }
@@ -6515,7 +8127,15 @@ fn infer_case(
     fn_constraints: &FxHashMap<String, FnConstraints>,
 ) -> Result<Ty, TypeError> {
     let scrutinee_ty = if let Some(scrutinee) = case.scrutinee() {
-        infer_expr(ctx, env, &scrutinee, types, type_registry, trait_registry, fn_constraints)?
+        infer_expr(
+            ctx,
+            env,
+            &scrutinee,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         ctx.fresh_var()
     };
@@ -6559,19 +8179,29 @@ fn infer_case(
 
             // Type-check the guard -- it must be Bool.
             let guard_ty = infer_expr(
-                ctx, env, &guard_expr, types, type_registry, trait_registry, fn_constraints,
+                ctx,
+                env,
+                &guard_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
             )?;
             let _ = ctx.unify(guard_ty, Ty::bool(), ConstraintOrigin::Builtin);
         }
 
         if let Some(body) = arm.body() {
-            let body_ty = infer_expr(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?;
+            let body_ty = infer_expr(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             if let Some(ref prev_ty) = result_ty {
-                ctx.unify(
-                    prev_ty.clone(),
-                    body_ty.clone(),
-                    ConstraintOrigin::Builtin,
-                )?;
+                ctx.unify(prev_ty.clone(), body_ty.clone(), ConstraintOrigin::Builtin)?;
             } else {
                 result_ty = Some(body_ty);
             }
@@ -6613,7 +8243,10 @@ fn infer_case(
     for idx in redundant_indices {
         let warn = TypeError::RedundantArm {
             arm_index: idx,
-            span: arm_spans.get(idx).copied().unwrap_or(case.syntax().text_range()),
+            span: arm_spans
+                .get(idx)
+                .copied()
+                .unwrap_or(case.syntax().text_range()),
         };
         ctx.warnings.push(warn);
     }
@@ -6632,7 +8265,15 @@ fn infer_return(
     fn_constraints: &FxHashMap<String, FnConstraints>,
 ) -> Result<Ty, TypeError> {
     if let Some(value) = ret.value() {
-        let _ty = infer_expr(ctx, env, &value, types, type_registry, trait_registry, fn_constraints)?;
+        let _ty = infer_expr(
+            ctx,
+            env,
+            &value,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
     }
     Ok(Ty::Never)
 }
@@ -6656,7 +8297,7 @@ fn build_method_fn_type(
     // Look up the method signature to determine parameter count.
     if let Some(method_sig) = trait_registry.find_method_sig(method_name, self_ty) {
         let mut param_types = vec![self_ty.clone()]; // self parameter
-        // Add fresh type vars for remaining params (we only know the count).
+                                                     // Add fresh type vars for remaining params (we only know the count).
         for _ in 0..method_sig.param_count {
             param_types.push(ctx.fresh_var());
         }
@@ -6798,9 +8439,12 @@ fn infer_field_access(
 
             // Check if base is a struct type name with Schema metadata functions.
             // e.g. User.__table__() -- User is a struct with deriving(Schema).
-            if field_name == "__table__" || field_name == "__fields__"
-                || field_name == "__primary_key__" || field_name == "__relationships__"
-                || field_name == "__field_types__" || field_name == "__relationship_meta__"
+            if field_name == "__table__"
+                || field_name == "__fields__"
+                || field_name == "__primary_key__"
+                || field_name == "__relationships__"
+                || field_name == "__field_types__"
+                || field_name == "__relationship_meta__"
                 || (field_name.starts_with("__") && field_name.ends_with("_col__"))
             {
                 let qualified = format!("{}.{}", base_name, field_name);
@@ -6812,7 +8456,15 @@ fn infer_field_access(
         }
     }
 
-    let base_ty = infer_expr(ctx, env, &base_expr, types, type_registry, trait_registry, fn_constraints)?;
+    let base_ty = infer_expr(
+        ctx,
+        env,
+        &base_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
     let resolved_base = ctx.resolve(base_ty);
 
     let struct_name = match &resolved_base {
@@ -6838,17 +8490,15 @@ fn infer_field_access(
             for (fname, fty) in &struct_info.fields {
                 if *fname == field_name {
                     // Substitute generic params with actual type args.
-                    let resolved_field = substitute_type_params(
-                        fty,
-                        &struct_info.generic_params,
-                        &type_args,
-                    );
+                    let resolved_field =
+                        substitute_type_params(fty, &struct_info.generic_params, &type_args);
                     return Ok(resolved_field);
                 }
             }
             // Field not found in struct -- try method resolution if in method call context.
             if is_method_call {
-                let matching_traits = trait_registry.find_method_traits(&field_name, &resolved_base);
+                let matching_traits =
+                    trait_registry.find_method_traits(&field_name, &resolved_base);
                 if matching_traits.len() > 1 {
                     let err = TypeError::AmbiguousMethod {
                         method_name: field_name.clone(),
@@ -6859,8 +8509,16 @@ fn infer_field_access(
                     ctx.errors.push(err.clone());
                     return Err(err);
                 }
-                if let Some(ret_ty) = trait_registry.resolve_trait_method(&field_name, &resolved_base) {
-                    let method_fn_ty = build_method_fn_type(trait_registry, &field_name, &resolved_base, &ret_ty, ctx);
+                if let Some(ret_ty) =
+                    trait_registry.resolve_trait_method(&field_name, &resolved_base)
+                {
+                    let method_fn_ty = build_method_fn_type(
+                        trait_registry,
+                        &field_name,
+                        &resolved_base,
+                        &ret_ty,
+                        ctx,
+                    );
                     return Ok(method_fn_ty);
                 }
                 // Method not found -- emit NoSuchMethod (not NoSuchField).
@@ -6897,7 +8555,8 @@ fn infer_field_access(
             return Err(err);
         }
         if let Some(ret_ty) = trait_registry.resolve_trait_method(&field_name, &resolved_base) {
-            let method_fn_ty = build_method_fn_type(trait_registry, &field_name, &resolved_base, &ret_ty, ctx);
+            let method_fn_ty =
+                build_method_fn_type(trait_registry, &field_name, &resolved_base, &ret_ty, ctx);
             return Ok(method_fn_ty);
         }
 
@@ -6989,7 +8648,15 @@ fn infer_struct_literal(
             // Unknown struct -- infer field values anyway, return a basic type.
             for field in sl.fields() {
                 if let Some(value) = field.value() {
-                    let _ = infer_expr(ctx, env, &value, types, type_registry, trait_registry, fn_constraints);
+                    let _ = infer_expr(
+                        ctx,
+                        env,
+                        &value,
+                        types,
+                        type_registry,
+                        trait_registry,
+                        fn_constraints,
+                    );
                 }
             }
             return Ok(Ty::struct_ty(&struct_name, vec![]));
@@ -7017,9 +8684,7 @@ fn infer_struct_literal(
             .fields
             .iter()
             .find(|(name, _)| *name == field_name)
-            .map(|(_, ty)| {
-                substitute_type_params(ty, &struct_def.generic_params, &generic_vars)
-            });
+            .map(|(_, ty)| substitute_type_params(ty, &struct_def.generic_params, &generic_vars));
 
         let expected_ty = match expected_ty {
             Some(ty) => ty,
@@ -7036,7 +8701,15 @@ fn infer_struct_literal(
 
         // Infer field value.
         if let Some(value) = field.value() {
-            let value_ty = infer_expr(ctx, env, &value, types, type_registry, trait_registry, fn_constraints)?;
+            let value_ty = infer_expr(
+                ctx,
+                env,
+                &value,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             ctx.unify(
                 value_ty,
                 expected_ty,
@@ -7066,26 +8739,21 @@ fn infer_struct_literal(
     // Look up the env entry for this struct to preserve its display_prefix
     // (set during import resolution or local struct registration).
     let tycon = match env.lookup(&struct_name) {
-        Some(scheme) => {
-            match &scheme.ty {
-                Ty::App(inner, _) => {
-                    if let Ty::Con(tc) = inner.as_ref() {
-                        tc.clone()
-                    } else {
-                        TyCon::new(&struct_name)
-                    }
+        Some(scheme) => match &scheme.ty {
+            Ty::App(inner, _) => {
+                if let Ty::Con(tc) = inner.as_ref() {
+                    tc.clone()
+                } else {
+                    TyCon::new(&struct_name)
                 }
-                Ty::Con(tc) => tc.clone(),
-                _ => TyCon::new(&struct_name),
             }
-        }
+            Ty::Con(tc) => tc.clone(),
+            _ => TyCon::new(&struct_name),
+        },
         None => TyCon::new(&struct_name),
     };
 
-    Ok(Ty::App(
-        Box::new(Ty::Con(tycon)),
-        generic_vars,
-    ))
+    Ok(Ty::App(Box::new(Ty::Con(tycon)), generic_vars))
 }
 
 // ── Struct Update Inference ────────────────────────────────────────────
@@ -7109,7 +8777,15 @@ fn infer_struct_update(
         Some(e) => e,
         None => return Ok(ctx.fresh_var()),
     };
-    let base_ty = infer_expr(ctx, env, &base_expr, types, type_registry, trait_registry, fn_constraints)?;
+    let base_ty = infer_expr(
+        ctx,
+        env,
+        &base_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
     let resolved_base = ctx.resolve(base_ty.clone());
 
     // Extract the struct name from the resolved type.
@@ -7147,7 +8823,15 @@ fn infer_struct_update(
             // Infer override values anyway.
             for field in update.override_fields() {
                 if let Some(value) = field.value() {
-                    let _ = infer_expr(ctx, env, &value, types, type_registry, trait_registry, fn_constraints);
+                    let _ = infer_expr(
+                        ctx,
+                        env,
+                        &value,
+                        types,
+                        type_registry,
+                        trait_registry,
+                        fn_constraints,
+                    );
                 }
             }
             return Ok(resolved_base);
@@ -7157,7 +8841,11 @@ fn infer_struct_update(
     // Create fresh type variables for generic params (matching base type args).
     let generic_vars: Vec<Ty> = match &resolved_base {
         Ty::App(_, args) => args.clone(),
-        _ => struct_def.generic_params.iter().map(|_| ctx.fresh_var()).collect(),
+        _ => struct_def
+            .generic_params
+            .iter()
+            .map(|_| ctx.fresh_var())
+            .collect(),
     };
 
     // Validate and infer each override field.
@@ -7189,7 +8877,15 @@ fn infer_struct_update(
 
         // Infer the override value and unify with expected field type.
         if let Some(value) = field.value() {
-            let value_ty = infer_expr(ctx, env, &value, types, type_registry, trait_registry, fn_constraints)?;
+            let value_ty = infer_expr(
+                ctx,
+                env,
+                &value,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             ctx.unify(
                 value_ty,
                 expected_ty,
@@ -7229,7 +8925,15 @@ fn infer_map_literal(
             let key_inferred = if entry.is_keyword_entry() {
                 Ty::string()
             } else {
-                infer_expr(ctx, env, &key_expr, types, type_registry, trait_registry, fn_constraints)?
+                infer_expr(
+                    ctx,
+                    env,
+                    &key_expr,
+                    types,
+                    type_registry,
+                    trait_registry,
+                    fn_constraints,
+                )?
             };
             ctx.unify(
                 key_inferred,
@@ -7240,7 +8944,15 @@ fn infer_map_literal(
             )?;
         }
         if let Some(val_expr) = entry.value() {
-            let val_inferred = infer_expr(ctx, env, &val_expr, types, type_registry, trait_registry, fn_constraints)?;
+            let val_inferred = infer_expr(
+                ctx,
+                env,
+                &val_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             ctx.unify(
                 val_inferred,
                 v_ty.clone(),
@@ -7271,7 +8983,15 @@ fn infer_list_literal(
 ) -> Result<Ty, TypeError> {
     let elem_ty = ctx.fresh_var();
     for elem in lit.elements() {
-        let t = infer_expr(ctx, env, &elem, types, type_registry, trait_registry, fn_constraints)?;
+        let t = infer_expr(
+            ctx,
+            env,
+            &elem,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
         ctx.unify(
             t,
             elem_ty.clone(),
@@ -7308,7 +9028,8 @@ fn infer_pattern(
                     let candidate = ctx.instantiate(scheme);
                     let resolved = ctx.resolve(candidate.clone());
                     // If the name resolves to a sum type (nullary constructor), use it.
-                    let is_sum_type = matches!(&resolved, Ty::App(con, _) if matches!(con.as_ref(), Ty::Con(_)));
+                    let is_sum_type =
+                        matches!(&resolved, Ty::App(con, _) if matches!(con.as_ref(), Ty::Con(_)));
                     if is_sum_type {
                         types.insert(pat.syntax().text_range(), candidate.clone());
                         return Ok(candidate);
@@ -7360,12 +9081,8 @@ fn infer_pattern(
         Pattern::Constructor(ctor_pat) => {
             infer_constructor_pattern(ctx, env, ctor_pat, pat, types, type_registry)
         }
-        Pattern::Or(or_pat) => {
-            infer_or_pattern(ctx, env, or_pat, pat, types, type_registry)
-        }
-        Pattern::As(as_pat) => {
-            infer_as_pattern(ctx, env, as_pat, pat, types, type_registry)
-        }
+        Pattern::Or(or_pat) => infer_or_pattern(ctx, env, or_pat, pat, types, type_registry),
+        Pattern::As(as_pat) => infer_as_pattern(ctx, env, as_pat, pat, types, type_registry),
         Pattern::Cons(cons_pat) => {
             infer_cons_pattern(ctx, env, cons_pat, pat, types, type_registry)
         }
@@ -7493,7 +9210,8 @@ fn infer_or_pattern(
     let first_bindings: Vec<(String, Scheme)> = first_names
         .iter()
         .filter_map(|name| {
-            env.lookup(name).map(|scheme| (name.clone(), scheme.clone()))
+            env.lookup(name)
+                .map(|scheme| (name.clone(), scheme.clone()))
         })
         .collect();
     env.pop_scope();
@@ -7656,7 +9374,6 @@ fn infer_cons_pattern(
     Ok(list_ty)
 }
 
-
 // ── Actor Inference (06-04) ─────────────────────────────────────────────
 
 /// Well-known environment key for tracking the current actor's message type.
@@ -7728,7 +9445,15 @@ fn infer_actor_def(
 
     // Infer the actor body.
     let _body_ty = if let Some(body) = actor_def.body() {
-        infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+        infer_block(
+            ctx,
+            env,
+            &body,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?
     } else {
         Ty::Tuple(vec![])
     };
@@ -7856,9 +9581,7 @@ fn infer_supervisor_def(
                             break;
                         }
                         // Stop at next key boundary.
-                        if tokens[j].text() == "restart"
-                            || tokens[j].text() == "shutdown"
-                        {
+                        if tokens[j].text() == "restart" || tokens[j].text() == "shutdown" {
                             break;
                         }
                         j += 1;
@@ -7876,9 +9599,7 @@ fn infer_supervisor_def(
                         let span = if val_start < j && val_start < tokens.len() {
                             // Span from first value token to last before next key.
                             let start = tokens[val_start].text_range().start();
-                            let end = tokens[(j - 1).min(tokens.len() - 1)]
-                                .text_range()
-                                .end();
+                            let end = tokens[(j - 1).min(tokens.len() - 1)].text_range().end();
                             TextRange::new(start, end)
                         } else {
                             tokens[i].text_range()
@@ -7894,9 +9615,7 @@ fn infer_supervisor_def(
                     // Validate restart type.
                     let mut j = i + 1;
                     while j < tokens.len() {
-                        if tokens[j].kind() == SyntaxKind::IDENT
-                            && tokens[j].text() != "restart"
-                        {
+                        if tokens[j].kind() == SyntaxKind::IDENT && tokens[j].text() != "restart" {
                             let restart_text = tokens[j].text().to_string();
                             match restart_text.as_str() {
                                 "permanent" | "transient" | "temporary" => {}
@@ -8064,20 +9783,27 @@ fn infer_service_def(
 
         // Infer init body -- its return type is the initial state.
         let init_body_ty = if let Some(body) = init_fn.body() {
-            infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+            infer_block(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?
         } else {
             Ty::Tuple(vec![])
         };
 
         // Unify init return type with state_ty.
-        ctx.unify(
-            init_body_ty,
-            state_ty.clone(),
-            ConstraintOrigin::Builtin,
-        )?;
+        ctx.unify(init_body_ty, state_ty.clone(), ConstraintOrigin::Builtin)?;
 
         // Record the init function's type so MIR lowering can resolve parameter types.
-        let init_fn_ty = Ty::Fun(init_param_types.clone(), Box::new(ctx.resolve(state_ty.clone())));
+        let init_fn_ty = Ty::Fun(
+            init_param_types.clone(),
+            Box::new(ctx.resolve(state_ty.clone())),
+        );
         types.insert(init_fn.syntax().text_range(), init_fn_ty);
 
         env.pop_scope();
@@ -8129,8 +9855,7 @@ fn infer_service_def(
                 name_to_type(&type_name)
             } else {
                 // Try full type annotation resolution (for generic types).
-                resolve_type_annotation(ctx, &ann, type_registry)
-                    .unwrap_or_else(|| ctx.fresh_var())
+                resolve_type_annotation(ctx, &ann, type_registry).unwrap_or_else(|| ctx.fresh_var())
             }
         } else {
             ctx.fresh_var()
@@ -8138,18 +9863,22 @@ fn infer_service_def(
 
         // Infer call handler body -- should return (new_state, reply) tuple.
         let body_ty = if let Some(body) = handler.body() {
-            infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+            infer_block(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?
         } else {
             Ty::Tuple(vec![state_ty.clone(), reply_ty.clone()])
         };
 
         // Body should return a tuple of (new_state, reply).
         let expected_body_ty = Ty::Tuple(vec![state_ty.clone(), reply_ty.clone()]);
-        ctx.unify(
-            body_ty,
-            expected_body_ty,
-            ConstraintOrigin::Builtin,
-        )?;
+        ctx.unify(body_ty, expected_body_ty, ConstraintOrigin::Builtin)?;
 
         env.pop_scope();
 
@@ -8198,17 +9927,21 @@ fn infer_service_def(
 
         // Infer cast handler body -- returns new_state.
         let body_ty = if let Some(body) = handler.body() {
-            infer_block(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?
+            infer_block(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?
         } else {
             state_ty.clone()
         };
 
         // Unify body return with state type.
-        ctx.unify(
-            body_ty,
-            state_ty.clone(),
-            ConstraintOrigin::Builtin,
-        )?;
+        ctx.unify(body_ty, state_ty.clone(), ConstraintOrigin::Builtin)?;
 
         env.pop_scope();
 
@@ -8259,8 +9992,12 @@ fn infer_service_def(
 
         // Start helper
         let resolved_start = ctx.resolve(start_fn_ty.clone());
-        info.helpers.insert("start".to_string(), Scheme::mono(resolved_start));
-        info.methods.push(("start".to_string(), format!("__service_{}_start", name_lower)));
+        info.helpers
+            .insert("start".to_string(), Scheme::mono(resolved_start));
+        info.methods.push((
+            "start".to_string(),
+            format!("__service_{}_start", name_lower),
+        ));
 
         // Call handler helpers
         for (variant_name, param_types, reply_ty) in &call_handler_info {
@@ -8270,8 +10007,16 @@ fn infer_service_def(
             let resolved_reply = ctx.resolve(reply_ty.clone());
             let fn_ty = Ty::Fun(fn_params, Box::new(resolved_reply));
             let resolved_fn = ctx.resolve(fn_ty);
-            info.helpers.insert(snake_name.clone(), Scheme::mono(resolved_fn));
-            info.methods.push((snake_name, format!("__service_{}_call_{}", name_lower, to_snake_case(variant_name))));
+            info.helpers
+                .insert(snake_name.clone(), Scheme::mono(resolved_fn));
+            info.methods.push((
+                snake_name,
+                format!(
+                    "__service_{}_call_{}",
+                    name_lower,
+                    to_snake_case(variant_name)
+                ),
+            ));
         }
 
         // Cast handler helpers
@@ -8281,8 +10026,16 @@ fn infer_service_def(
             fn_params.extend(param_types.iter().cloned());
             let fn_ty = Ty::Fun(fn_params, Box::new(Ty::Tuple(vec![])));
             let resolved_fn = ctx.resolve(fn_ty);
-            info.helpers.insert(snake_name.clone(), Scheme::mono(resolved_fn));
-            info.methods.push((snake_name, format!("__service_{}_cast_{}", name_lower, to_snake_case(variant_name))));
+            info.helpers
+                .insert(snake_name.clone(), Scheme::mono(resolved_fn));
+            info.methods.push((
+                snake_name,
+                format!(
+                    "__service_{}_cast_{}",
+                    name_lower,
+                    to_snake_case(variant_name)
+                ),
+            ));
         }
 
         ctx.local_service_exports.insert(service_name.clone(), info);
@@ -8293,7 +10046,10 @@ fn infer_service_def(
     // The service itself is a module-like entity. Register the name so it can be
     // used as a module qualifier in ServiceName.method() calls.
     // Register as a simple type constructor for recognition in field access.
-    env.insert(service_name.clone(), Scheme::mono(Ty::Con(TyCon::new(&service_name))));
+    env.insert(
+        service_name.clone(),
+        Scheme::mono(Ty::Con(TyCon::new(&service_name))),
+    );
 
     let resolved = ctx.resolve(start_fn_ty);
     types.insert(service_def.syntax().text_range(), resolved.clone());
@@ -8327,12 +10083,28 @@ fn infer_spawn(
 
     // First arg is the actor function reference.
     let actor_fn_expr = &args[0];
-    let actor_fn_ty = infer_expr(ctx, env, actor_fn_expr, types, type_registry, trait_registry, fn_constraints)?;
+    let actor_fn_ty = infer_expr(
+        ctx,
+        env,
+        actor_fn_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
 
     // Remaining args are initial state.
     let mut state_arg_types = Vec::new();
     for arg in args.iter().skip(1) {
-        let arg_ty = infer_expr(ctx, env, arg, types, type_registry, trait_registry, fn_constraints)?;
+        let arg_ty = infer_expr(
+            ctx,
+            env,
+            arg,
+            types,
+            type_registry,
+            trait_registry,
+            fn_constraints,
+        )?;
         state_arg_types.push(arg_ty);
     }
 
@@ -8392,8 +10164,24 @@ fn infer_send(
     let pid_expr = &args[0];
     let msg_expr = &args[1];
 
-    let pid_ty = infer_expr(ctx, env, pid_expr, types, type_registry, trait_registry, fn_constraints)?;
-    let msg_ty = infer_expr(ctx, env, msg_expr, types, type_registry, trait_registry, fn_constraints)?;
+    let pid_ty = infer_expr(
+        ctx,
+        env,
+        pid_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
+    let msg_ty = infer_expr(
+        ctx,
+        env,
+        msg_expr,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
 
     let resolved_pid = ctx.resolve(pid_ty);
 
@@ -8425,11 +10213,7 @@ fn infer_send(
         }
         // Type variable: constrain to Pid<msg_ty>.
         Ty::Var(_) => {
-            let _ = ctx.unify(
-                resolved_pid,
-                Ty::pid(msg_ty),
-                ConstraintOrigin::Builtin,
-            );
+            let _ = ctx.unify(resolved_pid, Ty::pid(msg_ty), ConstraintOrigin::Builtin);
         }
         _ => {
             // Not a Pid at all -- type mismatch will be caught by usage context.
@@ -8480,7 +10264,15 @@ fn infer_receive(
         }
 
         if let Some(body) = arm.body() {
-            let body_ty = infer_expr(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?;
+            let body_ty = infer_expr(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             if let Some(ref prev_ty) = result_ty {
                 ctx.unify(prev_ty.clone(), body_ty.clone(), ConstraintOrigin::Builtin)?;
             } else {
@@ -8494,11 +10286,27 @@ fn infer_receive(
     // Handle after (timeout) clause.
     if let Some(after) = recv.after_clause() {
         if let Some(timeout_expr) = after.timeout() {
-            let timeout_ty = infer_expr(ctx, env, &timeout_expr, types, type_registry, trait_registry, fn_constraints)?;
+            let timeout_ty = infer_expr(
+                ctx,
+                env,
+                &timeout_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             let _ = ctx.unify(timeout_ty, Ty::int(), ConstraintOrigin::Builtin);
         }
         if let Some(body) = after.body() {
-            let body_ty = infer_expr(ctx, env, &body, types, type_registry, trait_registry, fn_constraints)?;
+            let body_ty = infer_expr(
+                ctx,
+                env,
+                &body,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             if let Some(ref prev_ty) = result_ty {
                 ctx.unify(prev_ty.clone(), body_ty.clone(), ConstraintOrigin::Builtin)?;
             } else {
@@ -8548,7 +10356,15 @@ fn infer_link(
 ) -> Result<Ty, TypeError> {
     if let Some(arg_list) = link.arg_list() {
         for arg in arg_list.args() {
-            let _arg_ty = infer_expr(ctx, env, &arg, types, type_registry, trait_registry, fn_constraints)?;
+            let _arg_ty = infer_expr(
+                ctx,
+                env,
+                &arg,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
             // We could validate that arg_ty is a Pid, but for now we just
             // infer the type. A future refinement could add a type error.
         }
@@ -8581,7 +10397,15 @@ fn infer_try_expr(
         Some(op) => op,
         None => return Ok(ctx.fresh_var()),
     };
-    let operand_ty = infer_expr(ctx, env, &operand, types, type_registry, trait_registry, fn_constraints)?;
+    let operand_ty = infer_expr(
+        ctx,
+        env,
+        &operand,
+        types,
+        type_registry,
+        trait_registry,
+        fn_constraints,
+    )?;
     let resolved = ctx.resolve(operand_ty.clone());
 
     // 2. Determine whether operand is Result<T, E> or Option<T>.
@@ -8591,29 +10415,26 @@ fn infer_try_expr(
     }
 
     let try_kind = match &resolved {
-        Ty::App(con, args) => {
-            match con.as_ref() {
-                Ty::Con(tc) if tc.name == "Result" && args.len() == 2 => {
-                    Some(TryKind::Result {
-                        ok_ty: args[0].clone(),
-                        err_ty: args[1].clone(),
-                    })
-                }
-                Ty::Con(tc) if tc.name == "Option" && args.len() == 1 => {
-                    Some(TryKind::Option {
-                        inner_ty: args[0].clone(),
-                    })
-                }
-                _ => None,
-            }
-        }
+        Ty::App(con, args) => match con.as_ref() {
+            Ty::Con(tc) if tc.name == "Result" && args.len() == 2 => Some(TryKind::Result {
+                ok_ty: args[0].clone(),
+                err_ty: args[1].clone(),
+            }),
+            Ty::Con(tc) if tc.name == "Option" && args.len() == 1 => Some(TryKind::Option {
+                inner_ty: args[0].clone(),
+            }),
+            _ => None,
+        },
         // Handle the case where operand is an unresolved type variable --
         // try unifying with Result<T, E> first (most common usage).
         Ty::Var(_) => {
             let fresh_t = ctx.fresh_var();
             let fresh_e = ctx.fresh_var();
             let result_ty = Ty::result(fresh_t.clone(), fresh_e.clone());
-            if ctx.unify(resolved.clone(), result_ty, ConstraintOrigin::Builtin).is_ok() {
+            if ctx
+                .unify(resolved.clone(), result_ty, ConstraintOrigin::Builtin)
+                .is_ok()
+            {
                 Some(TryKind::Result {
                     ok_ty: fresh_t,
                     err_ty: fresh_e,
@@ -8622,7 +10443,10 @@ fn infer_try_expr(
                 // Fall back to Option<T>.
                 let fresh_t2 = ctx.fresh_var();
                 let option_ty = Ty::option(fresh_t2.clone());
-                if ctx.unify(resolved.clone(), option_ty, ConstraintOrigin::Builtin).is_ok() {
+                if ctx
+                    .unify(resolved.clone(), option_ty, ConstraintOrigin::Builtin)
+                    .is_ok()
+                {
                     Some(TryKind::Option { inner_ty: fresh_t2 })
                 } else {
                     None
@@ -8653,20 +10477,34 @@ fn infer_try_expr(
             if let Some(ref fn_ret_ty) = fn_ret {
                 let fn_ret_resolved = ctx.resolve(fn_ret_ty.clone());
                 match &fn_ret_resolved {
-                    Ty::App(con, args) if matches!(con.as_ref(), Ty::Con(tc) if tc.name == "Result") && args.len() == 2 => {
+                    Ty::App(con, args)
+                        if matches!(con.as_ref(), Ty::Con(tc) if tc.name == "Result")
+                            && args.len() == 2 =>
+                    {
                         // Try direct unification first (preserves existing behavior).
                         let err_resolved = ctx.resolve(err_ty.clone());
                         let fn_err_resolved = ctx.resolve(args[1].clone());
                         // Save error count before unify -- unify pushes errors internally
                         // and we need to undo them if a From impl exists.
                         let err_count_before = ctx.errors.len();
-                        if ctx.unify(err_resolved.clone(), fn_err_resolved.clone(), ConstraintOrigin::Builtin).is_err() {
+                        if ctx
+                            .unify(
+                                err_resolved.clone(),
+                                fn_err_resolved.clone(),
+                                ConstraintOrigin::Builtin,
+                            )
+                            .is_err()
+                        {
                             // Direct unification failed -- check for From impl.
                             // Only attempt From lookup when both types are concrete (not inference variables).
                             let err_is_concrete = !matches!(&err_resolved, Ty::Var(_));
                             let fn_err_is_concrete = !matches!(&fn_err_resolved, Ty::Var(_));
                             if err_is_concrete && fn_err_is_concrete {
-                                if trait_registry.has_impl_with_type_args("From", &[err_resolved.clone()], &fn_err_resolved) {
+                                if trait_registry.has_impl_with_type_args(
+                                    "From",
+                                    &[err_resolved.clone()],
+                                    &fn_err_resolved,
+                                ) {
                                     // From impl exists -- type check passes. Remove the
                                     // unification error that unify() pushed internally.
                                     ctx.errors.truncate(err_count_before);
@@ -8711,7 +10549,8 @@ fn infer_try_expr(
             if let Some(ref fn_ret_ty) = fn_ret {
                 let fn_ret_resolved = ctx.resolve(fn_ret_ty.clone());
                 match &fn_ret_resolved {
-                    Ty::App(con, _args) if matches!(con.as_ref(), Ty::Con(tc) if tc.name == "Option") => {
+                    Ty::App(con, _args) if matches!(con.as_ref(), Ty::Con(tc) if tc.name == "Option") =>
+                    {
                         // Compatible -- Option fn return type.
                     }
                     Ty::Var(_) => {
@@ -8815,10 +10654,16 @@ fn collect_annotation_tokens(
             rowan::NodeOrToken::Token(t) => {
                 let kind = t.kind();
                 match kind {
-                    SyntaxKind::IDENT | SyntaxKind::LT | SyntaxKind::GT
-                    | SyntaxKind::COMMA | SyntaxKind::QUESTION | SyntaxKind::BANG
-                    | SyntaxKind::L_PAREN | SyntaxKind::R_PAREN
-                    | SyntaxKind::ARROW | SyntaxKind::DOT => {
+                    SyntaxKind::IDENT
+                    | SyntaxKind::LT
+                    | SyntaxKind::GT
+                    | SyntaxKind::COMMA
+                    | SyntaxKind::QUESTION
+                    | SyntaxKind::BANG
+                    | SyntaxKind::L_PAREN
+                    | SyntaxKind::R_PAREN
+                    | SyntaxKind::ARROW
+                    | SyntaxKind::DOT => {
                         tokens.push((kind, t.text().to_string()));
                     }
                     _ => {}
@@ -8963,11 +10808,17 @@ fn resolve_alias(ty: Ty, type_registry: &TypeRegistry) -> Ty {
             ty
         }
         Ty::Fun(params, ret) => {
-            let p: Vec<Ty> = params.into_iter().map(|p| resolve_alias(p, type_registry)).collect();
+            let p: Vec<Ty> = params
+                .into_iter()
+                .map(|p| resolve_alias(p, type_registry))
+                .collect();
             Ty::Fun(p, Box::new(resolve_alias(*ret, type_registry)))
         }
         Ty::Tuple(elems) => {
-            let e: Vec<Ty> = elems.into_iter().map(|e| resolve_alias(e, type_registry)).collect();
+            let e: Vec<Ty> = elems
+                .into_iter()
+                .map(|e| resolve_alias(e, type_registry))
+                .collect();
             Ty::Tuple(e)
         }
         _ => ty,
@@ -8994,11 +10845,20 @@ fn substitute_type_params(ty: &Ty, param_names: &[String], param_values: &[Ty]) 
             Ty::App(Box::new(new_con), new_args)
         }
         Ty::Fun(params, ret) => {
-            let p: Vec<Ty> = params.iter().map(|p| substitute_type_params(p, param_names, param_values)).collect();
-            Ty::Fun(p, Box::new(substitute_type_params(ret, param_names, param_values)))
+            let p: Vec<Ty> = params
+                .iter()
+                .map(|p| substitute_type_params(p, param_names, param_values))
+                .collect();
+            Ty::Fun(
+                p,
+                Box::new(substitute_type_params(ret, param_names, param_values)),
+            )
         }
         Ty::Tuple(elems) => {
-            let e: Vec<Ty> = elems.iter().map(|e| substitute_type_params(e, param_names, param_values)).collect();
+            let e: Vec<Ty> = elems
+                .iter()
+                .map(|e| substitute_type_params(e, param_names, param_values))
+                .collect();
             Ty::Tuple(e)
         }
         _ => ty.clone(),
@@ -9042,7 +10902,15 @@ fn infer_json_expr(
     // inside `json { }` produces a compile-time type error").
     for field in json_expr.fields() {
         if let Some(val_expr) = field.value() {
-            infer_expr(ctx, env, &val_expr, types, type_registry, trait_registry, fn_constraints)?;
+            infer_expr(
+                ctx,
+                env,
+                &val_expr,
+                types,
+                type_registry,
+                trait_registry,
+                fn_constraints,
+            )?;
         }
     }
     // Return the Json newtype -- NOT Ty::string(). The Json type auto-coerces to

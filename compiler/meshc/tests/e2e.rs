@@ -62,21 +62,28 @@ fn compile_and_run_with_env(source: &str, env_vars: &[(&str, &str)]) -> String {
         .output()
         .expect("failed to invoke meshc");
 
-    assert!(output.status.success(), "meshc build failed:\nstdout: {}\nstderr: {}",
+    assert!(
+        output.status.success(),
+        "meshc build failed:\nstdout: {}\nstderr: {}",
         String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let binary = project_dir.join("project");
     let mut cmd = Command::new(&binary);
     for (key, val) in env_vars {
         cmd.env(key, val);
     }
-    let run_output = cmd.output()
+    let run_output = cmd
+        .output()
         .unwrap_or_else(|e| panic!("failed to run binary: {}", e));
 
-    assert!(run_output.status.success(), "binary execution failed:\nstdout: {}\nstderr: {}",
+    assert!(
+        run_output.status.success(),
+        "binary execution failed:\nstdout: {}\nstderr: {}",
         String::from_utf8_lossy(&run_output.stdout),
-        String::from_utf8_lossy(&run_output.stderr));
+        String::from_utf8_lossy(&run_output.stderr)
+    );
 
     String::from_utf8_lossy(&run_output.stdout).to_string()
 }
@@ -197,8 +204,7 @@ fn e2e_string_interp_hash() {
     let source = read_fixture("string_interp_hash.mpl");
     let output = compile_and_run(&source);
     assert_eq!(
-        output,
-        "Hello, World!\nCount: 3\nFlag: true\nExpr: 7\nNested: prefix-World-suffix\n",
+        output, "Hello, World!\nCount: 3\nFlag: true\nExpr: 7\nNested: prefix-World-suffix\n",
         "#{{}} interpolation must evaluate expressions and embed string representations"
     );
 }
@@ -209,8 +215,7 @@ fn e2e_heredoc_basic() {
     let source = read_fixture("heredoc_basic.mpl");
     let output = compile_and_run(&source);
     assert_eq!(
-        output,
-        "Hello,\nWorld!\n{\"key\": \"value\"}\n",
+        output, "Hello,\nWorld!\n{\"key\": \"value\"}\n",
         "Heredoc must strip common leading indentation and trailing whitespace line"
     );
 }
@@ -221,8 +226,7 @@ fn e2e_heredoc_interp() {
     let source = read_fixture("heredoc_interp.mpl");
     let output = compile_and_run(&source);
     assert_eq!(
-        output,
-        "{\"id\": 42, \"name\": \"Alice\"}\n",
+        output, "{\"id\": 42, \"name\": \"Alice\"}\n",
         "Heredoc interpolation must evaluate #{{expr}} and trim indentation"
     );
 }
@@ -233,10 +237,7 @@ fn e2e_env_get() {
     let source = read_fixture("env_get.mpl");
     let output = compile_and_run_with_env(
         &source,
-        &[
-            ("MESH_TEST_VAR", "hello"),
-            ("MESH_TEST_EMPTY_VAR", ""),
-        ],
+        &[("MESH_TEST_VAR", "hello"), ("MESH_TEST_EMPTY_VAR", "")],
     );
     assert_eq!(
         output,
@@ -362,12 +363,7 @@ fn e2e_target_flag() {
 
     let meshc = find_meshc();
     let output = Command::new(&meshc)
-        .args([
-            "build",
-            project_dir.to_str().unwrap(),
-            "--target",
-            triple,
-        ])
+        .args(["build", project_dir.to_str().unwrap(), "--target", triple])
         .output()
         .expect("failed to invoke meshc");
 
@@ -380,7 +376,9 @@ fn e2e_target_flag() {
 
     // Run the binary (should work since it's the host triple)
     let binary = project_dir.join("project");
-    let run_output = Command::new(&binary).output().expect("failed to run binary");
+    let run_output = Command::new(&binary)
+        .output()
+        .expect("failed to run binary");
     assert!(run_output.status.success());
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout),
@@ -419,7 +417,9 @@ fn e2e_optimization_levels() {
         );
 
         let binary = project_dir.join("project");
-        let run_output = Command::new(&binary).output().expect("failed to run binary");
+        let run_output = Command::new(&binary)
+            .output()
+            .expect("failed to run binary");
         assert!(
             run_output.status.success(),
             "Binary compiled with -O{} failed to run",
@@ -466,9 +466,7 @@ fn e2e_self_contained_binary() {
             deps
         );
     } else {
-        let ldd_output = Command::new("ldd")
-            .arg(binary.to_str().unwrap())
-            .output();
+        let ldd_output = Command::new("ldd").arg(binary.to_str().unwrap()).output();
         if let Ok(out) = ldd_output {
             let deps = String::from_utf8_lossy(&out.stdout);
             assert!(
@@ -811,7 +809,10 @@ fn e2e_nullary_constructor_match() {
 fn e2e_nested_collection_display() {
     let source = read_fixture("nested_collection_display.mpl");
     let output = compile_and_run(&source);
-    assert_eq!(output, "[10, 20, 30]\n", "List Display via string interpolation should render as [10, 20, 30]");
+    assert_eq!(
+        output, "[10, 20, 30]\n",
+        "List Display via string interpolation should render as [10, 20, 30]"
+    );
     // NOTE: List<List<Int>> e2e test requires generic List element types
     // (List.append currently typed as (List, Int) -> List).
     // Recursive callback resolution is verified at the MIR unit test level
@@ -1223,7 +1224,10 @@ fn e2e_while_loop() {
 fn e2e_break_continue() {
     let source = read_fixture("break_continue.mpl");
     let output = compile_and_run(&source);
-    assert_eq!(output, "before break\nafter loop\niteration\nnested break works\n");
+    assert_eq!(
+        output,
+        "before break\nafter loop\niteration\nnested break works\n"
+    );
 }
 
 /// BRKC-04: break outside any loop produces compile error.
@@ -1231,7 +1235,11 @@ fn e2e_break_continue() {
 fn e2e_break_outside_loop_error() {
     let source = "fn main() do\n  break\nend";
     let error = compile_expect_error(source);
-    assert!(error.contains("break"), "Expected break error, got: {}", error);
+    assert!(
+        error.contains("break"),
+        "Expected break error, got: {}",
+        error
+    );
 }
 
 /// BRKC-04: continue outside any loop produces compile error.
@@ -1239,7 +1247,11 @@ fn e2e_break_outside_loop_error() {
 fn e2e_continue_outside_loop_error() {
     let source = "fn main() do\n  continue\nend";
     let error = compile_expect_error(source);
-    assert!(error.contains("continue"), "Expected continue error, got: {}", error);
+    assert!(
+        error.contains("continue"),
+        "Expected continue error, got: {}",
+        error
+    );
 }
 
 /// BRKC-05: break inside closure within loop produces compile error.
@@ -1247,7 +1259,11 @@ fn e2e_continue_outside_loop_error() {
 fn e2e_break_in_closure_error() {
     let source = "fn main() do\n  while true do\n    let f = fn -> break end\n  end\nend";
     let error = compile_expect_error(source);
-    assert!(error.contains("break"), "Expected break error, got: {}", error);
+    assert!(
+        error.contains("break"),
+        "Expected break error, got: {}",
+        error
+    );
 }
 
 /// BRKC-05: continue inside closure within loop produces compile error.
@@ -1255,7 +1271,11 @@ fn e2e_break_in_closure_error() {
 fn e2e_continue_in_closure_error() {
     let source = "fn main() do\n  while true do\n    let f = fn -> continue end\n  end\nend";
     let error = compile_expect_error(source);
-    assert!(error.contains("continue"), "Expected continue error, got: {}", error);
+    assert!(
+        error.contains("continue"),
+        "Expected continue error, got: {}",
+        error
+    );
 }
 
 // ── Phase 34: For-In over Range ─────────────────────────────────────
@@ -1571,11 +1591,9 @@ fn e2e_multi_file_basic() {
     std::fs::write(
         project_dir.join("main.mpl"),
         "fn main() do\n  println(\"hello multi\")\nend\n",
-    ).unwrap();
-    std::fs::write(
-        project_dir.join("utils.mpl"),
-        "fn helper() do\n  42\nend\n",
-    ).unwrap();
+    )
+    .unwrap();
+    std::fs::write(project_dir.join("utils.mpl"), "fn helper() do\n  42\nend\n").unwrap();
 
     let meshc = find_meshc();
     let output = Command::new(&meshc)
@@ -1590,7 +1608,9 @@ fn e2e_multi_file_basic() {
     );
 
     let binary = project_dir.join("project");
-    let run_output = Command::new(&binary).output().expect("failed to run binary");
+    let run_output = Command::new(&binary)
+        .output()
+        .expect("failed to run binary");
     assert!(run_output.status.success());
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).trim(),
@@ -1608,12 +1628,10 @@ fn e2e_multi_file_parse_error_in_non_entry() {
     std::fs::write(
         project_dir.join("main.mpl"),
         "fn main() do\n  println(\"hello\")\nend\n",
-    ).unwrap();
+    )
+    .unwrap();
     // broken.mpl has a syntax error
-    std::fs::write(
-        project_dir.join("broken.mpl"),
-        "fn incomplete(\n",
-    ).unwrap();
+    std::fs::write(project_dir.join("broken.mpl"), "fn incomplete(\n").unwrap();
 
     let meshc = find_meshc();
     let output = Command::new(&meshc)
@@ -1643,11 +1661,13 @@ fn e2e_multi_file_nested_modules() {
     std::fs::write(
         project_dir.join("main.mpl"),
         "fn main() do\n  println(\"nested ok\")\nend\n",
-    ).unwrap();
+    )
+    .unwrap();
     std::fs::write(
         project_dir.join("math/vector.mpl"),
         "fn add(a :: Int, b :: Int) -> Int do\n  a + b\nend\n",
-    ).unwrap();
+    )
+    .unwrap();
 
     let meshc = find_meshc();
     let output = Command::new(&meshc)
@@ -1662,7 +1682,9 @@ fn e2e_multi_file_nested_modules() {
     );
 
     let binary = project_dir.join("project");
-    let run_output = Command::new(&binary).output().expect("failed to run binary");
+    let run_output = Command::new(&binary)
+        .output()
+        .expect("failed to run binary");
     assert!(run_output.status.success());
     assert_eq!(
         String::from_utf8_lossy(&run_output.stdout).trim(),
@@ -1748,7 +1770,9 @@ fn compile_multifile_expect_error(files: &[(&str, &str)]) -> String {
 #[test]
 fn e2e_cross_module_qualified_function_call() {
     let output = compile_multifile_and_run(&[
-        ("math.mpl", r#"
+        (
+            "math.mpl",
+            r#"
 pub fn add(a :: Int, b :: Int) -> Int do
   a + b
 end
@@ -1756,15 +1780,19 @@ end
 pub fn mul(a :: Int, b :: Int) -> Int do
   a * b
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Math
 
 fn main() do
   let result = Math.add(2, 3)
   println("${result}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "5\n");
 }
@@ -1774,7 +1802,9 @@ end
 #[test]
 fn e2e_cross_module_selective_import() {
     let output = compile_multifile_and_run(&[
-        ("math.mpl", r#"
+        (
+            "math.mpl",
+            r#"
 pub fn add(a :: Int, b :: Int) -> Int do
   a + b
 end
@@ -1782,15 +1812,19 @@ end
 pub fn mul(a :: Int, b :: Int) -> Int do
   a * b
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Math import add
 
 fn main() do
   let result = add(10, 20)
   println("${result}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "30\n");
 }
@@ -1800,7 +1834,9 @@ end
 #[test]
 fn e2e_cross_module_struct() {
     let output = compile_multifile_and_run(&[
-        ("point.mpl", r#"
+        (
+            "point.mpl",
+            r#"
 pub struct Point do
   x :: Int
   y :: Int
@@ -1809,15 +1845,19 @@ end
 pub fn origin() -> Point do
   Point { x: 0, y: 0 }
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Point
 
 fn main() do
   let p = Point.origin()
   println("${p.x}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "0\n");
 }
@@ -1827,7 +1867,9 @@ end
 #[test]
 fn e2e_cross_module_sum_type() {
     let output = compile_multifile_and_run(&[
-        ("shapes.mpl", r#"
+        (
+            "shapes.mpl",
+            r#"
 pub type Shape do
   Circle(Int)
   Rectangle(Int, Int)
@@ -1839,8 +1881,11 @@ pub fn area(s :: Shape) -> Int do
     Rectangle(w, h) -> w * h
   end
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Shapes import Shape, area
 
 fn main() do
@@ -1848,7 +1893,8 @@ fn main() do
   let a = area(c)
   println("${a}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "25\n");
 }
@@ -1856,15 +1902,16 @@ end
 /// Phase 39 IMPORT-06: Import of non-existent module produces error.
 #[test]
 fn e2e_import_nonexistent_module_error() {
-    let error = compile_multifile_expect_error(&[
-        ("main.mpl", r#"
+    let error = compile_multifile_expect_error(&[(
+        "main.mpl",
+        r#"
 import NonExistent
 
 fn main() do
   42
 end
-"#),
-    ]);
+"#,
+    )]);
     assert!(
         error.contains("not found") || error.contains("NonExistent"),
         "Expected error about NonExistent module not found, got: {}",
@@ -1876,18 +1923,24 @@ end
 #[test]
 fn e2e_import_nonexistent_name_error() {
     let error = compile_multifile_expect_error(&[
-        ("math.mpl", r#"
+        (
+            "math.mpl",
+            r#"
 pub fn add(a :: Int, b :: Int) -> Int do
   a + b
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Math import subtract
 
 fn main() do
   42
 end
-"#),
+"#,
+        ),
     ]);
     assert!(
         error.contains("subtract") || error.contains("not found") || error.contains("not exported"),
@@ -1900,19 +1953,25 @@ end
 #[test]
 fn e2e_nested_module_qualified_access() {
     let output = compile_multifile_and_run(&[
-        ("math/vector.mpl", r#"
+        (
+            "math/vector.mpl",
+            r#"
 pub fn dot(a :: Int, b :: Int) -> Int do
   a * b
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Math.Vector
 
 fn main() do
   let result = Vector.dot(3, 4)
   println("${result}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "12\n");
 }
@@ -1922,7 +1981,9 @@ end
 #[test]
 fn e2e_cross_module_struct_via_function() {
     let output = compile_multifile_and_run(&[
-        ("geometry.mpl", r#"
+        (
+            "geometry.mpl",
+            r#"
 pub struct Point do
   x :: Int
   y :: Int
@@ -1931,8 +1992,11 @@ end
 pub fn make_point(a :: Int, b :: Int) -> Point do
   Point { x: a, y: b }
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Geometry
 
 fn main() do
@@ -1940,7 +2004,8 @@ fn main() do
   println("${p.x}")
   println("${p.y}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "10\n20\n");
 }
@@ -1949,17 +2014,25 @@ end
 #[test]
 fn e2e_cross_module_multiple_imports() {
     let output = compile_multifile_and_run(&[
-        ("math.mpl", r#"
+        (
+            "math.mpl",
+            r#"
 pub fn add(a :: Int, b :: Int) -> Int do
   a + b
 end
-"#),
-        ("utils.mpl", r#"
+"#,
+        ),
+        (
+            "utils.mpl",
+            r#"
 pub fn double(x :: Int) -> Int do
   x * 2
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Math import add
 from Utils import double
 
@@ -1967,7 +2040,8 @@ fn main() do
   let result = double(add(3, 4))
   println("${result}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "14\n");
 }
@@ -1975,7 +2049,8 @@ end
 /// Phase 39: Single-file program still compiles identically (regression check).
 #[test]
 fn e2e_single_file_regression() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn double(x :: Int) -> Int do
   x * 2
 end
@@ -1984,7 +2059,8 @@ fn main() do
   let result = double(21)
   println("${result}")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "42\n");
 }
 
@@ -1995,18 +2071,24 @@ end
 #[test]
 fn e2e_visibility_private_fn_blocked() {
     let error = compile_multifile_expect_error(&[
-        ("math.mpl", r#"
+        (
+            "math.mpl",
+            r#"
 fn secret(a :: Int) -> Int do
   a + 1
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Math import secret
 
 fn main() do
   println("${secret(5)}")
 end
-"#),
+"#,
+        ),
     ]);
     assert!(
         error.contains("private") || error.contains("pub"),
@@ -2020,18 +2102,24 @@ end
 #[test]
 fn e2e_visibility_pub_fn_works() {
     let output = compile_multifile_and_run(&[
-        ("math.mpl", r#"
+        (
+            "math.mpl",
+            r#"
 pub fn add(a :: Int, b :: Int) -> Int do
   a + b
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Math import add
 
 fn main() do
   println("${add(2, 3)}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "5\n");
 }
@@ -2041,7 +2129,9 @@ end
 #[test]
 fn e2e_visibility_private_struct_blocked() {
     let error = compile_multifile_expect_error(&[
-        ("shapes.mpl", r#"
+        (
+            "shapes.mpl",
+            r#"
 struct Point do
   x :: Int
   y :: Int
@@ -2050,14 +2140,18 @@ end
 pub fn dummy() -> Int do
   0
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Shapes import Point
 
 fn main() do
   println("nope")
 end
-"#),
+"#,
+        ),
     ]);
     assert!(
         error.contains("private") || error.contains("pub"),
@@ -2071,7 +2165,9 @@ end
 #[test]
 fn e2e_visibility_pub_struct_accessible() {
     let output = compile_multifile_and_run(&[
-        ("geometry.mpl", r#"
+        (
+            "geometry.mpl",
+            r#"
 pub struct Point do
   x :: Int
   y :: Int
@@ -2080,15 +2176,19 @@ end
 pub fn make(a :: Int, b :: Int) -> Point do
   Point { x: a, y: b }
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Geometry import Point, make
 
 fn main() do
   let p = make(10, 20)
   println("${p.x},${p.y}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "10,20\n");
 }
@@ -2098,7 +2198,9 @@ end
 #[test]
 fn e2e_visibility_private_sum_type_blocked() {
     let error = compile_multifile_expect_error(&[
-        ("colors.mpl", r#"
+        (
+            "colors.mpl",
+            r#"
 type Color do
   Red
   Blue
@@ -2108,14 +2210,18 @@ end
 pub fn dummy() -> Int do
   0
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Colors import Color
 
 fn main() do
   println("nope")
 end
-"#),
+"#,
+        ),
     ]);
     assert!(
         error.contains("private") || error.contains("pub"),
@@ -2129,14 +2235,19 @@ end
 #[test]
 fn e2e_visibility_pub_sum_type_accessible() {
     let output = compile_multifile_and_run(&[
-        ("colors.mpl", r#"
+        (
+            "colors.mpl",
+            r#"
 pub type Color do
   Red
   Blue
   Green
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Colors import Color
 
 fn main() do
@@ -2147,7 +2258,8 @@ fn main() do
     Green -> println("green")
   end
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "red\n");
 }
@@ -2157,23 +2269,26 @@ end
 #[test]
 fn e2e_visibility_error_suggests_pub() {
     let error = compile_multifile_expect_error(&[
-        ("helpers.mpl", r#"
+        (
+            "helpers.mpl",
+            r#"
 fn internal() -> Int do
   42
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Helpers import internal
 
 fn main() do
   println("nope")
 end
-"#),
+"#,
+        ),
     ]);
-    assert!(
-        !error.is_empty(),
-        "Expected compilation to fail with error"
-    );
+    assert!(!error.is_empty(), "Expected compilation to fail with error");
     assert!(
         error.contains("private"),
         "Expected error to mention 'private', got: {}",
@@ -2192,7 +2307,9 @@ end
 #[test]
 fn e2e_visibility_qualified_private_blocked() {
     let error = compile_multifile_expect_error(&[
-        ("helpers.mpl", r#"
+        (
+            "helpers.mpl",
+            r#"
 fn secret() -> Int do
   42
 end
@@ -2200,15 +2317,19 @@ end
 pub fn public_fn() -> Int do
   1
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Helpers
 
 fn main() do
   let x = Helpers.secret()
   println("${x}")
 end
-"#),
+"#,
+        ),
     ]);
     assert!(
         !error.is_empty(),
@@ -2221,7 +2342,9 @@ end
 #[test]
 fn e2e_visibility_mixed_pub_private() {
     let output = compile_multifile_and_run(&[
-        ("utils.mpl", r#"
+        (
+            "utils.mpl",
+            r#"
 pub fn visible(x :: Int) -> Int do
   x * 2
 end
@@ -2229,14 +2352,18 @@ end
 fn hidden(x :: Int) -> Int do
   x * 3
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Utils import visible
 
 fn main() do
   println("${visible(5)}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "10\n");
 }
@@ -2249,7 +2376,9 @@ end
 #[test]
 fn e2e_xmod07_private_function_name_collision() {
     let output = compile_multifile_and_run(&[
-        ("utils.mpl", r#"
+        (
+            "utils.mpl",
+            r#"
 fn helper() -> Int do
   42
 end
@@ -2257,8 +2386,11 @@ end
 pub fn get_utils_value() -> Int do
   helper()
 end
-"#),
-        ("math_ops.mpl", r#"
+"#,
+        ),
+        (
+            "math_ops.mpl",
+            r#"
 fn helper() -> Int do
   99
 end
@@ -2266,8 +2398,11 @@ end
 pub fn get_math_value() -> Int do
   helper()
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Utils import get_utils_value
 from MathOps import get_math_value
 
@@ -2277,7 +2412,8 @@ fn main() do
   println("${a}")
   println("${b}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "42\n99\n");
 }
@@ -2287,19 +2423,27 @@ end
 #[test]
 fn e2e_xmod07_closure_name_collision() {
     let output = compile_multifile_and_run(&[
-        ("utils.mpl", r#"
+        (
+            "utils.mpl",
+            r#"
 pub fn apply_utils(x :: Int) -> Int do
   let f = fn n -> n + 10 end
   f(x)
 end
-"#),
-        ("math.mpl", r#"
+"#,
+        ),
+        (
+            "math.mpl",
+            r#"
 pub fn apply_math(x :: Int) -> Int do
   let f = fn n -> n * 2 end
   f(x)
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Utils
 import Math
 
@@ -2309,7 +2453,8 @@ fn main() do
   println("${a}")
   println("${b}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "15\n10\n");
 }
@@ -2319,19 +2464,25 @@ end
 #[test]
 fn e2e_xmod06_cross_module_generic_function() {
     let output = compile_multifile_and_run(&[
-        ("utils.mpl", r#"
+        (
+            "utils.mpl",
+            r#"
 pub fn identity(x :: Int) -> Int do
   x
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Utils import identity
 
 fn main() do
   let result = identity(42)
   println("${result}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "42\n");
 }
@@ -2342,11 +2493,16 @@ end
 #[test]
 fn e2e_xmod06_cross_module_generic_identity() {
     let output = compile_multifile_and_run(&[
-        ("utils.mpl", r#"
+        (
+            "utils.mpl",
+            r#"
 pub fn identity(x :: Int) -> Int = x
 pub fn identity_str(x :: String) -> String = x
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Utils import identity, identity_str
 
 fn main() do
@@ -2354,7 +2510,8 @@ fn main() do
   println("${a}")
   println(identity_str("hello"))
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "42\nhello\n");
 }
@@ -2364,7 +2521,9 @@ end
 #[test]
 fn e2e_xmod_comprehensive_multi_module_binary() {
     let output = compile_multifile_and_run(&[
-        ("geometry.mpl", r#"
+        (
+            "geometry.mpl",
+            r#"
 pub struct Point do
   x :: Int
   y :: Int
@@ -2377,8 +2536,11 @@ end
 pub fn point_sum(p :: Point) -> Int do
   p.x + p.y
 end
-"#),
-        ("math.mpl", r#"
+"#,
+        ),
+        (
+            "math.mpl",
+            r#"
 from Geometry import Point, make_point
 
 fn helper() -> Int do
@@ -2388,8 +2550,11 @@ end
 pub fn add_points(a :: Point, b :: Point) -> Point do
   make_point(a.x + b.x, a.y + b.y)
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Geometry
 import Math
 
@@ -2400,7 +2565,8 @@ fn main() do
   let sum = Geometry.point_sum(c)
   println("${sum}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "10\n");
 }
@@ -2413,7 +2579,9 @@ end
 #[test]
 fn e2e_comprehensive_multi_module_integration() {
     let output = compile_multifile_and_run(&[
-        ("geometry.mpl", r#"
+        (
+            "geometry.mpl",
+            r#"
 pub struct Point do
   x :: Int
   y :: Int
@@ -2426,20 +2594,29 @@ end
 pub fn point_sum(p :: Point) -> Int do
   p.x + p.y
 end
-"#),
-        ("math/vector.mpl", r#"
+"#,
+        ),
+        (
+            "math/vector.mpl",
+            r#"
 from Geometry import Point, make_point, point_sum
 
 pub fn scaled_sum(p :: Point, factor :: Int) -> Int do
   point_sum(p) * factor
 end
-"#),
-        ("utils.mpl", r#"
+"#,
+        ),
+        (
+            "utils.mpl",
+            r#"
 pub fn double(n :: Int) -> Int do
   n * 2
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Geometry import make_point
 from Utils import double
 import Math.Vector
@@ -2450,7 +2627,8 @@ fn main() do
   let result = double(sum)
   println("${result}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "28\n"); // (3+4)*2 = 14, double(14) = 28
 }
@@ -2461,13 +2639,18 @@ end
 #[test]
 fn e2e_module_qualified_type_in_error() {
     let error = compile_multifile_expect_error(&[
-        ("geometry.mpl", r#"
+        (
+            "geometry.mpl",
+            r#"
 pub struct Point do
   x :: Int
   y :: Int
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Geometry import Point
 
 fn takes_string(s :: String) -> String do
@@ -2478,7 +2661,8 @@ fn main() do
   let p = Point { x: 1, y: 2 }
   takes_string(p)
 end
-"#),
+"#,
+        ),
     ]);
     // The error output should contain module-qualified type name
     assert!(
@@ -2493,18 +2677,24 @@ end
 #[test]
 fn e2e_file_path_in_multi_module_error() {
     let error = compile_multifile_expect_error(&[
-        ("geometry.mpl", r#"
+        (
+            "geometry.mpl",
+            r#"
 pub fn bad_fn(x :: Int) -> String do
   x
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Geometry
 
 fn main() do
   Geometry.bad_fn(42)
 end
-"#),
+"#,
+        ),
     ]);
     // The error output should contain the actual file path, not <unknown>
     assert!(
@@ -2927,7 +3117,10 @@ fn e2e_collect_list() {
 fn e2e_collect_map() {
     let source = read_fixture("collect_map.mpl");
     let output = compile_and_run(&source);
-    assert_eq!(output, "%{0 => 100, 1 => 200, 2 => 300}\n%{10 => 1, 20 => 2, 30 => 3}\n3\n");
+    assert_eq!(
+        output,
+        "%{0 => 100, 1 => 200, 2 => 300}\n%{10 => 1, 20 => 2, 30 => 3}\n3\n"
+    );
 }
 
 /// Phase 79 COLL-03 + COLL-04: Set.collect deduplication and String.collect concatenation.
@@ -2976,7 +3169,10 @@ fn e2e_err_binding_pattern() {
 fn e2e_try_operator_result() {
     let source = read_fixture("try_operator_result.mpl");
     let output = compile_and_run(&source);
-    assert_eq!(output, "valid: 42\nerror: must be positive\nerror: too large\n");
+    assert_eq!(
+        output,
+        "valid: 42\nerror: must be positive\nerror: too large\n"
+    );
 }
 
 // ── Phase 87.1-02: Module System Fixes ────────────────────────────────
@@ -2988,7 +3184,9 @@ fn e2e_try_operator_result() {
 #[test]
 fn e2e_cross_module_polymorphic() {
     let output = compile_multifile_and_run(&[
-        ("utils.mpl", r#"
+        (
+            "utils.mpl",
+            r#"
 pub fn double(x) do
   x * 2
 end
@@ -3000,8 +3198,11 @@ end
 pub fn make_greeting(name :: String) -> String do
   "hello " <> name
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Utils import double, add_one, make_greeting
 
 fn main() do
@@ -3012,7 +3213,8 @@ fn main() do
   println("${b}")
   println(c)
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "42\n42\nhello world\n");
 }
@@ -3024,7 +3226,9 @@ end
 #[test]
 fn e2e_cross_module_service() {
     let output = compile_multifile_and_run(&[
-        ("services.mpl", r#"
+        (
+            "services.mpl",
+            r#"
 service Store do
   fn init(start_val :: Int) -> Int do
     start_val
@@ -3042,8 +3246,11 @@ service Store do
     0
   end
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Services import Store
 
 fn main() do
@@ -3056,7 +3263,8 @@ fn main() do
   let v3 = Store.get(pid)
   println("${v3}")
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "100\n200\n0\n");
 }
@@ -3068,7 +3276,9 @@ end
 #[test]
 fn e2e_cross_module_try_operator() {
     let output = compile_multifile_and_run(&[
-        ("validation.mpl", r#"
+        (
+            "validation.mpl",
+            r#"
 pub fn validate_positive(n :: Int) -> Int!String do
   if n > 0 do
     Ok(n)
@@ -3084,8 +3294,11 @@ pub fn validate_small(n :: Int) -> Int!String do
     Err("too large")
   end
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Validation import validate_positive, validate_small
 
 fn process(n :: Int) -> Int!String do
@@ -3111,7 +3324,8 @@ fn main() do
     Err(e) -> println("err: ${e}")
   end
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "ok: 20\nerr: must be positive\nerr: too large\n");
 }
@@ -3123,7 +3337,9 @@ end
 #[test]
 fn e2e_cross_module_from_json() {
     let output = compile_multifile_and_run(&[
-        ("models.mpl", r#"
+        (
+            "models.mpl",
+            r#"
 pub struct User do
   name :: String
   age :: Int
@@ -3132,8 +3348,11 @@ end deriving(Json)
 pub fn make_user(name :: String, age :: Int) -> User do
   User { name: name, age: age }
 end
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Models
 
 fn main() do
@@ -3146,14 +3365,17 @@ fn main() do
     Err(e) -> println("Error: ${e}")
   end
 end
-"#),
+"#,
+        ),
     ]);
     let lines: Vec<&str> = output.trim().lines().collect();
     assert_eq!(lines.len(), 2, "expected 2 lines, got: {:?}", lines);
     // JSON key order is non-deterministic; check both possible orderings
     assert!(
-        lines[0] == "{\"name\":\"Alice\",\"age\":30}" || lines[0] == "{\"age\":30,\"name\":\"Alice\"}",
-        "unexpected JSON: {}", lines[0]
+        lines[0] == "{\"name\":\"Alice\",\"age\":30}"
+            || lines[0] == "{\"age\":30,\"name\":\"Alice\"}",
+        "unexpected JSON: {}",
+        lines[0]
     );
     assert_eq!(lines[1], "Alice 30");
 }
@@ -3162,13 +3384,18 @@ end
 #[test]
 fn e2e_cross_module_from_json_selective_import() {
     let output = compile_multifile_and_run(&[
-        ("models.mpl", r#"
+        (
+            "models.mpl",
+            r#"
 pub struct User do
   name :: String
   age :: Int
 end deriving(Json)
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 from Models import User
 
 fn main() do
@@ -3180,7 +3407,8 @@ fn main() do
     Err(e) -> println("Error: ${e}")
   end
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output.trim(), "Bob 25");
 }
@@ -3188,7 +3416,8 @@ end
 /// Atom literals compile and execute, printing their string representation.
 #[test]
 fn e2e_atom_literals() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let name = :name
   let email = :email
@@ -3197,20 +3426,26 @@ fn main() do
   println("email atom works")
   println("asc atom works")
 end
-"#);
-    assert_eq!(output, "name atom works\nemail atom works\nasc atom works\n");
+"#,
+    );
+    assert_eq!(
+        output,
+        "name atom works\nemail atom works\nasc atom works\n"
+    );
 }
 
 /// Atom type is distinct from String -- assigning an atom to a String-annotated
 /// variable produces a type error.
 #[test]
 fn e2e_atom_type_distinct() {
-    let error = compile_expect_error(r#"
+    let error = compile_expect_error(
+        r#"
 fn main() do
   let x :: String = :name
   println(x)
 end
-"#);
+"#,
+    );
     assert!(
         error.contains("Atom") && error.contains("String"),
         "Expected type error mentioning Atom and String, got: {}",
@@ -3224,7 +3459,8 @@ end
 /// `greet(%{"name" => "Alice"})`.
 #[test]
 fn e2e_keyword_arguments() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn greet(opts :: Map<String, String>) -> String do
   Map.get(opts, "name")
 end
@@ -3233,7 +3469,8 @@ fn main() do
   let result = greet(name: "Alice")
   println(result)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "Alice\n");
 }
 
@@ -3241,7 +3478,8 @@ end
 /// to `query("users", %{"name" => "Alice"})`.
 #[test]
 fn e2e_keyword_args_mixed() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn query(table :: String, opts :: Map<String, String>) -> String do
   let name = Map.get(opts, "name")
   "${table}:${name}"
@@ -3251,7 +3489,8 @@ fn main() do
   let result = query("users", name: "Alice")
   println(result)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "users:Alice\n");
 }
 
@@ -3260,7 +3499,8 @@ end
 /// Multi-line pipe chains where |> at line start continues the previous expression.
 #[test]
 fn e2e_multiline_pipe() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn double(x :: Int) -> Int do
   x * 2
 end
@@ -3275,14 +3515,16 @@ fn main() do
     |> add_one
   println("${result}")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "11\n");
 }
 
 /// Multi-line pipe chain with more than 2 stages and function calls with arguments.
 #[test]
 fn e2e_multiline_pipe_complex() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn add(x :: Int, y :: Int) -> Int do
   x + y
 end
@@ -3302,14 +3544,16 @@ fn main() do
     |> negate
   println("${result}")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "-45\n");
 }
 
 /// Multi-line pipes work together with keyword arguments.
 #[test]
 fn e2e_multiline_pipe_with_keyword_args() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn double(x :: Int) -> Int do
   x * 2
 end
@@ -3329,7 +3573,8 @@ fn main() do
   let msg = describe(result: "${num}")
   println(msg)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "11\n");
 }
 
@@ -3357,15 +3602,18 @@ fn e2e_pipe_multiline_slot() {
 /// Both expressions compute 5 |> double |> add_one = 11.
 #[test]
 fn e2e_pipe_multiline_equivalence() {
-    let single_line = compile_and_run(r#"
+    let single_line = compile_and_run(
+        r#"
 fn double(x :: Int) -> Int do x * 2 end
 fn add_one(x :: Int) -> Int do x + 1 end
 fn main() do
   let result = 5 |> double |> add_one
   println("${result}")
 end
-"#);
-    let multi_line = compile_and_run(r#"
+"#,
+    );
+    let multi_line = compile_and_run(
+        r#"
 fn double(x :: Int) -> Int do x * 2 end
 fn add_one(x :: Int) -> Int do x + 1 end
 fn main() do
@@ -3374,29 +3622,40 @@ fn main() do
     add_one
   println("${result}")
 end
-"#);
-    assert_eq!(single_line, multi_line, "multi-line pipe must produce same output as single-line");
+"#,
+    );
+    assert_eq!(
+        single_line, multi_line,
+        "multi-line pipe must produce same output as single-line"
+    );
 }
 
 /// PIPE-02: Slot pipe equivalence — multi-line |N> == single-line |N>.
 #[test]
 fn e2e_pipe_slot_multiline_equivalence() {
-    let single_line = compile_and_run(r#"
+    let single_line = compile_and_run(
+        r#"
 fn add(a :: Int, b :: Int) -> Int do a + b end
 fn main() do
   let result = 5 |2> add(10)
   println("${result}")
 end
-"#);
-    let multi_line = compile_and_run(r#"
+"#,
+    );
+    let multi_line = compile_and_run(
+        r#"
 fn add(a :: Int, b :: Int) -> Int do a + b end
 fn main() do
   let result = 5 |2>
     add(10)
   println("${result}")
 end
-"#);
-    assert_eq!(single_line, multi_line, "multi-line slot pipe must produce same output as single-line");
+"#,
+    );
+    assert_eq!(
+        single_line, multi_line,
+        "multi-line slot pipe must produce same output as single-line"
+    );
 }
 
 /// Regression: existing single-line pipes unchanged by Phase 126 changes.
@@ -3412,7 +3671,8 @@ fn e2e_pipe_126_regression() {
 /// Basic struct update: create new struct with specific fields changed.
 #[test]
 fn e2e_struct_update_basic() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   name :: String
   email :: String
@@ -3426,14 +3686,16 @@ fn main() do
   println(updated.email)
   println("${updated.age}")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "Bob\nalice@example.com\n25\n");
 }
 
 /// Struct update with a single field override.
 #[test]
 fn e2e_struct_update_single_field() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Point do
   x :: Int
   y :: Int
@@ -3445,14 +3707,16 @@ fn main() do
   println("${p2.x}")
   println("${p2.y}")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "10\n2\n");
 }
 
 /// Struct update preserves original (immutability).
 #[test]
 fn e2e_struct_update_original_unchanged() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Config do
   host :: String
   port :: Int
@@ -3466,7 +3730,8 @@ fn main() do
   println(c2.host)
   println("${c2.port}")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "localhost\n8080\nlocalhost\n9090\n");
 }
 
@@ -3475,7 +3740,8 @@ end
 /// deriving(Schema) __table__() returns lowercased, pluralized struct name.
 #[test]
 fn e2e_deriving_schema_table() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3485,14 +3751,16 @@ end deriving(Schema)
 fn main() do
   println(User.__table__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "users\n");
 }
 
 /// deriving(Schema) __primary_key__() returns "id" by default.
 #[test]
 fn e2e_deriving_schema_primary_key() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Comment do
   id :: String
   text :: String
@@ -3501,14 +3769,16 @@ end deriving(Schema)
 fn main() do
   println(Comment.__primary_key__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "id\n");
 }
 
 /// deriving(Schema) __fields__() returns list of field name strings.
 #[test]
 fn e2e_deriving_schema_fields() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Post do
   id :: String
   title :: String
@@ -3526,14 +3796,16 @@ fn main() do
   let f2 = List.get(fields, 2)
   println(f2)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "3\nid\ntitle\nbody\n");
 }
 
 /// deriving(Schema) __relationships__() returns list of relationship metadata strings.
 #[test]
 fn e2e_deriving_schema_relationships() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Post do
   id :: String
   title :: String
@@ -3555,14 +3827,16 @@ fn main() do
   let ur0 = List.get(user_rels, 0)
   println(ur0)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "belongs_to:user:User\nhas_many:posts:Post\n");
 }
 
 /// __relationship_meta__() returns 5-field encoded strings with FK and target table.
 #[test]
 fn e2e_relationship_meta_has_many() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3584,14 +3858,19 @@ fn main() do
   let pm0 = List.get(post_meta, 0)
   println(pm0)
 end
-"#);
-    assert_eq!(output, "has_many:posts:Post:user_id:posts\nbelongs_to:user:User:user_id:users\n");
+"#,
+    );
+    assert_eq!(
+        output,
+        "has_many:posts:Post:user_id:posts\nbelongs_to:user:User:user_id:users\n"
+    );
 }
 
 /// __relationship_meta__() for has_one relationships.
 #[test]
 fn e2e_relationship_meta_has_one() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3610,14 +3889,16 @@ fn main() do
   let m0 = List.get(meta, 0)
   println(m0)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "has_one:profile:Profile:user_id:profiles\n");
 }
 
 /// __relationship_meta__() with multiple relationships on one struct.
 #[test]
 fn e2e_relationship_meta_multiple() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3642,14 +3923,19 @@ fn main() do
   println(m0)
   println(m1)
 end
-"#);
-    assert_eq!(output, "has_many:posts:Post:user_id:posts\nhas_one:profile:Profile:user_id:profiles\n");
+"#,
+    );
+    assert_eq!(
+        output,
+        "has_many:posts:Post:user_id:posts\nhas_one:profile:Profile:user_id:profiles\n"
+    );
 }
 
 /// deriving(Schema) works alongside other derives (Schema, Eq).
 #[test]
 fn e2e_deriving_schema_with_other_derives() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Item do
   id :: String
   name :: String
@@ -3658,7 +3944,8 @@ end deriving(Schema, Eq)
 fn main() do
   println(Item.__table__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "items\n");
 }
 
@@ -3667,7 +3954,8 @@ end
 /// deriving(Schema) __field_types__() returns SQL type mappings.
 #[test]
 fn e2e_schema_field_types() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3683,14 +3971,19 @@ fn main() do
   println(List.get(types, 3))
   println(List.get(types, 4))
 end
-"#);
-    assert_eq!(output, "id:TEXT\nage:BIGINT\nactive:BOOLEAN\nscore:DOUBLE PRECISION\n");
+"#,
+    );
+    assert_eq!(
+        output,
+        "id:TEXT\nage:BIGINT\nactive:BOOLEAN\nscore:DOUBLE PRECISION\n"
+    );
 }
 
 /// deriving(Schema) per-field column accessors return column name strings.
 #[test]
 fn e2e_schema_column_accessor() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3702,14 +3995,16 @@ fn main() do
   println(User.__email_col__())
   println(User.__id_col__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "name\nemail\nid\n");
 }
 
 /// deriving(Schema) with `table "people"` overrides default table name.
 #[test]
 fn e2e_schema_custom_table_name() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   table "people"
   id :: String
@@ -3719,14 +4014,16 @@ end deriving(Schema)
 fn main() do
   println(User.__table__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "people\n");
 }
 
 /// deriving(Schema) with `primary_key :uuid` overrides default "id".
 #[test]
 fn e2e_schema_custom_primary_key() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   primary_key :uuid
   uuid :: String
@@ -3736,14 +4033,16 @@ end deriving(Schema)
 fn main() do
   println(User.__primary_key__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "uuid\n");
 }
 
 /// deriving(Schema) with `timestamps true` injects inserted_at/updated_at fields.
 #[test]
 fn e2e_schema_timestamps() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   timestamps true
   id :: String
@@ -3759,14 +4058,16 @@ fn main() do
   println(List.get(fields, 3))
   println(List.get(types, 2))
 end
-"#);
+"#,
+    );
     assert_eq!(output, "4\ninserted_at\nupdated_at\ninserted_at:TEXT\n");
 }
 
 /// deriving(Schema) defaults unchanged without options (backward compatibility).
 #[test]
 fn e2e_schema_defaults_unchanged() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct Post do
   id :: String
   title :: String
@@ -3776,7 +4077,8 @@ fn main() do
   println(Post.__table__())
   println(Post.__primary_key__())
 end
-"#);
+"#,
+    );
     assert_eq!(output, "posts\nid\n");
 }
 
@@ -3785,7 +4087,8 @@ end
 /// Orm.build_select with columns, where, order, and limit.
 #[test]
 fn e2e_orm_build_select_simple() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let cols = ["id", "name"]
   let wheres = ["name ="]
@@ -3793,40 +4096,49 @@ fn main() do
   let sql = Orm.build_select("users", cols, wheres, orders, 10, -1)
   println(sql)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "SELECT \"id\", \"name\" FROM \"users\" WHERE \"name\" = $1 ORDER BY \"name\" ASC LIMIT 10\n");
 }
 
 /// Orm.build_select with no columns (SELECT *), no where, no order.
 #[test]
 fn e2e_orm_build_select_all() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let sql = Orm.build_select("users", [], [], [], -1, -1)
   println(sql)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "SELECT * FROM \"users\"\n");
 }
 
 /// Orm.build_insert with columns and RETURNING.
 #[test]
 fn e2e_orm_build_insert() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let cols = ["name", "email"]
   let returning = ["id"]
   let sql = Orm.build_insert("users", cols, returning)
   println(sql)
 end
-"#);
-    assert_eq!(output, "INSERT INTO \"users\" (\"name\", \"email\") VALUES ($1, $2) RETURNING \"id\"\n");
+"#,
+    );
+    assert_eq!(
+        output,
+        "INSERT INTO \"users\" (\"name\", \"email\") VALUES ($1, $2) RETURNING \"id\"\n"
+    );
 }
 
 /// Orm.build_update with SET, WHERE, and RETURNING.
 #[test]
 fn e2e_orm_build_update() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let set_cols = ["name", "email"]
   let wheres = ["id ="]
@@ -3834,20 +4146,23 @@ fn main() do
   let sql = Orm.build_update("users", set_cols, wheres, returning)
   println(sql)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "UPDATE \"users\" SET \"name\" = $1, \"email\" = $2 WHERE \"id\" = $3 RETURNING \"id\", \"name\"\n");
 }
 
 /// Orm.build_delete with WHERE clause.
 #[test]
 fn e2e_orm_build_delete() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let wheres = ["id ="]
   let sql = Orm.build_delete("users", wheres, [])
   println(sql)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "DELETE FROM \"users\" WHERE \"id\" = $1\n");
 }
 
@@ -3856,19 +4171,22 @@ end
 /// Query.from creates a valid Query value (opaque Ptr).
 #[test]
 fn e2e_query_builder_basic_from() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Pipe-composable chain: from -> where -> order_by -> limit.
 #[test]
 fn e2e_query_builder_pipe_chain() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users")
     |> Query.where(:name, "Alice")
@@ -3876,14 +4194,16 @@ fn main() do
     |> Query.limit(10)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Operator-based where, where_null, and where_not_null.
 #[test]
 fn e2e_query_builder_where_op() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("posts")
     |> Query.where_op(:age, :gt, "21")
@@ -3891,14 +4211,16 @@ fn main() do
     |> Query.where_not_null(:name)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// All clause types compile and execute without crash.
 #[test]
 fn e2e_query_builder_all_clauses() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.select(["id", "name"])
@@ -3910,28 +4232,32 @@ fn main() do
     |> Query.having("count(*) >", "5")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Immutability: original Query is unchanged after pipe operations.
 #[test]
 fn e2e_query_builder_immutability() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q1 = Query.from("users")
   let q2 = q1 |> Query.where(:name, "Alice")
   let q3 = q1 |> Query.where(:name, "Bob")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Composable scopes: regular functions taking and returning Query via pipes.
 #[test]
 fn e2e_query_builder_composable_scope() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 pub fn active(q) do
   q |> Query.where(:status, "active")
 end
@@ -3944,14 +4270,16 @@ pub fn main() do
   let q = Query.from("users") |> active() |> recent()
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Schema struct pipe with explicit Query.from using __table__().
 #[test]
 fn e2e_query_builder_schema_pipe_explicit() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -3961,7 +4289,8 @@ pub fn main() do
   let q = Query.from(User.__table__()) |> Query.where(:name, "Alice")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -3970,11 +4299,13 @@ end
 /// Repo module is recognized as stdlib module (verifies module registration).
 #[test]
 fn e2e_repo_module_available() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   println("ok")
 end
-"#);
+"#,
+    );
     // If Repo is in STDLIB_MODULE_NAMES, programs compile with it available.
     // This test mainly exists to anchor the count.
     assert_eq!(output, "ok\n");
@@ -3983,7 +4314,8 @@ end
 /// Full pipeline compiles: Query build + Repo module available in type checking.
 #[test]
 fn e2e_repo_full_pipeline_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users")
     |> Query.where(:name, "Alice")
@@ -3991,26 +4323,30 @@ fn main() do
     |> Query.limit(10)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Repo + Query module type-check: count/exists with query composition.
 #[test]
 fn e2e_repo_count_exists_type_check() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users") |> Query.where(:active, "true")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Full pipeline with Schema struct integrating Query and Repo.
 #[test]
 fn e2e_repo_with_schema_struct() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -4023,14 +4359,16 @@ fn main() do
     |> Query.select(User.__fields__())
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Complex query with multiple clause types compiles with Repo available.
 #[test]
 fn e2e_repo_complex_query_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("orders")
     |> Query.where(:status, "active")
@@ -4042,7 +4380,8 @@ fn main() do
     |> Query.offset(10)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -4051,20 +4390,23 @@ end
 /// Verify Repo.insert type signature (Repo module with write ops is importable).
 #[test]
 fn e2e_repo_insert_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Repo
 
 fn main() do
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Verify all Repo write operations type-check (import Repo + Map).
 #[test]
 fn e2e_repo_write_pipeline_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Repo
 import Query
 import Map
@@ -4074,27 +4416,31 @@ fn main() do
   # We verify they compile and type-check
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Verify Repo.transaction with closure type-checks.
 #[test]
 fn e2e_repo_transaction_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Repo
 
 fn main() do
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Comprehensive test: full ORM pipeline combining Schema + Query + Repo.
 #[test]
 fn e2e_full_orm_pipeline_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 import Repo
 
@@ -4120,14 +4466,16 @@ fn main() do
     |> Query.offset(0)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Verify join/group_by/having compile together.
 #[test]
 fn e2e_query_builder_join_and_group() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4138,7 +4486,8 @@ fn main() do
     |> Query.select(["status", "count(*)"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -4147,60 +4496,69 @@ end
 /// Query.where_not_in compiles and produces valid query.
 #[test]
 fn e2e_query_builder_where_not_in() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("issues")
     |> Query.where_not_in(:status, ["archived", "deleted"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.where_between compiles and produces valid query.
 #[test]
 fn e2e_query_builder_where_between() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.where_between(:age, "18", "65")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.where_op with :ilike compiles.
 #[test]
 fn e2e_query_builder_where_ilike() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users")
     |> Query.where_op(:name, :ilike, "%alice%")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.where_or compiles with grouped OR conditions.
 #[test]
 fn e2e_query_builder_where_or() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("issues")
     |> Query.where(:project_id, "abc")
     |> Query.where_or([:status, :level], ["active", "error"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Combined: all new WHERE operators in one pipe chain.
 #[test]
 fn e2e_query_builder_advanced_where_combined() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.where(:project_id, "abc")
@@ -4214,7 +4572,8 @@ fn main() do
     |> Query.limit(50)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -4223,34 +4582,39 @@ end
 /// Query.order_by_raw emits raw ORDER BY expression.
 #[test]
 fn e2e_query_builder_order_by_raw() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.where(:project_id, "abc")
     |> Query.order_by_raw("random()")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.group_by_raw emits raw GROUP BY expression.
 #[test]
 fn e2e_query_builder_group_by_raw() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.group_by_raw("date_trunc('hour', received_at)")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.select_raw with count(*) and group_by_raw for analytics.
 #[test]
 fn e2e_query_builder_select_raw_with_group_by_raw() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.select_raw(["count(*)::text AS count", "level"])
@@ -4259,56 +4623,64 @@ fn main() do
     |> Query.order_by_raw("count DESC")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.where_raw with $1 style placeholders.
 #[test]
 fn e2e_query_builder_where_raw_dollar() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users")
     |> Query.where(:active, "true")
     |> Query.where_raw("email ILIKE $1", ["%@example.com"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.fragment with PG crypt function.
 #[test]
 fn e2e_query_builder_fragment_crypt() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("users")
     |> Query.where(:email, "alice@example.com")
     |> Query.fragment("AND password_hash = crypt(?, password_hash)", ["secret"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Query.where_raw for JSONB containment check.
 #[test]
 fn e2e_query_builder_jsonb_fragment() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.where(:project_id, "abc")
     |> Query.where_raw("tags @> ?::jsonb", ["{\"env\":\"production\"}"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Combined: all fragment positions (SELECT, WHERE, GROUP BY, ORDER BY).
 #[test]
 fn e2e_query_builder_fragments_all_positions() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let q = Query.from("events")
     |> Query.select_raw(["count(*)::text AS count"])
@@ -4318,7 +4690,8 @@ fn main() do
     |> Query.order_by_raw("date_trunc('hour', received_at)")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -4327,7 +4700,8 @@ end
 /// Basic inner join compiles and runs through the full pipeline.
 #[test]
 fn e2e_query_builder_inner_join() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4336,14 +4710,16 @@ fn main() do
     |> Query.select(["issues.id", "projects.name"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Left join compiles and runs.
 #[test]
 fn e2e_query_builder_left_join() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4351,14 +4727,16 @@ fn main() do
     |> Query.join(:left, "profiles", "profiles.user_id = users.id")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Two joins chained in one query.
 #[test]
 fn e2e_query_builder_multi_join() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4368,14 +4746,16 @@ fn main() do
     |> Query.select(["issues.id", "projects.name", "organizations.name"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Aliased join via Query.join_as compiles and runs.
 #[test]
 fn e2e_query_builder_join_as_alias() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4384,14 +4764,16 @@ fn main() do
     |> Query.select(["issues.id", "p.name"])
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Join combined with WHERE, ORDER BY, and LIMIT.
 #[test]
 fn e2e_query_builder_join_with_where() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4402,14 +4784,16 @@ fn main() do
     |> Query.limit(10)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Two aliased joins in one query.
 #[test]
 fn e2e_query_builder_multi_alias_join() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4419,7 +4803,8 @@ fn main() do
     |> Query.where(:status, "active")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -4427,7 +4812,8 @@ end
 
 #[test]
 fn e2e_query_builder_select_count() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4435,13 +4821,15 @@ fn main() do
     |> Query.select_count()
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 #[test]
 fn e2e_query_builder_select_sum() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4449,13 +4837,15 @@ fn main() do
     |> Query.select_sum(:amount)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 #[test]
 fn e2e_query_builder_select_avg_group_by() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4464,13 +4854,15 @@ fn main() do
     |> Query.group_by(:category)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 #[test]
 fn e2e_query_builder_select_min_max() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4479,13 +4871,15 @@ fn main() do
     |> Query.select_max(:created_at)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 #[test]
 fn e2e_query_builder_aggregate_with_having() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4495,13 +4889,15 @@ fn main() do
     |> Query.having("count(*) >", "5")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 #[test]
 fn e2e_query_builder_select_count_field() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Query
 
 fn main() do
@@ -4509,7 +4905,8 @@ fn main() do
     |> Query.select_count_field(:assignee_id)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -4518,7 +4915,8 @@ end
 /// Test 1: Changeset.cast creates changeset from params, filtering to allowed fields.
 #[test]
 fn e2e_changeset_cast_basic() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4532,14 +4930,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "valid\n");
 }
 
 /// Test 2: validate_required catches missing fields.
 #[test]
 fn e2e_changeset_validate_required() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4554,14 +4954,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "invalid\n");
 }
 
 /// Test 3: validate_length catches short strings.
 #[test]
 fn e2e_changeset_validate_length() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4576,14 +4978,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "invalid\n");
 }
 
 /// Test 4: validate_format checks substring presence.
 #[test]
 fn e2e_changeset_validate_format() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4598,14 +5002,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "invalid\n");
 }
 
 /// Test 5: validate_inclusion checks allowed values.
 #[test]
 fn e2e_changeset_validate_inclusion() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4620,14 +5026,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "invalid\n");
 }
 
 /// Test 6: validate_number checks bounds.
 #[test]
 fn e2e_changeset_validate_number() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4642,14 +5050,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "invalid\n");
 }
 
 /// Test 7: Multiple validators on different fields accumulate errors.
 #[test]
 fn e2e_changeset_pipe_chain_accumulates_errors() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4666,14 +5076,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "invalid\n");
 }
 
 /// Test 8: Changeset with all validations passing.
 #[test]
 fn e2e_changeset_valid_passes() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4690,14 +5102,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "valid\n");
 }
 
 /// Test 9: 4-arg cast with field_types compiles and runs.
 #[test]
 fn e2e_changeset_cast_with_types_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 struct User do
@@ -4717,14 +5131,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "valid\n");
 }
 
 /// Test 10: Field accessors return correct data.
 #[test]
 fn e2e_changeset_accessors() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4734,7 +5150,8 @@ fn main() do
   let name = Changeset.get_change(cs, :name)
   println(name)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "Alice\n");
 }
 
@@ -4743,21 +5160,24 @@ end
 /// Test 11: Repo.insert_changeset compiles (Changeset and Repo modules importable together).
 #[test]
 fn e2e_repo_insert_changeset_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 import Repo
 
 fn main() do
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Test 12: Invalid changeset skips SQL execution.
 #[test]
 fn e2e_changeset_invalid_skips_sql() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4772,14 +5192,16 @@ fn main() do
     println("skipped SQL")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "skipped SQL\n");
 }
 
 /// Test 13: Full changeset validation pipeline -- all validators pass.
 #[test]
 fn e2e_full_changeset_validation_pipeline() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4797,14 +5219,16 @@ fn main() do
     println("invalid")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "valid\n");
 }
 
 /// Test 14: Repo.insert_changeset has correct type (Schema + changeset).
 #[test]
 fn e2e_changeset_repo_insert_type_checks() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 import Repo
 
@@ -4822,14 +5246,16 @@ fn main() do
     |> Changeset.validate_format(:email, "@")
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 /// Test 15: Update changeset with existing data passes validation.
 #[test]
 fn e2e_changeset_update_type_checks() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 import Repo
 
@@ -4846,14 +5272,16 @@ fn main() do
     println("invalid update")
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "valid update\n");
 }
 
 /// Test 16: Multi-field error accumulation with get_error accessor.
 #[test]
 fn e2e_changeset_error_accumulation_multiple_fields() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Changeset
 
 fn main() do
@@ -4873,7 +5301,8 @@ fn main() do
     println(email_err)
   end
 end
-"#);
+"#,
+    );
     assert_eq!(output, "can't be blank\nhas invalid format\n");
 }
 
@@ -4882,7 +5311,8 @@ end
 /// Repo.preload compiles with correct type signature (4 params: pool, rows, assocs, meta).
 #[test]
 fn e2e_repo_preload_type_check() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -4902,14 +5332,19 @@ fn main() do
   println(m0)
   println("preload_types_ok")
 end
-"#);
-    assert_eq!(output, "has_many:posts:Post:user_id:posts\npreload_types_ok\n");
+"#,
+    );
+    assert_eq!(
+        output,
+        "has_many:posts:Post:user_id:posts\npreload_types_ok\n"
+    );
 }
 
 /// Repo.preload with merged metadata for nested preloading compiles correctly.
 #[test]
 fn e2e_repo_preload_merged_meta() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 struct User do
   id :: String
   name :: String
@@ -4941,7 +5376,8 @@ fn main() do
   println(pm0)
   println(pm1)
 end
-"#);
+"#,
+    );
     assert_eq!(output, "has_many:posts:Post:user_id:posts\nbelongs_to:user:User:user_id:users\nhas_many:comments:Comment:post_id:comments\n");
 }
 
@@ -4950,24 +5386,28 @@ end
 /// Migration.create_table compiles with correct type signature.
 #[test]
 fn e2e_migration_create_table_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   println("migration_ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "migration_ok\n");
 }
 
 /// Migration module is available and all 8 functions type-check.
 #[test]
 fn e2e_migration_module_type_check() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Migration
 
 fn main() do
   println("migration_types_ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "migration_types_ok\n");
 }
 
@@ -4977,7 +5417,8 @@ fn e2e_migration_table_ops_compile() {
     // This test verifies that the function signatures type-check correctly.
     // The functions require a pool handle and string parameters.
     // We cannot execute them without a live database, so we verify compilation only.
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn run_migration(pool :: PoolHandle) -> Int!String do
   Migration.create_table(pool, "users", [
     "id:UUID:PRIMARY KEY",
@@ -4991,14 +5432,16 @@ end
 fn main() do
   println("table_ops_ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "table_ops_ok\n");
 }
 
 /// Migration column operations (add, drop, rename) compile.
 #[test]
 fn e2e_migration_column_ops_compile() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn run_migration(pool :: PoolHandle) -> Int!String do
   Migration.add_column(pool, "users", "age:BIGINT")?
   Migration.drop_column(pool, "users", "age")?
@@ -5009,14 +5452,16 @@ end
 fn main() do
   println("column_ops_ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "column_ops_ok\n");
 }
 
 /// Migration index operations (create, drop) compile.
 #[test]
 fn e2e_migration_index_ops_compile() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn run_migration(pool :: PoolHandle) -> Int!String do
   Migration.create_index(pool, "users", ["email"], "unique:true")?
   Migration.drop_index(pool, "users", ["email"])?
@@ -5026,14 +5471,16 @@ end
 fn main() do
   println("index_ops_ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "index_ops_ok\n");
 }
 
 /// Migration.execute (raw SQL escape hatch) compiles.
 #[test]
 fn e2e_migration_execute_compiles() {
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn run_migration(pool :: PoolHandle) -> Int!String do
   Migration.execute(pool, "CREATE EXTENSION IF NOT EXISTS pgcrypto")?
   Ok(0)
@@ -5042,7 +5489,8 @@ end
 fn main() do
   println("execute_ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "execute_ok\n");
 }
 
@@ -5208,8 +5656,7 @@ fn e2e_migrate_generate_scaffold_compiles() {
     std::fs::create_dir_all(&compile_dir).expect("create compile dir");
 
     // Copy migration as migration.mpl module
-    std::fs::copy(entry.path(), compile_dir.join("migration.mpl"))
-        .expect("copy migration file");
+    std::fs::copy(entry.path(), compile_dir.join("migration.mpl")).expect("copy migration file");
 
     // Create a main.mpl that imports and uses the migration module
     let main_content = r#"import Migration
@@ -5222,8 +5669,7 @@ fn main() do
   println("scaffold_compiles")
 end
 "#;
-    std::fs::write(compile_dir.join("main.mpl"), main_content)
-        .expect("write main.mpl");
+    std::fs::write(compile_dir.join("main.mpl"), main_content).expect("write main.mpl");
 
     // Step 4: Compile the project
     let build_output = Command::new(&meshc)
@@ -5259,7 +5705,8 @@ fn e2e_repo_insert_or_update() {
     // Verifies Repo.insert_or_update compiles through full pipeline
     // (typechecker + MIR lowering + codegen + JIT symbol resolution).
     // Does not call at runtime since we need a PoolHandle (not SqliteConn).
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Repo
 import Map
 
@@ -5270,14 +5717,16 @@ end
 fn main() do
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
 #[test]
 fn e2e_query_builder_where_sub() {
     // Verifies subquery WHERE compiles through full pipeline
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn main() do
   let sub = Query.from("projects")
     |> Query.select(["id"])
@@ -5286,7 +5735,8 @@ fn main() do
     |> Query.where_sub(:project_id, sub)
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -5294,7 +5744,8 @@ end
 fn e2e_try_result_binding_arity() {
     // Regression test: let x = Sqlite.execute(db, sql, params)? followed by
     // Int.to_string(x) should NOT trigger a spurious E0003 arity mismatch.
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 fn run() -> Int!String do
   let db = Sqlite.open(":memory:")?
   let _ = Sqlite.execute(db, "CREATE TABLE t (id INTEGER)", [])?
@@ -5311,7 +5762,8 @@ fn main() do
     Err(e) -> println(e)
   end
 end
-"#);
+"#,
+    );
     assert!(output.contains("ok"));
 }
 
@@ -5320,7 +5772,8 @@ fn e2e_repo_delete_where_returning() {
     // Verifies Repo.delete_where_returning compiles through full pipeline
     // (typechecker + MIR lowering + codegen + JIT symbol resolution).
     // Does not call at runtime since we need a PoolHandle (not SqliteConn).
-    let output = compile_and_run(r#"
+    let output = compile_and_run(
+        r#"
 import Repo
 import Query
 
@@ -5332,7 +5785,8 @@ end
 fn main() do
   println("ok")
 end
-"#);
+"#,
+    );
     assert_eq!(output, "ok\n");
 }
 
@@ -5359,7 +5813,8 @@ fn e2e_slot_pipe_arity_error() {
     let err = compile_expect_error(&source);
     assert!(
         err.contains("slot position 5") || err.contains("out of range"),
-        "Expected arity error message, got: {}", err
+        "Expected arity error message, got: {}",
+        err
     );
 }
 
@@ -5370,7 +5825,8 @@ fn e2e_slot_pipe_parse_error_slot_1() {
     let err = compile_expect_error(source);
     assert!(
         err.contains("|>") || err.contains("first argument") || err.contains("error"),
-        "Expected parse error for |1>, got: {}", err
+        "Expected parse error for |1>, got: {}",
+        err
     );
 }
 
@@ -5413,7 +5869,11 @@ fn e2e_regex_captures() {
 fn e2e_regex_replace() {
     let source = read_fixture("regex_replace_split.mpl");
     let output = compile_and_run(&source);
-    assert!(output.starts_with("fooNbarN\n"), "Expected replace output, got: {}", output);
+    assert!(
+        output.starts_with("fooNbarN\n"),
+        "Expected replace output, got: {}",
+        output
+    );
 }
 
 /// Phase 119: Regex.split(rx, str) -> List<String> (REGEX-06).
@@ -5455,11 +5915,16 @@ fn e2e_type_alias_basic() {
 #[test]
 fn e2e_type_alias_pub() {
     let output = compile_multifile_and_run(&[
-        ("types.mpl", r#"
+        (
+            "types.mpl",
+            r#"
 pub type UserId = Int
 pub type Email = String
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Types
 
 fn greet(id :: Types.UserId, email :: Types.Email) -> Types.Email do
@@ -5471,7 +5936,8 @@ fn main() do
   let addr :: Types.Email = "user@example.com"
   println(greet(id, addr))
 end
-"#),
+"#,
+        ),
     ]);
     assert_eq!(output, "user@example.com\n");
 }
@@ -5483,17 +5949,23 @@ end
 #[test]
 fn e2e_type_alias_private_not_exported() {
     let error = compile_multifile_expect_error(&[
-        ("internals.mpl", r#"
+        (
+            "internals.mpl",
+            r#"
 type InternalId = Int
-"#),
-        ("main.mpl", r#"
+"#,
+        ),
+        (
+            "main.mpl",
+            r#"
 import Internals
 
 fn main() do
   let x :: Internals.InternalId = 42
   println(x)
 end
-"#),
+"#,
+        ),
     ]);
     assert!(
         !error.is_empty(),
@@ -5508,7 +5980,10 @@ end
 fn e2e_crypto_sha256() {
     let source = read_fixture("crypto_sha256.mpl");
     let output = compile_and_run(&source);
-    assert_eq!(output, "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n");
+    assert_eq!(
+        output,
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n"
+    );
 }
 
 /// Phase 135: Crypto.sha512(s) returns correct SHA-512 lowercase hex digest (CRYPTO-02).
@@ -5526,7 +6001,10 @@ fn e2e_crypto_hmac() {
     let source = read_fixture("crypto_hmac.mpl");
     let output = compile_and_run(&source);
     let lines: Vec<&str> = output.lines().collect();
-    assert_eq!(lines[0], "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
+    assert_eq!(
+        lines[0],
+        "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+    );
     assert_eq!(lines[1], "164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737");
 }
 
@@ -5553,7 +6031,11 @@ fn e2e_crypto_uuid4() {
 fn e2e_base64_encode() {
     let source = read_fixture("base64_encode_decode.mpl");
     let output = compile_and_run(&source);
-    assert!(output.starts_with("aGVsbG8=\n"), "Expected aGVsbG8= as first line, got: {}", output);
+    assert!(
+        output.starts_with("aGVsbG8=\n"),
+        "Expected aGVsbG8= as first line, got: {}",
+        output
+    );
 }
 
 /// Phase 135: Base64.decode round-trips and returns Err on invalid input (ENCODE-02).
@@ -5588,7 +6070,11 @@ fn e2e_hex_encode_lowercase() {
     let source = read_fixture("hex_encode_decode.mpl");
     let output = compile_and_run(&source);
     let first_line = output.lines().next().unwrap_or("");
-    assert_eq!(first_line, first_line.to_lowercase(), "Hex.encode must produce lowercase output");
+    assert_eq!(
+        first_line,
+        first_line.to_lowercase(),
+        "Hex.encode must produce lowercase output"
+    );
     assert_eq!(first_line, "6869");
 }
 

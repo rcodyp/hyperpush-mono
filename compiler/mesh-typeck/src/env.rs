@@ -38,10 +38,7 @@ impl TypeEnv {
     ///
     /// Panics if called when only the global scope remains.
     pub fn pop_scope(&mut self) {
-        assert!(
-            self.scopes.len() > 1,
-            "cannot pop the global scope"
-        );
+        assert!(self.scopes.len() > 1, "cannot pop the global scope");
         self.scopes.pop();
     }
 
@@ -81,7 +78,7 @@ impl Default for TypeEnv {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ty::{Ty, Scheme};
+    use crate::ty::{Scheme, Ty};
 
     #[test]
     fn lookup_in_current_scope() {

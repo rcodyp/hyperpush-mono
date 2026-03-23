@@ -48,11 +48,7 @@ pub extern "C" fn mesh_range_to_list(range: *mut u8) -> *mut u8 {
 
 /// Apply a closure to each element of the range, returning a List.
 #[no_mangle]
-pub extern "C" fn mesh_range_map(
-    range: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_range_map(range: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -84,11 +80,7 @@ pub extern "C" fn mesh_range_map(
 
 /// Filter elements of the range, returning a List of matching integers.
 #[no_mangle]
-pub extern "C" fn mesh_range_filter(
-    range: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_range_filter(range: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -216,7 +208,11 @@ mod tests {
         let r = mesh_range_new(1, 6);
 
         unsafe extern "C" fn is_even(x: u64) -> u64 {
-            if x % 2 == 0 { 1 } else { 0 }
+            if x % 2 == 0 {
+                1
+            } else {
+                0
+            }
         }
 
         let filtered = mesh_range_filter(r, is_even as *mut u8, std::ptr::null_mut());

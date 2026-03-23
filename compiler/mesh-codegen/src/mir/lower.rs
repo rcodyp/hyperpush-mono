@@ -5,8 +5,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use rowan::TextRange;
-use rustc_hash::FxHashMap;
 use mesh_parser::ast::expr::{
     BinaryExpr, CallExpr, CaseExpr, ClosureExpr, Expr, FieldAccess, ForInExpr, IfExpr, JsonExpr,
     LinkExpr, ListLiteral, Literal, MapLiteral, MatchArm, NameRef, PipeExpr, ReceiveExpr,
@@ -23,6 +21,8 @@ use mesh_parser::syntax_kind::SyntaxKind;
 use mesh_parser::Parse;
 use mesh_typeck::ty::Ty;
 use mesh_typeck::{TraitRegistry, TypeckResult};
+use rowan::TextRange;
+use rustc_hash::FxHashMap;
 
 use super::types::{mangle_type_name, mir_type_to_impl_name, mir_type_to_ty, resolve_type};
 use super::{
@@ -74,9 +74,7 @@ fn extract_map_types(ty: &Ty) -> Option<(Ty, Ty)> {
             }
             None
         }
-        Ty::Con(con) if con.name == "Map" => {
-            Some((Ty::int(), Ty::int()))
-        }
+        Ty::Con(con) if con.name == "Map" => Some((Ty::int(), Ty::int())),
         _ => None,
     }
 }
@@ -93,9 +91,7 @@ fn extract_set_elem_type(ty: &Ty) -> Option<Ty> {
             }
             None
         }
-        Ty::Con(con) if con.name == "Set" => {
-            Some(Ty::int())
-        }
+        Ty::Con(con) if con.name == "Set" => Some(Ty::int()),
         _ => None,
     }
 }
@@ -161,7 +157,10 @@ fn mangle_trait_method(
         format!("{}__{}__{}", trait_name, method_name, impl_type_name)
     } else {
         let args_str = trait_type_args.join("_");
-        format!("{}_{}__{}__{}", trait_name, args_str, method_name, impl_type_name)
+        format!(
+            "{}_{}__{}__{}",
+            trait_name, args_str, method_name, impl_type_name
+        )
     }
 }
 
@@ -180,16 +179,25 @@ fn substitute_type_params(ty: &Ty, subst: &HashMap<String, &Ty>) -> Ty {
         }
         Ty::App(con, args) => {
             let con_sub = substitute_type_params(con, subst);
-            let args_sub: Vec<Ty> = args.iter().map(|a| substitute_type_params(a, subst)).collect();
+            let args_sub: Vec<Ty> = args
+                .iter()
+                .map(|a| substitute_type_params(a, subst))
+                .collect();
             Ty::App(Box::new(con_sub), args_sub)
         }
         Ty::Fun(params, ret) => {
-            let params_sub: Vec<Ty> = params.iter().map(|p| substitute_type_params(p, subst)).collect();
+            let params_sub: Vec<Ty> = params
+                .iter()
+                .map(|p| substitute_type_params(p, subst))
+                .collect();
             let ret_sub = substitute_type_params(ret, subst);
             Ty::Fun(params_sub, Box::new(ret_sub))
         }
         Ty::Tuple(elems) => {
-            let elems_sub: Vec<Ty> = elems.iter().map(|e| substitute_type_params(e, subst)).collect();
+            let elems_sub: Vec<Ty> = elems
+                .iter()
+                .map(|e| substitute_type_params(e, subst))
+                .collect();
             Ty::Tuple(elems_sub)
         }
         _ => ty.clone(),
@@ -307,7 +315,12 @@ fn mir_type_to_sql_type(ty: &MirType) -> &'static str {
 }
 
 impl<'a> Lowerer<'a> {
-    fn new(typeck: &'a TypeckResult, parse: &'a Parse, module_name: &str, pub_fns: &HashSet<String>) -> Self {
+    fn new(
+        typeck: &'a TypeckResult,
+        parse: &'a Parse,
+        module_name: &str,
+        pub_fns: &HashSet<String>,
+    ) -> Self {
         Lowerer {
             types: &typeck.types,
             registry: &typeck.type_registry,
@@ -321,13 +334,17 @@ impl<'a> Lowerer<'a> {
             closure_counter: 0,
             known_functions: HashMap::new(),
             entry_function: None,
-            service_modules: typeck.imported_service_methods.iter()
+            service_modules: typeck
+                .imported_service_methods
+                .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             mono_depth: 0,
             max_mono_depth: 64,
             monomorphized_trait_fns: HashSet::new(),
-            user_modules: typeck.qualified_modules.iter()
+            user_modules: typeck
+                .qualified_modules
+                .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             imported_functions: typeck.imported_functions.iter().cloned().collect(),
@@ -338,7 +355,9 @@ impl<'a> Lowerer<'a> {
             current_fn_return_type: None,
             try_counter: 0,
             is_test_mode: false,
-            overloaded_call_targets: typeck.overloaded_call_targets.iter()
+            overloaded_call_targets: typeck
+                .overloaded_call_targets
+                .iter()
                 .map(|(k, v)| (*k, v.clone()))
                 .collect(),
             overloaded_pub_fn_names: std::collections::HashSet::new(),
@@ -395,11 +414,30 @@ impl<'a> Lowerer<'a> {
         }
         // Builtin/runtime prefixes: do not prefix
         const BUILTIN_PREFIXES: &[&str] = &[
-            "mesh_", "Ord__", "Eq__", "Display__", "Debug__", "Hash__",
-            "Default__", "Add__", "Sub__", "Mul__", "Div__", "Rem__", "Neg__",
-            "FromRow__", "FromJson__", "ToJson__",
-            "From_", "From__", "Into_", "Into__",
-            "TryFrom_", "TryFrom__", "TryInto_", "TryInto__", // Phase 128
+            "mesh_",
+            "Ord__",
+            "Eq__",
+            "Display__",
+            "Debug__",
+            "Hash__",
+            "Default__",
+            "Add__",
+            "Sub__",
+            "Mul__",
+            "Div__",
+            "Rem__",
+            "Neg__",
+            "FromRow__",
+            "FromJson__",
+            "ToJson__",
+            "From_",
+            "From__",
+            "Into_",
+            "Into__",
+            "TryFrom_",
+            "TryFrom__",
+            "TryInto_",
+            "TryInto__", // Phase 128
         ];
         for prefix in BUILTIN_PREFIXES {
             if name.starts_with(prefix) {
@@ -407,7 +445,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         // Apply module prefix: ModuleName__function_name
-        format!("{}__{}",  self.module_name.replace('.', "_"), name)
+        format!("{}__{}", self.module_name.replace('.', "_"), name)
     }
 
     // ── Type resolution helper ───────────────────────────────────────
@@ -684,10 +722,12 @@ impl<'a> Lowerer<'a> {
                         if let Some(method_name) = method.name().and_then(|n| n.text()) {
                             provided_methods.insert(method_name.clone());
                             let mangled = mangle_trait_method(
-                                &trait_name, &trait_type_args, &method_name, &type_name,
+                                &trait_name,
+                                &trait_type_args,
+                                &method_name,
+                                &type_name,
                             );
-                            let fn_ty =
-                                self.resolve_range(method.syntax().text_range());
+                            let fn_ty = self.resolve_range(method.syntax().text_range());
                             self.known_functions.insert(mangled.clone(), fn_ty);
                         }
                     }
@@ -698,7 +738,10 @@ impl<'a> Lowerer<'a> {
                                 && !provided_methods.contains(&trait_method.name)
                             {
                                 let mangled = mangle_trait_method(
-                                    &trait_name, &trait_type_args, &trait_method.name, &type_name,
+                                    &trait_name,
+                                    &trait_type_args,
+                                    &trait_method.name,
+                                    &type_name,
                                 );
                                 // Use the return type from the trait method sig, fallback to Unit.
                                 let fn_ty = if let Some(ret_ty) = &trait_method.return_type {
@@ -746,19 +789,31 @@ impl<'a> Lowerer<'a> {
         );
         self.known_functions.insert(
             "mesh_string_slice".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::Int, MirType::Int], Box::new(MirType::String)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::Int, MirType::Int],
+                Box::new(MirType::String),
+            ),
         );
         self.known_functions.insert(
             "mesh_string_contains".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Bool),
+            ),
         );
         self.known_functions.insert(
             "mesh_string_starts_with".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Bool),
+            ),
         );
         self.known_functions.insert(
             "mesh_string_ends_with".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Bool),
+            ),
         );
         self.known_functions.insert(
             "mesh_string_trim".to_string(),
@@ -774,7 +829,10 @@ impl<'a> Lowerer<'a> {
         );
         self.known_functions.insert(
             "mesh_string_replace".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String, MirType::String], Box::new(MirType::String)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String, MirType::String],
+                Box::new(MirType::String),
+            ),
         );
         // Phase 46: String split/join/to_int/to_float
         self.known_functions.insert(
@@ -800,11 +858,17 @@ impl<'a> Lowerer<'a> {
         );
         self.known_functions.insert(
             "mesh_file_write".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Ptr)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Ptr),
+            ),
         );
         self.known_functions.insert(
             "mesh_file_append".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Ptr)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Ptr),
+            ),
         );
         self.known_functions.insert(
             "mesh_file_exists".to_string(),
@@ -834,7 +898,10 @@ impl<'a> Lowerer<'a> {
         );
         self.known_functions.insert(
             "mesh_env_get_with_default".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::String)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::String),
+            ),
         );
         self.known_functions.insert(
             "mesh_env_get_int".to_string(),
@@ -859,7 +926,10 @@ impl<'a> Lowerer<'a> {
         );
         self.known_functions.insert(
             "mesh_regex_replace".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr, MirType::String, MirType::String], Box::new(MirType::String)),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::String, MirType::String],
+                Box::new(MirType::String),
+            ),
         );
         self.known_functions.insert(
             "mesh_regex_split".to_string(),
@@ -878,16 +948,25 @@ impl<'a> Lowerer<'a> {
         // Crypto: (String, String) -> String (HMAC)
         self.known_functions.insert(
             "mesh_crypto_hmac_sha256".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::String)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::String),
+            ),
         );
         self.known_functions.insert(
             "mesh_crypto_hmac_sha512".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::String)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::String),
+            ),
         );
         // Crypto: (String, String) -> Bool
         self.known_functions.insert(
             "mesh_crypto_secure_compare".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Bool),
+            ),
         );
         // Crypto: () -> String (uuid4 — zero args)
         self.known_functions.insert(
@@ -895,506 +974,1667 @@ impl<'a> Lowerer<'a> {
             MirType::FnPtr(vec![], Box::new(MirType::String)),
         );
         // Base64: String -> String (encode functions)
-        self.known_functions.insert("mesh_base64_encode".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_base64_encode_url".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
+        self.known_functions.insert(
+            "mesh_base64_encode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_base64_encode_url".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)),
+        );
         // Base64: String -> Ptr/Result (decode functions)
-        self.known_functions.insert("mesh_base64_decode".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_base64_decode_url".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_base64_decode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_base64_decode_url".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
         // Hex: String -> String (encode)
-        self.known_functions.insert("mesh_hex_encode".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
+        self.known_functions.insert(
+            "mesh_hex_encode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)),
+        );
         // Hex: String -> Ptr/Result (decode)
-        self.known_functions.insert("mesh_hex_decode".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_hex_decode".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
         // DateTime functions (Phase 136)
         // utc_now() -> DateTime (i64)
-        self.known_functions.insert("mesh_datetime_utc_now".to_string(),
-            MirType::FnPtr(vec![], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_datetime_utc_now".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)),
+        );
         // from_iso8601(s: String) -> Result (Ptr)
-        self.known_functions.insert("mesh_datetime_from_iso8601".to_string(),
-            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_datetime_from_iso8601".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
         // to_iso8601(dt: i64) -> String
-        self.known_functions.insert("mesh_datetime_to_iso8601".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::String)));
+        self.known_functions.insert(
+            "mesh_datetime_to_iso8601".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::String)),
+        );
         // from_unix_ms(ms: i64) -> Result (Ptr)
-        self.known_functions.insert("mesh_datetime_from_unix_ms".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_datetime_from_unix_ms".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
         // to_unix_ms(dt: i64) -> Int
-        self.known_functions.insert("mesh_datetime_to_unix_ms".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_datetime_to_unix_ms".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Int)),
+        );
         // from_unix_secs(s: i64) -> Result (Ptr)
-        self.known_functions.insert("mesh_datetime_from_unix_secs".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_datetime_from_unix_secs".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
         // to_unix_secs(dt: i64) -> Int
-        self.known_functions.insert("mesh_datetime_to_unix_secs".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_datetime_to_unix_secs".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Int)),
+        );
         // add(dt: i64, n: i64, unit: String) -> DateTime (i64)
-        self.known_functions.insert("mesh_datetime_add".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int, MirType::String], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_datetime_add".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Int, MirType::String],
+                Box::new(MirType::Int),
+            ),
+        );
         // diff(dt1: i64, dt2: i64, unit: String) -> Float  (CRITICAL: Float, not Int)
-        self.known_functions.insert("mesh_datetime_diff".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int, MirType::String], Box::new(MirType::Float)));
+        self.known_functions.insert(
+            "mesh_datetime_diff".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Int, MirType::String],
+                Box::new(MirType::Float),
+            ),
+        );
         // before(dt1: i64, dt2: i64) -> Bool (i8)
-        self.known_functions.insert("mesh_datetime_before".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Bool)));
+        self.known_functions.insert(
+            "mesh_datetime_before".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Bool)),
+        );
         // after(dt1: i64, dt2: i64) -> Bool (i8)
-        self.known_functions.insert("mesh_datetime_after".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Bool)));
+        self.known_functions.insert(
+            "mesh_datetime_after".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Bool)),
+        );
         // Http client functions (Phase 137)
         // MeshRequest handle is u64 -> MirType::Int
-        self.known_functions.insert("mesh_http_build".to_string(),
-            MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_header".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::String, MirType::String], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_body".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_timeout".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_query".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::String, MirType::String], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_json".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_send".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_http_build".to_string(),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Int),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_header".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::String, MirType::String],
+                Box::new(MirType::Int),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_body".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_http_timeout".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_http_query".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::String, MirType::String],
+                Box::new(MirType::Int),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_json".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_http_send".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
         // Http streaming + cancel + keep-alive (Phase 137 Plan 02)
         // mesh_http_stream(req: i64, fn_ptr: ptr, env_ptr: ptr) -> i64 (cancel handle)
-        self.known_functions.insert("mesh_http_stream".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_http_stream_bytes".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_http_stream".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Int),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_stream_bytes".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Int),
+            ),
+        );
         // mesh_http_cancel(cancel_handle: i64) -> unit
-        self.known_functions.insert("mesh_http_cancel".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_http_cancel".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)),
+        );
         // mesh_http_client() -> i64 (Agent handle)
-        self.known_functions.insert("mesh_http_client".to_string(),
-            MirType::FnPtr(vec![], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_http_client".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)),
+        );
         // mesh_http_send_with(client: i64, req: i64) -> ptr
-        self.known_functions.insert("mesh_http_send_with".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_http_send_with".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)),
+        );
         // mesh_http_client_close(client: i64) -> unit
-        self.known_functions.insert("mesh_http_client_close".to_string(),
-            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_http_client_close".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)),
+        );
         // ── Test runtime functions (Phase 138) ─────────────────────────
         // mesh_test_begin(name: ptr) -> void
-        self.known_functions.insert("mesh_test_begin".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_begin".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Unit)),
+        );
         // mesh_test_pass() -> void
-        self.known_functions.insert("mesh_test_pass".to_string(),
-            MirType::FnPtr(vec![], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_pass".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Unit)),
+        );
         // mesh_test_fail_msg(msg: ptr) -> void
-        self.known_functions.insert("mesh_test_fail_msg".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_fail_msg".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Unit)),
+        );
         // mesh_test_assert(cond: i8, expr_src: ptr, file: ptr, file_len: i64, line: i64) -> void
-        self.known_functions.insert("mesh_test_assert".to_string(),
-            MirType::FnPtr(vec![MirType::Bool, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_assert".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Bool,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                    MirType::Int,
+                ],
+                Box::new(MirType::Unit),
+            ),
+        );
         // mesh_test_assert_eq(lhs: ptr, rhs: ptr, expr_src: ptr, file: ptr, file_len: i64, line: i64) -> void
-        self.known_functions.insert("mesh_test_assert_eq".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_assert_eq".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                    MirType::Int,
+                ],
+                Box::new(MirType::Unit),
+            ),
+        );
         // mesh_test_assert_ne — same signature as assert_eq
-        self.known_functions.insert("mesh_test_assert_ne".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_assert_ne".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                    MirType::Int,
+                ],
+                Box::new(MirType::Unit),
+            ),
+        );
         // mesh_test_assert_raises(fn_ptr: ptr, env_ptr: ptr, file: ptr, file_len: i64, line: i64) -> void
-        self.known_functions.insert("mesh_test_assert_raises".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_assert_raises".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                    MirType::Int,
+                ],
+                Box::new(MirType::Unit),
+            ),
+        );
         // mesh_test_summary(passed: i64, failed: i64, elapsed_ms: i64) -> void
-        self.known_functions.insert("mesh_test_summary".to_string(),
-            MirType::FnPtr(vec![MirType::Int, MirType::Int, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_summary".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Int, MirType::Int],
+                Box::new(MirType::Unit),
+            ),
+        );
         // mesh_test_cleanup_actors() -> void
-        self.known_functions.insert("mesh_test_cleanup_actors".to_string(),
-            MirType::FnPtr(vec![], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_cleanup_actors".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Unit)),
+        );
         // mesh_test_run_body(fn_ptr: ptr, env_ptr: ptr) -> void
-        self.known_functions.insert("mesh_test_run_body".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_test_run_body".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)),
+        );
         // mesh_test_mock_actor(fn_ptr: ptr, env_ptr: ptr) -> i64
-        self.known_functions.insert("mesh_test_mock_actor".to_string(),
-            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_test_mock_actor".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)),
+        );
         // mesh_test_pass_count() -> i64
-        self.known_functions.insert("mesh_test_pass_count".to_string(),
-            MirType::FnPtr(vec![], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_test_pass_count".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)),
+        );
         // mesh_test_fail_count() -> i64
-        self.known_functions.insert("mesh_test_fail_count".to_string(),
-            MirType::FnPtr(vec![], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_test_fail_count".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Int)),
+        );
         // ── Collection functions (Phase 8 Plan 02) ─────────────────────
         // List
-        self.known_functions.insert("mesh_list_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_length".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_list_append".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_head".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_tail".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_concat".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_reverse".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_map".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_filter".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_reduce".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_from_array".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_list_new".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_length".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_list_append".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_head".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_tail".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_get".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_concat".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_reverse".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_map".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_filter".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_reduce".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_from_array".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
         // Phase 46: sort, find, any, all, contains
-        self.known_functions.insert("mesh_list_sort".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_find".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_any".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Bool)));
-        self.known_functions.insert("mesh_list_all".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Bool)));
-        self.known_functions.insert("mesh_list_contains".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Bool)));
+        self.known_functions.insert(
+            "mesh_list_sort".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_find".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_any".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Bool),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_all".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Bool),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_contains".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Bool)),
+        );
         // Phase 47: zip, flat_map, flatten, enumerate, take, drop, last, nth
-        self.known_functions.insert("mesh_list_zip".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_flat_map".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_flatten".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_enumerate".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_take".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_drop".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_last".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_list_nth".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_list_zip".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_flat_map".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_flatten".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_enumerate".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_take".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_drop".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_last".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_list_nth".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
         // Map
-        self.known_functions.insert("mesh_map_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_new_typed".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_tag_string".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_put".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_map_has_key".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Bool)));
-        self.known_functions.insert("mesh_map_delete".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_size".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_map_keys".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_values".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_map_new".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_new_typed".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_tag_string".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_put".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Int, MirType::Int],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_map_get".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_map_has_key".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Bool)),
+        );
+        self.known_functions.insert(
+            "mesh_map_delete".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_size".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_map_keys".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_values".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // Phase 47: Map merge/to_list/from_list
-        self.known_functions.insert("mesh_map_merge".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_to_list".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_from_list".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_map_merge".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_to_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_from_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // Set
-        self.known_functions.insert("mesh_set_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_add".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_remove".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_contains".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Bool)));
-        self.known_functions.insert("mesh_set_size".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_set_union".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_intersection".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_set_new".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_set_add".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_set_remove".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_set_contains".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Bool)),
+        );
+        self.known_functions.insert(
+            "mesh_set_size".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_set_union".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_set_intersection".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // Phase 47: Set difference/to_list/from_list
-        self.known_functions.insert("mesh_set_difference".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_to_list".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_from_list".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_set_difference".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_set_to_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_set_from_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // Collection Display (Phase 21 Plan 04)
-        self.known_functions.insert("mesh_list_to_string".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_map_to_string".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_set_to_string".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_string_to_string".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_list_to_string".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_map_to_string".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_set_to_string".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_string_to_string".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
         // List Eq/Ord (Phase 27)
-        self.known_functions.insert("mesh_list_eq".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Bool)));
-        self.known_functions.insert("mesh_list_compare".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_list_eq".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Bool),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_list_compare".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Int),
+            ),
+        );
         // Tuple
-        self.known_functions.insert("mesh_tuple_nth".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_tuple_first".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_tuple_second".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_tuple_size".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_tuple_nth".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_tuple_first".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_tuple_second".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_tuple_size".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
         // Range
-        self.known_functions.insert("mesh_range_new".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_range_to_list".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_range_map".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_range_filter".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_range_length".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_range_new".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_range_to_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_range_map".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_range_filter".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_range_length".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
         // Queue
-        self.known_functions.insert("mesh_queue_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_queue_push".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_queue_pop".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_queue_peek".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_queue_size".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_queue_is_empty".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Bool)));
+        self.known_functions.insert(
+            "mesh_queue_new".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_queue_push".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_queue_pop".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_queue_peek".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_queue_size".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_queue_is_empty".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Bool)),
+        );
         // JSON functions (Phase 8 Plan 04)
-        self.known_functions.insert("mesh_json_parse".to_string(), MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_encode".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_json_encode_string".to_string(), MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_json_encode_int".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_json_encode_bool".to_string(), MirType::FnPtr(vec![MirType::Bool], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_json_encode_map".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_json_encode_list".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_json_from_int".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_from_float".to_string(), MirType::FnPtr(vec![MirType::Float], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_from_bool".to_string(), MirType::FnPtr(vec![MirType::Bool], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_from_string".to_string(), MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_json_parse".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_encode".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_json_encode_string".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_json_encode_int".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_json_encode_bool".to_string(),
+            MirType::FnPtr(vec![MirType::Bool], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_json_encode_map".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_json_encode_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_json_from_int".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_from_float".to_string(),
+            MirType::FnPtr(vec![MirType::Float], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_from_bool".to_string(),
+            MirType::FnPtr(vec![MirType::Bool], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_from_string".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
         // Phase 132: decode a JSON-encoded String back to a raw *mut MeshJson pointer.
         // Used when a Json-typed variable (String from mesh_json_encode) needs to be
         // embedded raw into a parent json { } object without double-encoding.
-        self.known_functions.insert("mesh_json_parse_raw".to_string(), MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_json_parse_raw".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
         // Phase 103: JSON field extraction (no DB roundtrip)
         // mesh_json_get(json: String, key: String) -> String
-        self.known_functions.insert("mesh_json_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_json_get".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_json_get_nested(json: String, path1: String, path2: String) -> String
-        self.known_functions.insert("mesh_json_get_nested".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_json_get_nested".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // JSON structured object/array functions (Phase 49)
-        self.known_functions.insert("mesh_json_object_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_object_put".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_object_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_array_new".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_array_push".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_array_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_as_int".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_as_float".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_as_string".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_as_bool".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_null".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_json_object_new".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_object_put".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_json_object_get".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_array_new".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_array_push".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_array_get".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_as_int".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_as_float".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_as_string".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_as_bool".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_null".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
         // JSON collection helpers (callback-based, for List<T> and Map<String, V> fields)
-        self.known_functions.insert("mesh_json_from_list".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_from_map".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_to_list".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_json_to_map".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_json_from_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_from_map".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_to_list".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_json_to_map".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // Result helpers (for from_json Result propagation)
-        self.known_functions.insert("mesh_alloc_result".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_result_is_ok".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_result_unwrap".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_alloc_result".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_result_is_ok".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_result_unwrap".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // HTTP functions (Phase 8 Plan 05)
-        self.known_functions.insert("mesh_http_router".to_string(), MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_route".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_serve".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_http_serve_tls".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int, MirType::String, MirType::String], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_http_response_new".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_response_with_headers".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::String, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_get".to_string(), MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_post".to_string(), MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_request_method".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_http_request_path".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_http_request_body".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)));
-        self.known_functions.insert("mesh_http_request_header".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_request_query".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_http_router".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_http_route".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::String, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_serve".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Unit)),
+        );
+        self.known_functions.insert(
+            "mesh_http_serve_tls".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Int, MirType::String, MirType::String],
+                Box::new(MirType::Unit),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_response_new".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::String], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_http_response_with_headers".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::String, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_get".to_string(),
+            MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_http_post".to_string(),
+            MirType::FnPtr(
+                vec![MirType::String, MirType::String],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_request_method".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_http_request_path".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_http_request_body".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::String)),
+        );
+        self.known_functions.insert(
+            "mesh_http_request_header".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_http_request_query".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)),
+        );
         // Phase 51: Method-specific routing and path parameter extraction
-        self.known_functions.insert("mesh_http_route_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_route_post".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_route_put".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_route_delete".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_http_request_param".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_http_route_get".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::String, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_route_post".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::String, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_route_put".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::String, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_route_delete".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::String, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_http_request_param".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::String], Box::new(MirType::Ptr)),
+        );
         // Phase 52: Middleware
-        self.known_functions.insert("mesh_http_use_middleware".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_http_use_middleware".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // ── WebSocket functions (Phase 60) ──────────────────────────────
         // mesh_ws_serve(on_connect_fn: ptr, on_connect_env: ptr, on_message_fn: ptr, on_message_env: ptr, on_close_fn: ptr, on_close_env: ptr, port: i64) -> void
-        self.known_functions.insert("mesh_ws_serve".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_ws_serve".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                ],
+                Box::new(MirType::Unit),
+            ),
+        );
         // mesh_ws_send(conn: ptr, msg: ptr) -> i64
-        self.known_functions.insert("mesh_ws_send".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_ws_send".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)),
+        );
         // mesh_ws_send_binary(conn: ptr, data: ptr, len: i64) -> i64
-        self.known_functions.insert("mesh_ws_send_binary".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Int], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_ws_send_binary".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Int],
+                Box::new(MirType::Int),
+            ),
+        );
         // mesh_ws_serve_tls(on_connect_fn: ptr, on_connect_env: ptr, on_message_fn: ptr, on_message_env: ptr, on_close_fn: ptr, on_close_env: ptr, port: i64, cert_path: ptr, key_path: ptr) -> void
-        self.known_functions.insert("mesh_ws_serve_tls".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_ws_serve_tls".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                ],
+                Box::new(MirType::Unit),
+            ),
+        );
         // ── WebSocket Room functions (Phase 62) ──────────────────────────
         // mesh_ws_join(conn: ptr, room: ptr) -> i64
-        self.known_functions.insert("mesh_ws_join".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_ws_join".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)),
+        );
         // mesh_ws_leave(conn: ptr, room: ptr) -> i64
-        self.known_functions.insert("mesh_ws_leave".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_ws_leave".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)),
+        );
         // mesh_ws_broadcast(room: ptr, msg: ptr) -> i64
-        self.known_functions.insert("mesh_ws_broadcast".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_ws_broadcast".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)),
+        );
         // mesh_ws_broadcast_except(room: ptr, msg: ptr, except_conn: ptr) -> i64
-        self.known_functions.insert("mesh_ws_broadcast_except".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
+        self.known_functions.insert(
+            "mesh_ws_broadcast_except".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Int),
+            ),
+        );
         // ── SQLite functions (Phase 53) ──────────────────────────────────
         // Connection handle is MirType::Int (i64) for GC safety (SQLT-07).
-        self.known_functions.insert("mesh_sqlite_open".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_sqlite_close".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_sqlite_execute".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_sqlite_query".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_sqlite_open".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_sqlite_close".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)),
+        );
+        self.known_functions.insert(
+            "mesh_sqlite_execute".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_sqlite_query".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── PostgreSQL functions (Phase 54) ──────────────────────────────
         // Connection handle is MirType::Int (i64) for GC safety (same as SQLite).
-        self.known_functions.insert("mesh_pg_connect".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pg_close".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_pg_execute".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pg_query".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_pg_connect".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_pg_close".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)),
+        );
+        self.known_functions.insert(
+            "mesh_pg_execute".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_pg_query".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 57: PG Transaction functions ──────────────────────────
         // mesh_pg_begin(conn: i64) -> ptr (Result)
-        self.known_functions.insert("mesh_pg_begin".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pg_commit".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pg_rollback".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_pg_begin".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_pg_commit".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_pg_rollback".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
         // mesh_pg_transaction(conn: i64, fn_ptr: ptr, env_ptr: ptr) -> ptr
-        self.known_functions.insert("mesh_pg_transaction".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_pg_transaction".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 57: SQLite Transaction functions ──────────────────────
-        self.known_functions.insert("mesh_sqlite_begin".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_sqlite_commit".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_sqlite_rollback".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_sqlite_begin".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_sqlite_commit".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_sqlite_rollback".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
         // ── Phase 57: Connection Pool functions ─────────────────────────
         // mesh_pool_open(url: ptr, min: i64, max: i64, timeout: i64) -> ptr
-        self.known_functions.insert("mesh_pool_open".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int, MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pool_close".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_pool_checkout".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pool_checkin".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_pool_query".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pool_execute".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_pool_open".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Int, MirType::Int, MirType::Int],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_pool_close".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)),
+        );
+        self.known_functions.insert(
+            "mesh_pool_checkout".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_pool_checkin".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Unit)),
+        );
+        self.known_functions.insert(
+            "mesh_pool_query".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_pool_execute".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 58: Row Parsing & Struct-to-Row Mapping ─────────────────
-        self.known_functions.insert("mesh_row_from_row_get".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_row_parse_int".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_row_parse_float".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_row_parse_bool".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pg_query_as".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_pool_query_as".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_row_from_row_get".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_row_parse_int".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_row_parse_float".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_row_parse_bool".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_pg_query_as".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_pool_query_as".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 97: ORM SQL Generation ─────────────────────────────────
         // mesh_orm_build_select(table: ptr, columns: ptr, where_clauses: ptr, order_by: ptr, limit: i64, offset: i64) -> ptr
-        self.known_functions.insert("mesh_orm_build_select".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_orm_build_select".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Int,
+                    MirType::Int,
+                ],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_orm_build_insert(table: ptr, columns: ptr, returning: ptr) -> ptr
-        self.known_functions.insert("mesh_orm_build_insert".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_orm_build_insert".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_orm_build_update(table: ptr, set_columns: ptr, where_clauses: ptr, returning: ptr) -> ptr
-        self.known_functions.insert("mesh_orm_build_update".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_orm_build_update".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_orm_build_delete(table: ptr, where_clauses: ptr, returning: ptr) -> ptr
-        self.known_functions.insert("mesh_orm_build_delete".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_orm_build_delete".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 98: Query Builder ─────────────────────────────────────
         // mesh_query_from(table: ptr) -> ptr
-        self.known_functions.insert("mesh_query_from".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_from".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_where(q: ptr, field: ptr, value: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_where_op(q: ptr, field: ptr, op: ptr, value: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_op".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_op".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_where_in(q: ptr, field: ptr, values: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_in".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_in".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_where_null(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_null".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_null".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_where_not_null(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_not_null".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_not_null".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_where_not_in(q: ptr, field: ptr, values: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_not_in".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_not_in".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_where_between(q: ptr, field: ptr, low: ptr, high: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_between".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_between".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_where_or(q: ptr, fields: ptr, values: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_or".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_or".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_select(q: ptr, fields: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_order_by(q: ptr, field: ptr, direction: ptr) -> ptr
-        self.known_functions.insert("mesh_query_order_by".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_order_by".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_limit(q: ptr, n: i64) -> ptr
-        self.known_functions.insert("mesh_query_limit".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_limit".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
         // mesh_query_offset(q: ptr, n: i64) -> ptr
-        self.known_functions.insert("mesh_query_offset".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_offset".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)),
+        );
         // mesh_query_join(q: ptr, type: ptr, table: ptr, on_clause: ptr) -> ptr
-        self.known_functions.insert("mesh_query_join".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_join".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_join_as(q: ptr, type: ptr, table: ptr, alias: ptr, on_clause: ptr) -> ptr
-        self.known_functions.insert("mesh_query_join_as".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_join_as".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                ],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_query_group_by(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_group_by".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_group_by".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_having(q: ptr, clause: ptr, value: ptr) -> ptr
-        self.known_functions.insert("mesh_query_having".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_having".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 108: Aggregate SELECT functions ─────────────────────────
         // mesh_query_select_count(q: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_count".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_count".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_select_count_field(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_count_field".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_count_field".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_select_sum(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_sum".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_sum".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_select_avg(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_avg".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_avg".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_select_min(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_min".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_min".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_select_max(q: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_max".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_max".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_fragment(q: ptr, sql: ptr, params: ptr) -> ptr
-        self.known_functions.insert("mesh_query_fragment".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_fragment".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 103: Query Builder Raw Extensions ─────────────────────
         // mesh_query_order_by_raw(q: ptr, expression: ptr) -> ptr
-        self.known_functions.insert("mesh_query_order_by_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_order_by_raw".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_group_by_raw(q: ptr, expression: ptr) -> ptr
-        self.known_functions.insert("mesh_query_group_by_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_group_by_raw".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_select_raw(q: ptr, expressions: ptr) -> ptr
-        self.known_functions.insert("mesh_query_select_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_select_raw".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_query_where_raw(q: ptr, clause: ptr, params: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_raw".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_raw".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 109: Subquery WHERE ─────────────────────────────────────
         // mesh_query_where_sub(q: ptr, field: ptr, sub_query: ptr) -> ptr
-        self.known_functions.insert("mesh_query_where_sub".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_query_where_sub".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 98: Repo Read Operations ───────────────────────────────
         // mesh_repo_all(pool: i64, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_all".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_all".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_repo_one(pool: i64, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_one".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_one".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_repo_get(pool: i64, table: ptr, id: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_get".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_get".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_get_by(pool: i64, table: ptr, field: ptr, value: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_get_by".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_get_by".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_count(pool: i64, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_count".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_count".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_repo_exists(pool: i64, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_exists".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_exists".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // ── Phase 98: Repo Write Operations ─────────────────────────────
         // mesh_repo_insert(pool: i64, table: ptr, fields: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_insert".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_insert".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_update(pool: i64, table: ptr, id: ptr, fields: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_update".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_update".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_delete(pool: i64, table: ptr, id: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_delete".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_delete".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_transaction(pool: i64, fn_ptr: ptr, env_ptr: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_transaction".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_transaction".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 103: Extended Repo Write Operations ────────────────────
         // mesh_repo_update_where(pool: i64, table: ptr, fields: ptr, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_update_where".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_update_where".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_delete_where(pool: i64, table: ptr, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_delete_where".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_delete_where".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_query_raw(pool: i64, sql: ptr, params: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_query_raw".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_query_raw".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_execute_raw(pool: i64, sql: ptr, params: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_execute_raw".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_execute_raw".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 109: Upsert, RETURNING, Subquery ────────────────────────
         // mesh_repo_insert_or_update(pool: i64, table: ptr, fields: ptr, conflict_targets: ptr, update_fields: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_insert_or_update".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_insert_or_update".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Int,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                ],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_delete_where_returning(pool: i64, table: ptr, query: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_delete_where_returning".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_delete_where_returning".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 99: Repo Changeset Operations ─────────────────────────
         // mesh_repo_insert_changeset(pool: i64, table: ptr, changeset: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_insert_changeset".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_insert_changeset".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_update_changeset(pool: i64, table: ptr, id: ptr, changeset: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_update_changeset".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_update_changeset".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 100: Repo Preloading ──────────────────────────────────
         // mesh_repo_preload(pool: i64, rows: ptr, associations: ptr, rel_meta: ptr) -> ptr
-        self.known_functions.insert("mesh_repo_preload".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_repo_preload".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Phase 99: Changeset Operations ──────────────────────────────
         // mesh_changeset_cast(data: ptr, params: ptr, allowed: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_cast".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_cast".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_changeset_cast_with_types(data: ptr, params: ptr, allowed: ptr, field_types: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_cast_with_types".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_cast_with_types".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_changeset_validate_required(cs: ptr, fields: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_validate_required".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_validate_required".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_changeset_validate_length(cs: ptr, field: ptr, min: ptr, max: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_validate_length".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_validate_length".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_changeset_validate_format(cs: ptr, field: ptr, pattern: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_validate_format".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_validate_format".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_changeset_validate_inclusion(cs: ptr, field: ptr, allowed_values: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_validate_inclusion".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_validate_inclusion".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_changeset_validate_number(cs: ptr, field: ptr, gt: ptr, lt: ptr, gte: ptr, lte: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_validate_number".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_validate_number".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                ],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_changeset_valid(cs: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_valid".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_valid".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_changeset_errors(cs: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_errors".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_errors".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_changeset_changes(cs: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_changes".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_changes".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_changeset_get_change(cs: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_get_change".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_get_change".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_changeset_get_error(cs: ptr, field: ptr) -> ptr
-        self.known_functions.insert("mesh_changeset_get_error".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_changeset_get_error".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // ── Phase 101: Migration DDL Operations ─────────────────────────
         // mesh_migration_create_table(pool: i64, table: ptr, columns: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_create_table".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_create_table".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_migration_drop_table(pool: i64, table: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_drop_table".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_drop_table".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // mesh_migration_add_column(pool: i64, table: ptr, col_def: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_add_column".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_add_column".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_migration_drop_column(pool: i64, table: ptr, col: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_drop_column".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_drop_column".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_migration_rename_column(pool: i64, table: ptr, old: ptr, new: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_rename_column".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_rename_column".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_migration_create_index(pool: i64, table: ptr, cols: ptr, opts: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_create_index".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_create_index".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_migration_drop_index(pool: i64, table: ptr, cols: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_drop_index".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_drop_index".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_migration_execute(pool: i64, sql: ptr) -> ptr
-        self.known_functions.insert("mesh_migration_execute".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_migration_execute".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // ── Job functions (Phase 9 Plan 04) ──────────────────────────────
         // mesh_job_async takes (fn_ptr, env_ptr) -> i64 (PID)
         // But the closure splitting at codegen will expand the closure arg into (fn_ptr, env_ptr)
-        self.known_functions.insert("mesh_job_async".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)));
-        self.known_functions.insert("mesh_job_await".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_job_await_timeout".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_job_async".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Int)),
+        );
+        self.known_functions.insert(
+            "mesh_job_await".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_job_await_timeout".to_string(),
+            MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Ptr)),
+        );
         // mesh_job_map takes (list_ptr, fn_ptr, env_ptr) -> ptr
         // Closure splitting expands the closure arg into (fn_ptr, env_ptr)
-        self.known_functions.insert("mesh_job_map".to_string(), MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)));
+        self.known_functions.insert(
+            "mesh_job_map".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // ── Timer functions (Phase 44 Plan 02) ──────────────────────────────
         // mesh_timer_sleep(ms: i64) -> void (Unit)
-        self.known_functions.insert("mesh_timer_sleep".to_string(), MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_timer_sleep".to_string(),
+            MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Unit)),
+        );
         // mesh_timer_send_after(pid: i64, ms: i64, msg_ptr: ptr, msg_size: i64) -> void (Unit)
-        self.known_functions.insert("mesh_timer_send_after".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Int, MirType::Ptr, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_timer_send_after".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Int, MirType::Ptr, MirType::Int],
+                Box::new(MirType::Unit),
+            ),
+        );
         // ── Service runtime functions (Phase 9 Plan 03) ─────────────────
-        self.known_functions.insert("mesh_service_call".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Int, MirType::Ptr, MirType::Int], Box::new(MirType::Ptr)));
-        self.known_functions.insert("mesh_service_reply".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Int], Box::new(MirType::Unit)));
-        self.known_functions.insert("mesh_actor_send".to_string(), MirType::FnPtr(vec![MirType::Int, MirType::Ptr, MirType::Int], Box::new(MirType::Unit)));
+        self.known_functions.insert(
+            "mesh_service_call".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Int, MirType::Ptr, MirType::Int],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_service_reply".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Int],
+                Box::new(MirType::Unit),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_actor_send".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Int],
+                Box::new(MirType::Unit),
+            ),
+        );
 
         // Also register variant constructors as known functions.
         for (_, sum_info) in &self.registry.sum_type_defs {
@@ -1477,7 +2717,10 @@ impl<'a> Lowerer<'a> {
                         .unwrap_or_else(|| "<unnamed>".to_string());
                     provided_methods.insert(method_name.clone());
                     let mangled = mangle_trait_method(
-                        &trait_name, &trait_type_args, &method_name, &type_name,
+                        &trait_name,
+                        &trait_type_args,
+                        &method_name,
+                        &type_name,
                     );
                     self.lower_impl_method(&method, &mangled, &type_name);
                 }
@@ -1609,7 +2852,10 @@ impl<'a> Lowerer<'a> {
             self.entry_function = Some("mesh_main".to_string());
             "mesh_main".to_string()
         } else if self.overloaded_pub_fn_names.contains(&name) {
-            let arity = fn_def.param_list().map(|pl| pl.params().count()).unwrap_or(0);
+            let arity = fn_def
+                .param_list()
+                .map(|pl| pl.params().count())
+                .unwrap_or(0);
             format!("{}__{}", name, arity)
         } else {
             self.qualify_name(&name)
@@ -1657,14 +2903,11 @@ impl<'a> Lowerer<'a> {
             if let Some(Ty::Fun(param_tys, _)) = &fn_ty_raw {
                 for (param, param_ty) in param_list.params().zip(param_tys.iter()) {
                     // Detect self parameter via SELF_KW token.
-                    let is_self = param
-                        .syntax()
-                        .children_with_tokens()
-                        .any(|tok| {
-                            tok.as_token()
-                                .map(|t| t.kind() == SyntaxKind::SELF_KW)
-                                .unwrap_or(false)
-                        });
+                    let is_self = param.syntax().children_with_tokens().any(|tok| {
+                        tok.as_token()
+                            .map(|t| t.kind() == SyntaxKind::SELF_KW)
+                            .unwrap_or(false)
+                    });
 
                     let param_name = if is_self {
                         "self".to_string()
@@ -1685,14 +2928,11 @@ impl<'a> Lowerer<'a> {
             } else {
                 // Fallback: use range-based type lookup for each param.
                 for param in param_list.params() {
-                    let is_self = param
-                        .syntax()
-                        .children_with_tokens()
-                        .any(|tok| {
-                            tok.as_token()
-                                .map(|t| t.kind() == SyntaxKind::SELF_KW)
-                                .unwrap_or(false)
-                        });
+                    let is_self = param.syntax().children_with_tokens().any(|tok| {
+                        tok.as_token()
+                            .map(|t| t.kind() == SyntaxKind::SELF_KW)
+                            .unwrap_or(false)
+                    });
 
                     let param_name = if is_self {
                         "self".to_string()
@@ -1787,9 +3027,7 @@ impl<'a> Lowerer<'a> {
         let tree = self.parse.syntax();
         let method_node = tree
             .descendants()
-            .find(|n| {
-                n.kind() == SyntaxKind::INTERFACE_METHOD && n.text_range() == method_range
-            });
+            .find(|n| n.kind() == SyntaxKind::INTERFACE_METHOD && n.text_range() == method_range);
 
         let method_node = match method_node {
             Some(n) => n,
@@ -1814,14 +3052,11 @@ impl<'a> Lowerer<'a> {
 
         if let Some(param_list) = interface_method.param_list() {
             for param in param_list.params() {
-                let is_self = param
-                    .syntax()
-                    .children_with_tokens()
-                    .any(|tok| {
-                        tok.as_token()
-                            .map(|t| t.kind() == SyntaxKind::SELF_KW)
-                            .unwrap_or(false)
-                    });
+                let is_self = param.syntax().children_with_tokens().any(|tok| {
+                    tok.as_token()
+                        .map(|t| t.kind() == SyntaxKind::SELF_KW)
+                        .unwrap_or(false)
+                });
 
                 let param_name = if is_self {
                     "self".to_string()
@@ -1911,8 +3146,7 @@ impl<'a> Lowerer<'a> {
                         let mut mir_ty = resolve_type(t, self.registry, is_closure);
                         // Recover concrete type for Ty::Var parameters from usage sites.
                         if mir_ty == MirType::Unit && matches!(t, Ty::Var(_)) {
-                            if let Some(recovered) =
-                                self.resolve_param_from_usage(&name, param_idx)
+                            if let Some(recovered) = self.resolve_param_from_usage(&name, param_idx)
                             {
                                 mir_ty = recovered;
                             }
@@ -2064,7 +3298,10 @@ impl<'a> Lowerer<'a> {
 
     /// Lower a clause's guard expression to an optional MirExpr.
     fn lower_clause_guard(&mut self, clause: &FnDef) -> Option<MirExpr> {
-        clause.guard().and_then(|gc| gc.expr()).map(|e| self.lower_expr(&e))
+        clause
+            .guard()
+            .and_then(|gc| gc.expr())
+            .map(|e| self.lower_expr(&e))
     }
 
     /// Lower a clause's body expression.
@@ -2219,11 +3456,7 @@ impl<'a> Lowerer<'a> {
 
     /// Convert a pattern to a boolean condition expression.
     /// Returns None for wildcard/variable patterns (always match).
-    fn pattern_to_condition(
-        &self,
-        pat: &Pattern,
-        param: &(String, MirType),
-    ) -> Option<MirExpr> {
+    fn pattern_to_condition(&self, pat: &Pattern, param: &(String, MirType)) -> Option<MirExpr> {
         match pat {
             Pattern::Wildcard(_) | Pattern::Ident(_) => None,
             Pattern::Literal(lit) => {
@@ -2325,22 +3558,21 @@ impl<'a> Lowerer<'a> {
             .unwrap_or_else(|| "<unnamed>".to_string());
 
         // Look up from type registry for accurate types.
-        let fields: Vec<(String, MirType)> = if let Some(info) = self.registry.struct_defs.get(&name) {
-            info.fields
-                .iter()
-                .map(|(fname, fty)| {
-                    (
-                        fname.clone(),
-                        resolve_type(fty, self.registry, false),
-                    )
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let fields: Vec<(String, MirType)> =
+            if let Some(info) = self.registry.struct_defs.get(&name) {
+                info.fields
+                    .iter()
+                    .map(|(fname, fty)| (fname.clone(), resolve_type(fty, self.registry, false)))
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
         // Check if this is a generic struct (trait functions generated lazily at instantiation).
-        let has_generic_params = self.registry.struct_defs.get(&name)
+        let has_generic_params = self
+            .registry
+            .struct_defs
+            .get(&name)
             .map_or(false, |info| !info.generic_params.is_empty());
 
         if !has_generic_params {
@@ -2405,11 +3637,21 @@ impl<'a> Lowerer<'a> {
                     schema_fields.push(("updated_at".to_string(), MirType::String));
                 }
 
-                self.generate_schema_metadata(&name, &schema_fields, &relationships, custom_table, custom_pk, has_timestamps);
+                self.generate_schema_metadata(
+                    &name,
+                    &schema_fields,
+                    &relationships,
+                    custom_table,
+                    custom_pk,
+                    has_timestamps,
+                );
 
                 // Use extended fields (with timestamps) for the struct layout.
                 if has_timestamps {
-                    self.structs.push(MirStructDef { name, fields: schema_fields });
+                    self.structs.push(MirStructDef {
+                        name,
+                        fields: schema_fields,
+                    });
                 } else {
                     self.structs.push(MirStructDef { name, fields });
                 }
@@ -2453,18 +3695,23 @@ impl<'a> Lowerer<'a> {
         };
 
         // Build a substitution map: generic param name -> concrete Ty.
-        let subst: HashMap<String, &Ty> = struct_info.generic_params
+        let subst: HashMap<String, &Ty> = struct_info
+            .generic_params
             .iter()
             .zip(type_args.iter())
             .map(|(param, arg)| (param.clone(), arg))
             .collect();
 
         // Substitute generic params with concrete types in the field list.
-        let fields: Vec<(String, MirType)> = struct_info.fields
+        let fields: Vec<(String, MirType)> = struct_info
+            .fields
             .iter()
             .map(|(fname, fty)| {
                 let concrete_ty = substitute_type_params(fty, &subst);
-                (fname.clone(), resolve_type(&concrete_ty, self.registry, false))
+                (
+                    fname.clone(),
+                    resolve_type(&concrete_ty, self.registry, false),
+                )
             })
             .collect();
 
@@ -2517,32 +3764,33 @@ impl<'a> Lowerer<'a> {
             .unwrap_or_else(|| "<unnamed>".to_string());
 
         // Look up from type registry for accurate variant info.
-        let variants: Vec<MirVariantDef> = if let Some(info) = self.registry.sum_type_defs.get(&name) {
-            info.variants
-                .iter()
-                .enumerate()
-                .map(|(i, v)| {
-                    let fields = v
-                        .fields
-                        .iter()
-                        .map(|f| {
-                            let ty = match f {
-                                mesh_typeck::VariantFieldInfo::Positional(ty) => ty,
-                                mesh_typeck::VariantFieldInfo::Named(_, ty) => ty,
-                            };
-                            resolve_type(ty, self.registry, false)
-                        })
-                        .collect();
-                    MirVariantDef {
-                        name: v.name.clone(),
-                        fields,
-                        tag: i as u8,
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let variants: Vec<MirVariantDef> =
+            if let Some(info) = self.registry.sum_type_defs.get(&name) {
+                info.variants
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| {
+                        let fields = v
+                            .fields
+                            .iter()
+                            .map(|f| {
+                                let ty = match f {
+                                    mesh_typeck::VariantFieldInfo::Positional(ty) => ty,
+                                    mesh_typeck::VariantFieldInfo::Named(_, ty) => ty,
+                                };
+                                resolve_type(ty, self.registry, false)
+                            })
+                            .collect();
+                        MirVariantDef {
+                            name: v.name.clone(),
+                            fields,
+                            tag: i as u8,
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
         // Conditional MIR generation based on deriving clause.
         // No deriving clause = backward compat (generate all default trait functions).
@@ -2586,7 +3834,12 @@ impl<'a> Lowerer<'a> {
         self.generate_debug_inspect_struct_with_display_name(name, name, fields);
     }
 
-    fn generate_debug_inspect_struct_with_display_name(&mut self, name: &str, display_name: &str, fields: &[(String, MirType)]) {
+    fn generate_debug_inspect_struct_with_display_name(
+        &mut self,
+        name: &str,
+        display_name: &str,
+        fields: &[(String, MirType)],
+    ) {
         let mangled = format!("Debug__inspect__{}", name);
         let struct_ty = MirType::Struct(name.to_string());
         let concat_ty = MirType::FnPtr(
@@ -2608,7 +3861,10 @@ impl<'a> Lowerer<'a> {
             // Append "field_name: "
             let label = format!("{}: ", field_name);
             result = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_string_concat".to_string(),
+                    concat_ty.clone(),
+                )),
                 args: vec![result, MirExpr::StringLit(label, MirType::String)],
                 ty: MirType::String,
             };
@@ -2625,7 +3881,10 @@ impl<'a> Lowerer<'a> {
 
             // Append field value string
             result = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_string_concat".to_string(),
+                    concat_ty.clone(),
+                )),
                 args: vec![result, field_str],
                 ty: MirType::String,
             };
@@ -2633,8 +3892,14 @@ impl<'a> Lowerer<'a> {
             // Append separator: ", " for non-last fields
             if !is_last {
                 result = MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
-                    args: vec![result, MirExpr::StringLit(", ".to_string(), MirType::String)],
+                    func: Box::new(MirExpr::Var(
+                        "mesh_string_concat".to_string(),
+                        concat_ty.clone(),
+                    )),
+                    args: vec![
+                        result,
+                        MirExpr::StringLit(", ".to_string(), MirType::String),
+                    ],
                     ty: MirType::String,
                 };
             }
@@ -2643,8 +3908,14 @@ impl<'a> Lowerer<'a> {
         // Append closing " }" for non-empty structs
         if !fields.is_empty() {
             result = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
-                args: vec![result, MirExpr::StringLit(" }".to_string(), MirType::String)],
+                func: Box::new(MirExpr::Var(
+                    "mesh_string_concat".to_string(),
+                    concat_ty.clone(),
+                )),
+                args: vec![
+                    result,
+                    MirExpr::StringLit(" }".to_string(), MirType::String),
+                ],
                 ty: MirType::String,
             };
         }
@@ -3163,9 +4434,7 @@ impl<'a> Lowerer<'a> {
                                 .fields
                                 .iter()
                                 .enumerate()
-                                .map(|(i, ft)| {
-                                    MirPattern::Var(format!("other_{}", i), ft.clone())
-                                })
+                                .map(|(i, ft)| MirPattern::Var(format!("other_{}", i), ft.clone()))
                                 .collect();
                             let other_bindings: Vec<(String, MirType)> = other_v
                                 .fields
@@ -3487,10 +4756,7 @@ impl<'a> Lowerer<'a> {
         let struct_ty = MirType::Struct(name.to_string());
         let self_var = MirExpr::Var("self".to_string(), struct_ty.clone());
 
-        let combine_ty = MirType::FnPtr(
-            vec![MirType::Int, MirType::Int],
-            Box::new(MirType::Int),
-        );
+        let combine_ty = MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Int));
 
         let body = if fields.is_empty() {
             // Empty struct: return a constant hash (the FNV offset basis).
@@ -3546,10 +4812,7 @@ impl<'a> Lowerer<'a> {
         let sum_ty = MirType::SumType(name.to_string());
         let self_var = MirExpr::Var("self".to_string(), sum_ty.clone());
 
-        let combine_ty = MirType::FnPtr(
-            vec![MirType::Int, MirType::Int],
-            Box::new(MirType::Int),
-        );
+        let combine_ty = MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Int));
         let hash_int_ty = MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Int));
 
         let body = if variants.is_empty() {
@@ -3576,7 +4839,10 @@ impl<'a> Lowerer<'a> {
 
                     // Start with hashing the tag
                     let tag_hash = MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_hash_int".to_string(), hash_int_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_hash_int".to_string(),
+                            hash_int_ty.clone(),
+                        )),
                         args: vec![MirExpr::IntLit(v.tag as i64, MirType::Int)],
                         ty: MirType::Int,
                     };
@@ -3649,10 +4915,7 @@ impl<'a> Lowerer<'a> {
             Box::new(MirType::Ptr),
         );
         let arr_new_ty = MirType::FnPtr(vec![], Box::new(MirType::Ptr));
-        let arr_push_ty = MirType::FnPtr(
-            vec![MirType::Ptr, MirType::Ptr],
-            Box::new(MirType::Ptr),
-        );
+        let arr_push_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
         let from_string_ty = MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr));
 
         let arms: Vec<MirMatchArm> = variants
@@ -3748,10 +5011,7 @@ impl<'a> Lowerer<'a> {
         let body = if arms.is_empty() {
             // No variants: return empty JSON object
             MirExpr::Call {
-                func: Box::new(MirExpr::Var(
-                    "mesh_json_object_new".to_string(),
-                    obj_new_ty,
-                )),
+                func: Box::new(MirExpr::Var("mesh_json_object_new".to_string(), obj_new_ty)),
                 args: vec![],
                 ty: MirType::Ptr,
             }
@@ -3792,14 +5052,21 @@ impl<'a> Lowerer<'a> {
         let as_string_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
         let is_ok_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int));
         let unwrap_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
-        let str_eq_ty = MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool));
-        let alloc_result_ty = MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr));
+        let str_eq_ty = MirType::FnPtr(
+            vec![MirType::String, MirType::String],
+            Box::new(MirType::Bool),
+        );
+        let alloc_result_ty =
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr));
         let arr_get_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Int], Box::new(MirType::Ptr));
 
         // Build the unknown-tag error as the final else branch
         // Use a simple error message (can't easily concat runtime strings in MIR)
         let unknown_tag_err = MirExpr::Call {
-            func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
+            func: Box::new(MirExpr::Var(
+                "mesh_alloc_result".to_string(),
+                alloc_result_ty.clone(),
+            )),
             args: vec![
                 MirExpr::IntLit(1, MirType::Int),
                 MirExpr::StringLit(format!("unknown variant for {}", name), MirType::String),
@@ -3821,7 +5088,10 @@ impl<'a> Lowerer<'a> {
                     ty: MirType::SumType(name.to_string()),
                 };
                 MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_alloc_result".to_string(),
+                        alloc_result_ty.clone(),
+                    )),
                     args: vec![MirExpr::IntLit(0, MirType::Int), variant_val],
                     ty: MirType::Ptr,
                 }
@@ -3842,7 +5112,10 @@ impl<'a> Lowerer<'a> {
             // If mesh_string_eq(tag_str, "VariantName") then decode else continue chain
             tag_dispatch = MirExpr::If {
                 cond: Box::new(MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_string_eq".to_string(), str_eq_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_string_eq".to_string(),
+                        str_eq_ty.clone(),
+                    )),
                     args: vec![
                         MirExpr::Var("__tag_str".to_string(), MirType::String),
                         MirExpr::StringLit(v.name.clone(), MirType::String),
@@ -3879,7 +5152,10 @@ impl<'a> Lowerer<'a> {
             }),
             body: Box::new(MirExpr::If {
                 cond: Box::new(MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_result_is_ok".to_string(),
+                        is_ok_ty.clone(),
+                    )),
                     args: vec![MirExpr::Var("__tag_res".to_string(), MirType::Ptr)],
                     ty: MirType::Int,
                 }),
@@ -3887,7 +5163,10 @@ impl<'a> Lowerer<'a> {
                     name: "__tag_json".to_string(),
                     ty: MirType::Ptr,
                     value: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_unwrap".to_string(),
+                            unwrap_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var("__tag_res".to_string(), MirType::Ptr)],
                         ty: MirType::Ptr,
                     }),
@@ -3895,13 +5174,19 @@ impl<'a> Lowerer<'a> {
                         name: "__tag_str_res".to_string(),
                         ty: MirType::Ptr,
                         value: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_json_as_string".to_string(), as_string_ty)),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_json_as_string".to_string(),
+                                as_string_ty,
+                            )),
                             args: vec![MirExpr::Var("__tag_json".to_string(), MirType::Ptr)],
                             ty: MirType::Ptr,
                         }),
                         body: Box::new(MirExpr::If {
                             cond: Box::new(MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_result_is_ok".to_string(),
+                                    is_ok_ty.clone(),
+                                )),
                                 args: vec![MirExpr::Var("__tag_str_res".to_string(), MirType::Ptr)],
                                 ty: MirType::Int,
                             }),
@@ -3909,13 +5194,22 @@ impl<'a> Lowerer<'a> {
                                 name: "__tag_str".to_string(),
                                 ty: MirType::String,
                                 value: Box::new(MirExpr::Call {
-                                    func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty)),
-                                    args: vec![MirExpr::Var("__tag_str_res".to_string(), MirType::Ptr)],
+                                    func: Box::new(MirExpr::Var(
+                                        "mesh_result_unwrap".to_string(),
+                                        unwrap_ty,
+                                    )),
+                                    args: vec![MirExpr::Var(
+                                        "__tag_str_res".to_string(),
+                                        MirType::Ptr,
+                                    )],
                                     ty: MirType::Ptr,
                                 }),
                                 body: Box::new(tag_dispatch),
                             }),
-                            else_body: Box::new(MirExpr::Var("__tag_str_res".to_string(), MirType::Ptr)),
+                            else_body: Box::new(MirExpr::Var(
+                                "__tag_str_res".to_string(),
+                                MirType::Ptr,
+                            )),
                             ty: MirType::Ptr,
                         }),
                     }),
@@ -3959,9 +5253,7 @@ impl<'a> Lowerer<'a> {
         let field_exprs: Vec<MirExpr> = field_types
             .iter()
             .enumerate()
-            .map(|(i, ft)| {
-                MirExpr::Var(format!("__fval_{}_{}", variant_name, i), ft.clone())
-            })
+            .map(|(i, ft)| MirExpr::Var(format!("__fval_{}_{}", variant_name, i), ft.clone()))
             .collect();
 
         let variant_val = MirExpr::ConstructVariant {
@@ -3972,7 +5264,10 @@ impl<'a> Lowerer<'a> {
         };
 
         let ok_result = MirExpr::Call {
-            func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
+            func: Box::new(MirExpr::Var(
+                "mesh_alloc_result".to_string(),
+                alloc_result_ty.clone(),
+            )),
             args: vec![MirExpr::IntLit(0, MirType::Int), variant_val],
             ty: MirType::Ptr,
         };
@@ -3988,7 +5283,10 @@ impl<'a> Lowerer<'a> {
 
             // mesh_json_array_get(fields_arr, i)
             let arr_get_call = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_json_array_get".to_string(), arr_get_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_json_array_get".to_string(),
+                    arr_get_ty.clone(),
+                )),
                 args: vec![
                     MirExpr::Var(format!("__fields_arr_{}", variant_name), MirType::Ptr),
                     MirExpr::IntLit(i as i64, MirType::Int),
@@ -4010,7 +5308,10 @@ impl<'a> Lowerer<'a> {
                 value: Box::new(extract_call),
                 body: Box::new(MirExpr::If {
                     cond: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_is_ok".to_string(),
+                            is_ok_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(extract_res_var.clone(), MirType::Ptr)],
                         ty: MirType::Int,
                     }),
@@ -4018,7 +5319,10 @@ impl<'a> Lowerer<'a> {
                         name: val_var,
                         ty: ft.clone(),
                         value: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_result_unwrap".to_string(),
+                                unwrap_ty.clone(),
+                            )),
                             args: vec![MirExpr::Var(extract_res_var.clone(), MirType::Ptr)],
                             ty: MirType::Ptr,
                         }),
@@ -4036,7 +5340,10 @@ impl<'a> Lowerer<'a> {
                 value: Box::new(arr_get_call),
                 body: Box::new(MirExpr::If {
                     cond: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_is_ok".to_string(),
+                            is_ok_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(arr_get_res_var.clone(), MirType::Ptr)],
                         ty: MirType::Int,
                     }),
@@ -4044,7 +5351,10 @@ impl<'a> Lowerer<'a> {
                         name: field_json_var,
                         ty: MirType::Ptr,
                         value: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_result_unwrap".to_string(),
+                                unwrap_ty.clone(),
+                            )),
                             args: vec![MirExpr::Var(arr_get_res_var.clone(), MirType::Ptr)],
                             ty: MirType::Ptr,
                         }),
@@ -4069,7 +5379,10 @@ impl<'a> Lowerer<'a> {
             name: fields_res_var.clone(),
             ty: MirType::Ptr,
             value: Box::new(MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_json_object_get".to_string(), obj_get_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_json_object_get".to_string(),
+                    obj_get_ty.clone(),
+                )),
                 args: vec![
                     MirExpr::Var("json".to_string(), MirType::Ptr),
                     MirExpr::StringLit("fields".to_string(), MirType::String),
@@ -4078,7 +5391,10 @@ impl<'a> Lowerer<'a> {
             }),
             body: Box::new(MirExpr::If {
                 cond: Box::new(MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_result_is_ok".to_string(),
+                        is_ok_ty.clone(),
+                    )),
                     args: vec![MirExpr::Var(fields_res_var.clone(), MirType::Ptr)],
                     ty: MirType::Int,
                 }),
@@ -4086,7 +5402,10 @@ impl<'a> Lowerer<'a> {
                     name: fields_arr_var,
                     ty: MirType::Ptr,
                     value: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_unwrap".to_string(),
+                            unwrap_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(fields_res_var.clone(), MirType::Ptr)],
                         ty: MirType::Ptr,
                     }),
@@ -4130,7 +5449,8 @@ impl<'a> Lowerer<'a> {
             // determine element types for callback-based encode/decode.
             let json_val = if matches!(field_ty, MirType::Ptr) {
                 if let Some(info) = self.registry.struct_defs.get(name) {
-                    if let Some((_, typeck_ty)) = info.fields.iter().find(|(n, _)| n == field_name) {
+                    if let Some((_, typeck_ty)) = info.fields.iter().find(|(n, _)| n == field_name)
+                    {
                         let typeck_ty = typeck_ty.clone();
                         self.emit_collection_to_json(field_access, &typeck_ty, name)
                     } else {
@@ -4146,7 +5466,10 @@ impl<'a> Lowerer<'a> {
             let key = MirExpr::StringLit(field_name.clone(), MirType::String);
 
             body = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_json_object_put".to_string(), obj_put_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_json_object_put".to_string(),
+                    obj_put_ty.clone(),
+                )),
                 args: vec![body, key, json_val],
                 ty: MirType::Ptr,
             };
@@ -4171,7 +5494,12 @@ impl<'a> Lowerer<'a> {
 
     /// Emit a to_json conversion for a value of the given MIR type.
     /// Returns a MirExpr that evaluates to *mut MeshJson (MirType::Ptr).
-    fn emit_to_json_for_type(&mut self, expr: MirExpr, ty: &MirType, _context_struct: &str) -> MirExpr {
+    fn emit_to_json_for_type(
+        &mut self,
+        expr: MirExpr,
+        ty: &MirType,
+        _context_struct: &str,
+    ) -> MirExpr {
         match ty {
             MirType::Int => {
                 let fn_ty = MirType::FnPtr(vec![MirType::Int], Box::new(MirType::Ptr));
@@ -4236,7 +5564,12 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Emit Option<T> to JSON encoding: Some(v) -> encode inner, None -> null.
-    fn emit_option_to_json(&mut self, expr: MirExpr, sum_name: &str, context_struct: &str) -> MirExpr {
+    fn emit_option_to_json(
+        &mut self,
+        expr: MirExpr,
+        sum_name: &str,
+        context_struct: &str,
+    ) -> MirExpr {
         let inner_type_str = sum_name.strip_prefix("Option_").unwrap_or("Int");
         let inner_mir_type = self.mir_type_from_name(inner_type_str);
 
@@ -4257,7 +5590,10 @@ impl<'a> Lowerer<'a> {
                     pattern: MirPattern::Constructor {
                         type_name: sum_name.to_string(),
                         variant: "Some".to_string(),
-                        fields: vec![MirPattern::Var("__opt_val".to_string(), inner_mir_type.clone())],
+                        fields: vec![MirPattern::Var(
+                            "__opt_val".to_string(),
+                            inner_mir_type.clone(),
+                        )],
                         bindings: vec![("__opt_val".to_string(), inner_mir_type)],
                     },
                     guard: None,
@@ -4288,7 +5624,9 @@ impl<'a> Lowerer<'a> {
             // SqliteConn is an opaque u64 handle, lowered to Int for GC safety (SQLT-07).
             "SqliteConn" => MirType::Int,
             n => {
-                if self.structs.iter().any(|s| s.name == n) || self.registry.struct_defs.contains_key(n) {
+                if self.structs.iter().any(|s| s.name == n)
+                    || self.registry.struct_defs.contains_key(n)
+                {
                     MirType::Struct(n.to_string())
                 } else {
                     MirType::Ptr
@@ -4298,7 +5636,12 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Emit collection (List/Map) to JSON encoding using callback-based runtime helpers.
-    fn emit_collection_to_json(&mut self, expr: MirExpr, typeck_ty: &Ty, _context_struct: &str) -> MirExpr {
+    fn emit_collection_to_json(
+        &mut self,
+        expr: MirExpr,
+        typeck_ty: &Ty,
+        _context_struct: &str,
+    ) -> MirExpr {
         match typeck_ty {
             Ty::App(base, args) => {
                 if let Ty::Con(con) = base.as_ref() {
@@ -4306,10 +5649,17 @@ impl<'a> Lowerer<'a> {
                         "List" => {
                             let elem_ty = args.first().cloned().unwrap_or(Ty::int());
                             let callback_name = self.resolve_to_json_callback(&elem_ty);
-                            let fn_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
-                            let callback_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
+                            let fn_ty = MirType::FnPtr(
+                                vec![MirType::Ptr, MirType::Ptr],
+                                Box::new(MirType::Ptr),
+                            );
+                            let callback_ty =
+                                MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
                             MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_json_from_list".to_string(), fn_ty)),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_json_from_list".to_string(),
+                                    fn_ty,
+                                )),
                                 args: vec![expr, MirExpr::Var(callback_name, callback_ty)],
                                 ty: MirType::Ptr,
                             }
@@ -4317,10 +5667,17 @@ impl<'a> Lowerer<'a> {
                         "Map" => {
                             let val_ty = args.get(1).cloned().unwrap_or(Ty::string());
                             let callback_name = self.resolve_to_json_callback(&val_ty);
-                            let fn_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
-                            let callback_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
+                            let fn_ty = MirType::FnPtr(
+                                vec![MirType::Ptr, MirType::Ptr],
+                                Box::new(MirType::Ptr),
+                            );
+                            let callback_ty =
+                                MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
                             MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_json_from_map".to_string(), fn_ty)),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_json_from_map".to_string(),
+                                    fn_ty,
+                                )),
                                 args: vec![expr, MirExpr::Var(callback_name, callback_ty)],
                                 ty: MirType::Ptr,
                             }
@@ -4459,7 +5816,10 @@ impl<'a> Lowerer<'a> {
                 let val_lowered = self.lower_expr(&val_expr);
                 let parse_raw_ty = MirType::FnPtr(vec![MirType::String], Box::new(MirType::Ptr));
                 MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_json_parse_raw".to_string(), parse_raw_ty)),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_json_parse_raw".to_string(),
+                        parse_raw_ty,
+                    )),
                     args: vec![val_lowered],
                     ty: MirType::Ptr,
                 }
@@ -4529,9 +5889,16 @@ impl<'a> Lowerer<'a> {
 
         // Build the innermost expression: alloc_result(0, struct_ptr)
         // Construct StructLit with field vars, then wrap in Ok result.
-        let field_bindings: Vec<(String, MirExpr)> = fields.iter().enumerate().map(|(i, (fname, fty))| {
-            (fname.clone(), MirExpr::Var(format!("__field_{}", i), fty.clone()))
-        }).collect();
+        let field_bindings: Vec<(String, MirExpr)> = fields
+            .iter()
+            .enumerate()
+            .map(|(i, (fname, fty))| {
+                (
+                    fname.clone(),
+                    MirExpr::Var(format!("__field_{}", i), fty.clone()),
+                )
+            })
+            .collect();
 
         let struct_lit = MirExpr::StructLit {
             name: name.to_string(),
@@ -4541,16 +5908,14 @@ impl<'a> Lowerer<'a> {
 
         // Use alloc_result(0, struct_ptr) for Ok result.
         // The codegen will heap-allocate the struct via the StructValue -> Ptr coercion.
-        let alloc_result_ty = MirType::FnPtr(
-            vec![MirType::Int, MirType::Ptr],
-            Box::new(MirType::Ptr),
-        );
+        let alloc_result_ty =
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr));
         let ok_result = MirExpr::Call {
-            func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
-            args: vec![
-                MirExpr::IntLit(0, MirType::Int),
-                struct_lit,
-            ],
+            func: Box::new(MirExpr::Var(
+                "mesh_alloc_result".to_string(),
+                alloc_result_ty.clone(),
+            )),
+            args: vec![MirExpr::IntLit(0, MirType::Int), struct_lit],
             ty: MirType::Ptr,
         };
 
@@ -4559,7 +5924,8 @@ impl<'a> Lowerer<'a> {
         let mut body = ok_result;
 
         for (i, (field_name, field_ty)) in fields.iter().enumerate().rev() {
-            let obj_get_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
+            let obj_get_ty =
+                MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
             let key_lit = MirExpr::StringLit(field_name.clone(), MirType::String);
 
             let get_call = MirExpr::Call {
@@ -4576,7 +5942,8 @@ impl<'a> Lowerer<'a> {
             // For collection fields (Ptr), look up typeck Ty for proper decoding
             let extract_call = if matches!(field_ty, MirType::Ptr) {
                 if let Some(info) = self.registry.struct_defs.get(name) {
-                    if let Some((_, typeck_ty)) = info.fields.iter().find(|(n, _)| n == field_name) {
+                    if let Some((_, typeck_ty)) = info.fields.iter().find(|(n, _)| n == field_name)
+                    {
                         let typeck_ty = typeck_ty.clone();
                         self.emit_collection_from_json(
                             MirExpr::Var(field_var.clone(), MirType::Ptr),
@@ -4612,7 +5979,10 @@ impl<'a> Lowerer<'a> {
                 value: Box::new(extract_call),
                 body: Box::new(MirExpr::If {
                     cond: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_is_ok".to_string(),
+                            is_ok_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(extract_result_var.clone(), MirType::Ptr)],
                         ty: MirType::Int,
                     }),
@@ -4620,7 +5990,10 @@ impl<'a> Lowerer<'a> {
                         name: val_var,
                         ty: field_ty.clone(),
                         value: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_result_unwrap".to_string(),
+                                unwrap_ty.clone(),
+                            )),
                             args: vec![MirExpr::Var(extract_result_var.clone(), MirType::Ptr)],
                             ty: MirType::Ptr,
                         }),
@@ -4638,7 +6011,10 @@ impl<'a> Lowerer<'a> {
                 value: Box::new(get_call),
                 body: Box::new(MirExpr::If {
                     cond: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_is_ok".to_string(),
+                            is_ok_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                         ty: MirType::Int,
                     }),
@@ -4646,7 +6022,10 @@ impl<'a> Lowerer<'a> {
                         name: field_var,
                         ty: MirType::Ptr,
                         value: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_result_unwrap".to_string(),
+                                unwrap_ty.clone(),
+                            )),
                             args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                             ty: MirType::Ptr,
                         }),
@@ -4690,23 +6069,28 @@ impl<'a> Lowerer<'a> {
 
         let is_ok_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Int));
         let unwrap_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
-        let alloc_result_ty = MirType::FnPtr(
-            vec![MirType::Int, MirType::Ptr],
-            Box::new(MirType::Ptr),
-        );
+        let alloc_result_ty =
+            MirType::FnPtr(vec![MirType::Int, MirType::Ptr], Box::new(MirType::Ptr));
         let row_get_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
         let str_len_ty = MirType::FnPtr(vec![MirType::String], Box::new(MirType::Int));
 
         // Build the innermost expression: alloc_result(0, struct_ptr)
-        let field_bindings: Vec<(String, MirExpr)> = fields.iter().enumerate().map(|(i, (fname, fty))| {
-            // For Option fields at MIR level, they're SumType("Option_X") but stored as Ptr
-            let var_ty = if matches!(fty, MirType::SumType(ref s) if s.starts_with("Option_")) {
-                MirType::Ptr
-            } else {
-                fty.clone()
-            };
-            (fname.clone(), MirExpr::Var(format!("__field_{}", i), var_ty))
-        }).collect();
+        let field_bindings: Vec<(String, MirExpr)> = fields
+            .iter()
+            .enumerate()
+            .map(|(i, (fname, fty))| {
+                // For Option fields at MIR level, they're SumType("Option_X") but stored as Ptr
+                let var_ty = if matches!(fty, MirType::SumType(ref s) if s.starts_with("Option_")) {
+                    MirType::Ptr
+                } else {
+                    fty.clone()
+                };
+                (
+                    fname.clone(),
+                    MirExpr::Var(format!("__field_{}", i), var_ty),
+                )
+            })
+            .collect();
 
         let struct_lit = MirExpr::StructLit {
             name: name.to_string(),
@@ -4715,11 +6099,11 @@ impl<'a> Lowerer<'a> {
         };
 
         let ok_result = MirExpr::Call {
-            func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
-            args: vec![
-                MirExpr::IntLit(0, MirType::Int),
-                struct_lit,
-            ],
+            func: Box::new(MirExpr::Var(
+                "mesh_alloc_result".to_string(),
+                alloc_result_ty.clone(),
+            )),
+            args: vec![MirExpr::IntLit(0, MirType::Int), struct_lit],
             ty: MirType::Ptr,
         };
 
@@ -4736,7 +6120,10 @@ impl<'a> Lowerer<'a> {
 
             // mesh_row_from_row_get(row, "field_name")
             let get_call = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_row_from_row_get".to_string(), row_get_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_row_from_row_get".to_string(),
+                    row_get_ty.clone(),
+                )),
                 args: vec![row_var.clone(), key_lit],
                 ty: MirType::Ptr,
             };
@@ -4748,7 +6135,11 @@ impl<'a> Lowerer<'a> {
                 } else {
                     "String"
                 };
-                let option_sum_name = if let MirType::SumType(ref s) = field_ty { s.clone() } else { format!("Option_{}", inner_type_str) };
+                let option_sum_name = if let MirType::SumType(ref s) = field_ty {
+                    s.clone()
+                } else {
+                    format!("Option_{}", inner_type_str)
+                };
 
                 // None variant: ConstructVariant with no fields
                 let none_expr = MirExpr::ConstructVariant {
@@ -4760,7 +6151,10 @@ impl<'a> Lowerer<'a> {
 
                 // Ok(None) result
                 let ok_none = MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_alloc_result".to_string(),
+                        alloc_result_ty.clone(),
+                    )),
                     args: vec![MirExpr::IntLit(0, MirType::Int), none_expr.clone()],
                     ty: MirType::Ptr,
                 };
@@ -4782,7 +6176,10 @@ impl<'a> Lowerer<'a> {
                     name: col_str_var.clone(),
                     ty: MirType::Ptr,
                     value: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_unwrap".to_string(),
+                            unwrap_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                         ty: MirType::Ptr,
                     }),
@@ -4790,7 +6187,10 @@ impl<'a> Lowerer<'a> {
                         cond: Box::new(MirExpr::BinOp {
                             op: BinOp::Eq,
                             lhs: Box::new(MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_string_length".to_string(), str_len_ty.clone())),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_string_length".to_string(),
+                                    str_len_ty.clone(),
+                                )),
                                 args: vec![MirExpr::Var(col_str_var.clone(), MirType::Ptr)],
                                 ty: MirType::Int,
                             }),
@@ -4815,7 +6215,10 @@ impl<'a> Lowerer<'a> {
                     value: Box::new(get_call),
                     body: Box::new(MirExpr::If {
                         cond: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_result_is_ok".to_string(),
+                                is_ok_ty.clone(),
+                            )),
                             args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                             ty: MirType::Int,
                         }),
@@ -4825,16 +6228,28 @@ impl<'a> Lowerer<'a> {
                             value: Box::new(null_check),
                             body: Box::new(MirExpr::If {
                                 cond: Box::new(MirExpr::Call {
-                                    func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
-                                    args: vec![MirExpr::Var(outer_result_var.clone(), MirType::Ptr)],
+                                    func: Box::new(MirExpr::Var(
+                                        "mesh_result_is_ok".to_string(),
+                                        is_ok_ty.clone(),
+                                    )),
+                                    args: vec![MirExpr::Var(
+                                        outer_result_var.clone(),
+                                        MirType::Ptr,
+                                    )],
                                     ty: MirType::Int,
                                 }),
                                 then_body: Box::new(MirExpr::Let {
                                     name: val_var.clone(),
                                     ty: MirType::Ptr,
                                     value: Box::new(MirExpr::Call {
-                                        func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
-                                        args: vec![MirExpr::Var(outer_result_var.clone(), MirType::Ptr)],
+                                        func: Box::new(MirExpr::Var(
+                                            "mesh_result_unwrap".to_string(),
+                                            unwrap_ty.clone(),
+                                        )),
+                                        args: vec![MirExpr::Var(
+                                            outer_result_var.clone(),
+                                            MirType::Ptr,
+                                        )],
                                         ty: MirType::Ptr,
                                     }),
                                     body: Box::new(body),
@@ -4867,7 +6282,10 @@ impl<'a> Lowerer<'a> {
                         value: Box::new(get_call),
                         body: Box::new(MirExpr::If {
                             cond: Box::new(MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_result_is_ok".to_string(),
+                                    is_ok_ty.clone(),
+                                )),
                                 args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                                 ty: MirType::Int,
                             }),
@@ -4875,7 +6293,10 @@ impl<'a> Lowerer<'a> {
                                 name: val_var,
                                 ty: MirType::String,
                                 value: Box::new(MirExpr::Call {
-                                    func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                                    func: Box::new(MirExpr::Var(
+                                        "mesh_result_unwrap".to_string(),
+                                        unwrap_ty.clone(),
+                                    )),
                                     args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                                     ty: MirType::Ptr,
                                 }),
@@ -4901,7 +6322,10 @@ impl<'a> Lowerer<'a> {
                         name: col_str_var.clone(),
                         ty: MirType::Ptr,
                         value: Box::new(MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_result_unwrap".to_string(),
+                                unwrap_ty.clone(),
+                            )),
                             args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                             ty: MirType::Ptr,
                         }),
@@ -4915,16 +6339,28 @@ impl<'a> Lowerer<'a> {
                             }),
                             body: Box::new(MirExpr::If {
                                 cond: Box::new(MirExpr::Call {
-                                    func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
-                                    args: vec![MirExpr::Var(parse_result_var.clone(), MirType::Ptr)],
+                                    func: Box::new(MirExpr::Var(
+                                        "mesh_result_is_ok".to_string(),
+                                        is_ok_ty.clone(),
+                                    )),
+                                    args: vec![MirExpr::Var(
+                                        parse_result_var.clone(),
+                                        MirType::Ptr,
+                                    )],
                                     ty: MirType::Int,
                                 }),
                                 then_body: Box::new(MirExpr::Let {
                                     name: val_var,
                                     ty: field_ty.clone(),
                                     value: Box::new(MirExpr::Call {
-                                        func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
-                                        args: vec![MirExpr::Var(parse_result_var.clone(), MirType::Ptr)],
+                                        func: Box::new(MirExpr::Var(
+                                            "mesh_result_unwrap".to_string(),
+                                            unwrap_ty.clone(),
+                                        )),
+                                        args: vec![MirExpr::Var(
+                                            parse_result_var.clone(),
+                                            MirType::Ptr,
+                                        )],
                                         ty: MirType::Ptr,
                                     }),
                                     body: Box::new(body),
@@ -4942,7 +6378,10 @@ impl<'a> Lowerer<'a> {
                         value: Box::new(get_call),
                         body: Box::new(MirExpr::If {
                             cond: Box::new(MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_result_is_ok".to_string(),
+                                    is_ok_ty.clone(),
+                                )),
                                 args: vec![MirExpr::Var(get_result_var.clone(), MirType::Ptr)],
                                 ty: MirType::Int,
                             }),
@@ -4996,7 +6435,10 @@ impl<'a> Lowerer<'a> {
                 ty: MirType::SumType(option_sum_name.to_string()),
             };
             return MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_alloc_result".to_string(),
+                    alloc_result_ty.clone(),
+                )),
                 args: vec![MirExpr::IntLit(0, MirType::Int), some_expr],
                 ty: MirType::Ptr,
             };
@@ -5031,7 +6473,10 @@ impl<'a> Lowerer<'a> {
             }),
             body: Box::new(MirExpr::If {
                 cond: Box::new(MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_result_is_ok".to_string(), is_ok_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_result_is_ok".to_string(),
+                        is_ok_ty.clone(),
+                    )),
                     args: vec![MirExpr::Var(parse_var.clone(), MirType::Ptr)],
                     ty: MirType::Int,
                 }),
@@ -5039,7 +6484,10 @@ impl<'a> Lowerer<'a> {
                     name: parsed_val_var.clone(),
                     ty: inner_ty.clone(),
                     value: Box::new(MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_result_unwrap".to_string(), unwrap_ty.clone())),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_result_unwrap".to_string(),
+                            unwrap_ty.clone(),
+                        )),
                         args: vec![MirExpr::Var(parse_var.clone(), MirType::Ptr)],
                         ty: MirType::Ptr,
                     }),
@@ -5051,7 +6499,10 @@ impl<'a> Lowerer<'a> {
                             ty: MirType::SumType(option_sum_name.to_string()),
                         };
                         MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_alloc_result".to_string(), alloc_result_ty.clone())),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_alloc_result".to_string(),
+                                alloc_result_ty.clone(),
+                            )),
                             args: vec![MirExpr::IntLit(0, MirType::Int), some_expr],
                             ty: MirType::Ptr,
                         }
@@ -5168,10 +6619,8 @@ impl<'a> Lowerer<'a> {
             captures: vec![],
             has_tail_calls: false,
         });
-        self.known_functions.insert(
-            rels_fn_name,
-            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
-        );
+        self.known_functions
+            .insert(rels_fn_name, MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
 
         // ── __field_types__() ────────────────────────────────────────
         // Returns List<String> where each entry is "field_name:SQL_TYPE".
@@ -5195,10 +6644,8 @@ impl<'a> Lowerer<'a> {
             captures: vec![],
             has_tail_calls: false,
         });
-        self.known_functions.insert(
-            ft_fn_name,
-            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
-        );
+        self.known_functions
+            .insert(ft_fn_name, MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
 
         // ── __relationship_meta__() ──────────────────────────────────
         // Returns List<String> where each string is "kind:name:target:fk:target_table".
@@ -5242,10 +6689,8 @@ impl<'a> Lowerer<'a> {
             captures: vec![],
             has_tail_calls: false,
         });
-        self.known_functions.insert(
-            meta_fn_name,
-            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
-        );
+        self.known_functions
+            .insert(meta_fn_name, MirType::FnPtr(vec![], Box::new(MirType::Ptr)));
 
         // ── Per-field column accessors ───────────────────────────────
         // User.__name_col__() -> "name"
@@ -5269,7 +6714,12 @@ impl<'a> Lowerer<'a> {
 
     /// Emit a from_json extraction for a value of the given MIR type.
     /// Returns a MirExpr that produces a Result (Ok(value) or Err(string)).
-    fn emit_from_json_for_type(&self, json_expr: MirExpr, target_ty: &MirType, _context_struct: &str) -> MirExpr {
+    fn emit_from_json_for_type(
+        &self,
+        json_expr: MirExpr,
+        target_ty: &MirType,
+        _context_struct: &str,
+    ) -> MirExpr {
         let fn_name = match target_ty {
             MirType::Int => "mesh_json_as_int",
             MirType::Float => "mesh_json_as_float",
@@ -5310,7 +6760,12 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Emit Option<T> from JSON decoding: null -> Ok(None), other -> decode inner then wrap in Some.
-    fn emit_option_from_json(&self, json_expr: MirExpr, sum_name: &str, _context_struct: &str) -> MirExpr {
+    fn emit_option_from_json(
+        &self,
+        json_expr: MirExpr,
+        sum_name: &str,
+        _context_struct: &str,
+    ) -> MirExpr {
         // For Option<T>, the from_json simply returns the JSON value.
         // The inner extraction (Some/None wrapping) happens at a higher level
         // via mesh_json_as_* returning the inner value or null check.
@@ -5333,7 +6788,12 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Emit collection (List/Map) from JSON decoding using callback-based runtime helpers.
-    fn emit_collection_from_json(&mut self, json_expr: MirExpr, typeck_ty: &Ty, _context_struct: &str) -> MirExpr {
+    fn emit_collection_from_json(
+        &mut self,
+        json_expr: MirExpr,
+        typeck_ty: &Ty,
+        _context_struct: &str,
+    ) -> MirExpr {
         match typeck_ty {
             Ty::App(base, args) => {
                 if let Ty::Con(con) = base.as_ref() {
@@ -5341,10 +6801,17 @@ impl<'a> Lowerer<'a> {
                         "List" => {
                             let elem_ty = args.first().cloned().unwrap_or(Ty::int());
                             let callback_name = self.resolve_from_json_callback(&elem_ty);
-                            let fn_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
-                            let callback_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
+                            let fn_ty = MirType::FnPtr(
+                                vec![MirType::Ptr, MirType::Ptr],
+                                Box::new(MirType::Ptr),
+                            );
+                            let callback_ty =
+                                MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
                             MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_json_to_list".to_string(), fn_ty)),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_json_to_list".to_string(),
+                                    fn_ty,
+                                )),
                                 args: vec![json_expr, MirExpr::Var(callback_name, callback_ty)],
                                 ty: MirType::Ptr,
                             }
@@ -5352,8 +6819,12 @@ impl<'a> Lowerer<'a> {
                         "Map" => {
                             let val_ty = args.get(1).cloned().unwrap_or(Ty::string());
                             let callback_name = self.resolve_from_json_callback(&val_ty);
-                            let fn_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
-                            let callback_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
+                            let fn_ty = MirType::FnPtr(
+                                vec![MirType::Ptr, MirType::Ptr],
+                                Box::new(MirType::Ptr),
+                            );
+                            let callback_ty =
+                                MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
                             MirExpr::Call {
                                 func: Box::new(MirExpr::Var("mesh_json_to_map".to_string(), fn_ty)),
                                 args: vec![json_expr, MirExpr::Var(callback_name, callback_ty)],
@@ -5414,7 +6885,10 @@ impl<'a> Lowerer<'a> {
         // If parse is Ok, call FromJson__from_json__(parsed_json)
         // Else, return the error result directly
         let from_json_call = MirExpr::Call {
-            func: Box::new(MirExpr::Var(format!("FromJson__from_json__{}", name), from_json_ty)),
+            func: Box::new(MirExpr::Var(
+                format!("FromJson__from_json__{}", name),
+                from_json_ty,
+            )),
             args: vec![MirExpr::Var("__parsed_json".to_string(), MirType::Ptr)],
             ty: MirType::Ptr,
         };
@@ -5471,7 +6945,12 @@ impl<'a> Lowerer<'a> {
         self.generate_display_struct_with_display_name(name, name, fields);
     }
 
-    fn generate_display_struct_with_display_name(&mut self, name: &str, display_name: &str, fields: &[(String, MirType)]) {
+    fn generate_display_struct_with_display_name(
+        &mut self,
+        name: &str,
+        display_name: &str,
+        fields: &[(String, MirType)],
+    ) {
         let mangled = format!("Display__to_string__{}", name);
         let struct_ty = MirType::Struct(name.to_string());
         let concat_ty = MirType::FnPtr(
@@ -5503,7 +6982,10 @@ impl<'a> Lowerer<'a> {
 
                 // Append field value string
                 result = MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_string_concat".to_string(),
+                        concat_ty.clone(),
+                    )),
                     args: vec![result, field_str],
                     ty: MirType::String,
                 };
@@ -5511,8 +6993,14 @@ impl<'a> Lowerer<'a> {
                 // Append separator: ", " for non-last fields
                 if !is_last {
                     result = MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
-                        args: vec![result, MirExpr::StringLit(", ".to_string(), MirType::String)],
+                        func: Box::new(MirExpr::Var(
+                            "mesh_string_concat".to_string(),
+                            concat_ty.clone(),
+                        )),
+                        args: vec![
+                            result,
+                            MirExpr::StringLit(", ".to_string(), MirType::String),
+                        ],
                         ty: MirType::String,
                     };
                 }
@@ -5520,7 +7008,10 @@ impl<'a> Lowerer<'a> {
 
             // Append closing ")"
             result = MirExpr::Call {
-                func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
+                func: Box::new(MirExpr::Var(
+                    "mesh_string_concat".to_string(),
+                    concat_ty.clone(),
+                )),
                 args: vec![result, MirExpr::StringLit(")".to_string(), MirType::String)],
                 ty: MirType::String,
             };
@@ -5590,10 +7081,8 @@ impl<'a> Lowerer<'a> {
                             .collect();
 
                         // Build "VariantName(val0, val1)"
-                        let mut result = MirExpr::StringLit(
-                            format!("{}(", v.name),
-                            MirType::String,
-                        );
+                        let mut result =
+                            MirExpr::StringLit(format!("{}(", v.name), MirType::String);
 
                         for (i, ft) in v.fields.iter().enumerate() {
                             let is_last = i == v.fields.len() - 1;
@@ -5796,7 +7285,8 @@ impl<'a> Lowerer<'a> {
                 },
             };
 
-            let rest = self.build_lexicographic_lt_vars(fields, self_prefix, other_prefix, index + 1);
+            let rest =
+                self.build_lexicographic_lt_vars(fields, self_prefix, other_prefix, index + 1);
 
             MirExpr::If {
                 cond: Box::new(lt_cmp),
@@ -5891,7 +7381,12 @@ impl<'a> Lowerer<'a> {
         let mut result = parts.pop().unwrap();
         while let Some(part) = parts.pop() {
             match part {
-                MirExpr::Let { name, ty, value, body: _ } => {
+                MirExpr::Let {
+                    name,
+                    ty,
+                    value,
+                    body: _,
+                } => {
                     result = MirExpr::Let {
                         name,
                         ty,
@@ -5999,15 +7494,10 @@ impl<'a> Lowerer<'a> {
                     's' => acc | 4,
                     _ => acc,
                 });
-                let fn_ty = MirType::FnPtr(
-                    vec![MirType::String, MirType::Int],
-                    Box::new(MirType::Ptr),
-                );
+                let fn_ty =
+                    MirType::FnPtr(vec![MirType::String, MirType::Int], Box::new(MirType::Ptr));
                 MirExpr::Call {
-                    func: Box::new(MirExpr::Var(
-                        "mesh_regex_from_literal".to_string(),
-                        fn_ty,
-                    )),
+                    func: Box::new(MirExpr::Var("mesh_regex_from_literal".to_string(), fn_ty)),
                     args: vec![
                         MirExpr::StringLit(pattern, MirType::String),
                         MirExpr::IntLit(flags_bits, MirType::Int),
@@ -6059,9 +7549,7 @@ impl<'a> Lowerer<'a> {
     // ── Name reference lowering ──────────────────────────────────────
 
     fn lower_name_ref(&self, name_ref: &NameRef) -> MirExpr {
-        let name = name_ref
-            .text()
-            .unwrap_or_else(|| "<unknown>".to_string());
+        let name = name_ref.text().unwrap_or_else(|| "<unknown>".to_string());
 
         // Check if this is a nullary variant constructor (e.g., Red, None, Point).
         // These are NameRef nodes that refer to sum type variants with no fields.
@@ -6114,8 +7602,14 @@ impl<'a> Lowerer<'a> {
     // ── Binary expression lowering ───────────────────────────────────
 
     fn lower_binary_expr(&mut self, bin: &BinaryExpr) -> MirExpr {
-        let lhs = bin.lhs().map(|e| self.lower_expr(&e)).unwrap_or(MirExpr::Unit);
-        let rhs = bin.rhs().map(|e| self.lower_expr(&e)).unwrap_or(MirExpr::Unit);
+        let lhs = bin
+            .lhs()
+            .map(|e| self.lower_expr(&e))
+            .unwrap_or(MirExpr::Unit);
+        let rhs = bin
+            .rhs()
+            .map(|e| self.lower_expr(&e))
+            .unwrap_or(MirExpr::Unit);
 
         let op = bin
             .op()
@@ -6154,11 +7648,11 @@ impl<'a> Lowerer<'a> {
                 BinOp::Div => Some(("Div", "div", false, false)),
                 BinOp::Mod => Some(("Mod", "mod", false, false)),
                 BinOp::Eq => Some(("Eq", "eq", false, false)),
-                BinOp::NotEq => Some(("Eq", "eq", true, false)),      // negate eq
+                BinOp::NotEq => Some(("Eq", "eq", true, false)), // negate eq
                 BinOp::Lt => Some(("Ord", "lt", false, false)),
-                BinOp::Gt => Some(("Ord", "lt", false, true)),        // swap: b < a
-                BinOp::LtEq => Some(("Ord", "lt", true, true)),       // negate(b < a)
-                BinOp::GtEq => Some(("Ord", "lt", true, false)),      // negate(a < b)
+                BinOp::Gt => Some(("Ord", "lt", false, true)), // swap: b < a
+                BinOp::LtEq => Some(("Ord", "lt", true, true)), // negate(b < a)
+                BinOp::GtEq => Some(("Ord", "lt", true, false)), // negate(a < b)
                 _ => None,
             };
             if let Some((trait_name, method_name, negate, swap_args)) = dispatch {
@@ -6177,19 +7671,17 @@ impl<'a> Lowerer<'a> {
                     // operators return the Output type from typeck (ty from
                     // resolve_range).
                     let result_ty = match op {
-                        BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt
-                        | BinOp::LtEq | BinOp::GtEq => MirType::Bool,
+                        BinOp::Eq
+                        | BinOp::NotEq
+                        | BinOp::Lt
+                        | BinOp::Gt
+                        | BinOp::LtEq
+                        | BinOp::GtEq => MirType::Bool,
                         _ => ty.clone(),
                     };
-                    let fn_ty = MirType::FnPtr(
-                        vec![lhs_ty.clone(), rhs_ty],
-                        Box::new(result_ty.clone()),
-                    );
-                    let (call_lhs, call_rhs) = if swap_args {
-                        (rhs, lhs)
-                    } else {
-                        (lhs, rhs)
-                    };
+                    let fn_ty =
+                        MirType::FnPtr(vec![lhs_ty.clone(), rhs_ty], Box::new(result_ty.clone()));
+                    let (call_lhs, call_rhs) = if swap_args { (rhs, lhs) } else { (lhs, rhs) };
                     let call = MirExpr::Call {
                         func: Box::new(MirExpr::Var(mangled, fn_ty)),
                         args: vec![call_lhs, call_rhs],
@@ -6220,7 +7712,10 @@ impl<'a> Lowerer<'a> {
                                 let eq_callback = self.resolve_eq_callback(&elem_ty);
                                 let eq_callback_expr = MirExpr::Var(
                                     eq_callback,
-                                    MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Bool)),
+                                    MirType::FnPtr(
+                                        vec![MirType::Int, MirType::Int],
+                                        Box::new(MirType::Bool),
+                                    ),
                                 );
                                 let call = MirExpr::Call {
                                     func: Box::new(MirExpr::Var(
@@ -6247,7 +7742,10 @@ impl<'a> Lowerer<'a> {
                                 let cmp_callback = self.resolve_compare_callback(&elem_ty);
                                 let cmp_callback_expr = MirExpr::Var(
                                     cmp_callback,
-                                    MirType::FnPtr(vec![MirType::Int, MirType::Int], Box::new(MirType::Int)),
+                                    MirType::FnPtr(
+                                        vec![MirType::Int, MirType::Int],
+                                        Box::new(MirType::Int),
+                                    ),
                                 );
                                 let compare_call = MirExpr::Call {
                                     func: Box::new(MirExpr::Var(
@@ -6314,8 +7812,7 @@ impl<'a> Lowerer<'a> {
         // hardware path.
         if op == UnaryOp::Neg {
             let operand_ty = operand.ty().clone();
-            let is_user_type =
-                matches!(operand_ty, MirType::Struct(_) | MirType::SumType(_));
+            let is_user_type = matches!(operand_ty, MirType::Struct(_) | MirType::SumType(_));
             if is_user_type {
                 let ty_for_lookup = mir_type_to_ty(&operand_ty);
                 let type_name = mir_type_to_impl_name(&operand_ty);
@@ -6325,10 +7822,7 @@ impl<'a> Lowerer<'a> {
                     || self.known_functions.contains_key(&mangled);
 
                 if has_impl {
-                    let fn_ty = MirType::FnPtr(
-                        vec![operand_ty],
-                        Box::new(ty.clone()),
-                    );
+                    let fn_ty = MirType::FnPtr(vec![operand_ty], Box::new(ty.clone()));
                     return MirExpr::Call {
                         func: Box::new(MirExpr::Var(mangled, fn_ty)),
                         args: vec![operand],
@@ -6510,7 +8004,10 @@ impl<'a> Lowerer<'a> {
                     let method_name = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
 
                     // Lower the receiver expression
-                    let receiver = fa.base().map(|e| self.lower_expr(&e)).unwrap_or(MirExpr::Unit);
+                    let receiver = fa
+                        .base()
+                        .map(|e| self.lower_expr(&e))
+                        .unwrap_or(MirExpr::Unit);
 
                     // Lower explicit arguments
                     let mut args = vec![receiver];
@@ -6528,7 +8025,8 @@ impl<'a> Lowerer<'a> {
                         args.iter().map(|a| a.ty().clone()).collect(),
                         Box::new(ty.clone()),
                     );
-                    let callee = self.resolve_trait_callee(&method_name, &callee_var_ty, &first_arg_ty);
+                    let callee =
+                        self.resolve_trait_callee(&method_name, &callee_var_ty, &first_arg_ty);
 
                     // Apply the same post-dispatch optimizations as bare-name calls:
                     // Display__to_string__String identity short-circuit
@@ -6545,12 +8043,18 @@ impl<'a> Lowerer<'a> {
                                 Box::new(MirType::String),
                             );
                             let left = MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_string_concat".to_string(),
+                                    concat_ty.clone(),
+                                )),
                                 args: vec![quote.clone(), val],
                                 ty: MirType::String,
                             };
                             return MirExpr::Call {
-                                func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty)),
+                                func: Box::new(MirExpr::Var(
+                                    "mesh_string_concat".to_string(),
+                                    concat_ty,
+                                )),
                                 args: vec![left, quote],
                                 ty: MirType::String,
                             };
@@ -6564,8 +8068,12 @@ impl<'a> Lowerer<'a> {
                             && matches!(args[0].ty(), MirType::Ptr)
                         {
                             if let Some(base_expr) = fa.base() {
-                                if let Some(typeck_ty) = self.get_ty(base_expr.syntax().text_range()).cloned() {
-                                    if let Some(collection_call) = self.wrap_collection_to_string(&args[0], &typeck_ty) {
+                                if let Some(typeck_ty) =
+                                    self.get_ty(base_expr.syntax().text_range()).cloned()
+                                {
+                                    if let Some(collection_call) =
+                                        self.wrap_collection_to_string(&args[0], &typeck_ty)
+                                    {
                                         return collection_call;
                                     }
                                 }
@@ -6601,21 +8109,37 @@ impl<'a> Lowerer<'a> {
                             .arg_list()
                             .map(|al| al.args().map(|a| self.lower_expr(&a)).collect())
                             .unwrap_or_default();
-                        let cond = args.into_iter().next().unwrap_or(MirExpr::BoolLit(true, MirType::Bool));
+                        let cond = args
+                            .into_iter()
+                            .next()
+                            .unwrap_or(MirExpr::BoolLit(true, MirType::Bool));
                         // Build source string from the condition's syntax text
-                        let src_str = call.arg_list()
+                        let src_str = call
+                            .arg_list()
                             .and_then(|al| al.args().next())
                             .map(|arg| arg.syntax().text().to_string())
                             .unwrap_or_else(|| "assert".to_string());
                         let empty_str = MirExpr::StringLit(String::new(), MirType::String);
                         let src_lit = MirExpr::StringLit(src_str, MirType::String);
                         let fn_ty = MirType::FnPtr(
-                            vec![MirType::Bool, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            vec![
+                                MirType::Bool,
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Int,
+                                MirType::Int,
+                            ],
                             Box::new(MirType::Unit),
                         );
                         return MirExpr::Call {
                             func: Box::new(MirExpr::Var("mesh_test_assert".to_string(), fn_ty)),
-                            args: vec![cond, src_lit, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            args: vec![
+                                cond,
+                                src_lit,
+                                empty_str,
+                                MirExpr::IntLit(0, MirType::Int),
+                                MirExpr::IntLit(0, MirType::Int),
+                            ],
                             ty: MirType::Unit,
                         };
                     }
@@ -6626,19 +8150,41 @@ impl<'a> Lowerer<'a> {
                             .unwrap_or_default();
                         // Both args must be strings (MirType::String or MirType::Ptr).
                         // If they're non-string, try to convert.
-                        let lhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
-                        let rhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
+                        let lhs = if raw_args.is_empty() {
+                            MirExpr::StringLit(String::new(), MirType::String)
+                        } else {
+                            raw_args.remove(0)
+                        };
+                        let rhs = if raw_args.is_empty() {
+                            MirExpr::StringLit(String::new(), MirType::String)
+                        } else {
+                            raw_args.remove(0)
+                        };
                         let lhs_str = self.coerce_to_string(lhs);
                         let rhs_str = self.coerce_to_string(rhs);
                         let src_lit = MirExpr::StringLit("assert_eq".to_string(), MirType::String);
                         let empty_str = MirExpr::StringLit(String::new(), MirType::String);
                         let fn_ty = MirType::FnPtr(
-                            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            vec![
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Int,
+                                MirType::Int,
+                            ],
                             Box::new(MirType::Unit),
                         );
                         return MirExpr::Call {
                             func: Box::new(MirExpr::Var("mesh_test_assert_eq".to_string(), fn_ty)),
-                            args: vec![lhs_str, rhs_str, src_lit, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            args: vec![
+                                lhs_str,
+                                rhs_str,
+                                src_lit,
+                                empty_str,
+                                MirExpr::IntLit(0, MirType::Int),
+                                MirExpr::IntLit(0, MirType::Int),
+                            ],
                             ty: MirType::Unit,
                         };
                     }
@@ -6647,19 +8193,41 @@ impl<'a> Lowerer<'a> {
                             .arg_list()
                             .map(|al| al.args().map(|a| self.lower_expr(&a)).collect())
                             .unwrap_or_default();
-                        let lhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
-                        let rhs = if raw_args.is_empty() { MirExpr::StringLit(String::new(), MirType::String) } else { raw_args.remove(0) };
+                        let lhs = if raw_args.is_empty() {
+                            MirExpr::StringLit(String::new(), MirType::String)
+                        } else {
+                            raw_args.remove(0)
+                        };
+                        let rhs = if raw_args.is_empty() {
+                            MirExpr::StringLit(String::new(), MirType::String)
+                        } else {
+                            raw_args.remove(0)
+                        };
                         let lhs_str = self.coerce_to_string(lhs);
                         let rhs_str = self.coerce_to_string(rhs);
                         let src_lit = MirExpr::StringLit("assert_ne".to_string(), MirType::String);
                         let empty_str = MirExpr::StringLit(String::new(), MirType::String);
                         let fn_ty = MirType::FnPtr(
-                            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            vec![
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Int,
+                                MirType::Int,
+                            ],
                             Box::new(MirType::Unit),
                         );
                         return MirExpr::Call {
                             func: Box::new(MirExpr::Var("mesh_test_assert_ne".to_string(), fn_ty)),
-                            args: vec![lhs_str, rhs_str, src_lit, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            args: vec![
+                                lhs_str,
+                                rhs_str,
+                                src_lit,
+                                empty_str,
+                                MirExpr::IntLit(0, MirType::Int),
+                                MirExpr::IntLit(0, MirType::Int),
+                            ],
                             ty: MirType::Unit,
                         };
                     }
@@ -6677,13 +8245,27 @@ impl<'a> Lowerer<'a> {
                         let closure = args.into_iter().next().unwrap_or(MirExpr::Unit);
                         let empty_str = MirExpr::StringLit(String::new(), MirType::String);
                         let fn_ty = MirType::FnPtr(
-                            vec![MirType::Ptr, MirType::Ptr, MirType::Ptr, MirType::Int, MirType::Int],
+                            vec![
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Ptr,
+                                MirType::Int,
+                                MirType::Int,
+                            ],
                             Box::new(MirType::Unit),
                         );
                         return MirExpr::Call {
-                            func: Box::new(MirExpr::Var("mesh_test_assert_raises".to_string(), fn_ty)),
+                            func: Box::new(MirExpr::Var(
+                                "mesh_test_assert_raises".to_string(),
+                                fn_ty,
+                            )),
                             // [closure, file_ptr, file_len, line] — closure expands to (fn_ptr, env_ptr)
-                            args: vec![closure, empty_str, MirExpr::IntLit(0, MirType::Int), MirExpr::IntLit(0, MirType::Int)],
+                            args: vec![
+                                closure,
+                                empty_str,
+                                MirExpr::IntLit(0, MirType::Int),
+                                MirExpr::IntLit(0, MirType::Int),
+                            ],
                             ty: MirType::Unit,
                         };
                     }
@@ -6696,9 +8278,13 @@ impl<'a> Lowerer<'a> {
         // Check overloaded_call_targets first: if this call was resolved to a mangled
         // name__arity by the typechecker, emit the mangled name directly instead of
         // delegating to lower_expr (which would look up the plain unmangled name).
-        let overloaded_target = self.overloaded_call_targets.get(&call.syntax().text_range()).cloned();
+        let overloaded_target = self
+            .overloaded_call_targets
+            .get(&call.syntax().text_range())
+            .cloned();
         let callee = if let Some(ref mangled_name) = overloaded_target {
-            let callee_ty = call.callee()
+            let callee_ty = call
+                .callee()
                 .map(|e| self.resolve_range(e.syntax().text_range()))
                 .unwrap_or(MirType::Unit);
             Some(MirExpr::Var(mangled_name.clone(), callee_ty))
@@ -6782,8 +8368,10 @@ impl<'a> Lowerer<'a> {
         // - Struct keys with Hash impl: hash the key via Hash__hash__TypeName,
         //   use the hash as an integer key (hash-as-key approach for v1.3)
         let args = if let MirExpr::Var(ref name, _) = callee {
-            if matches!(name.as_str(), "mesh_map_put" | "mesh_map_get" | "mesh_map_has_key" | "mesh_map_delete")
-                && args.len() >= 2
+            if matches!(
+                name.as_str(),
+                "mesh_map_put" | "mesh_map_get" | "mesh_map_has_key" | "mesh_map_delete"
+            ) && args.len() >= 2
             {
                 let key_ty = args[1].ty().clone();
                 if matches!(key_ty, MirType::String) {
@@ -6791,7 +8379,10 @@ impl<'a> Lowerer<'a> {
                     let mut new_args = args;
                     let map_arg = new_args.remove(0);
                     let tagged_map = MirExpr::Call {
-                        func: Box::new(MirExpr::Var("mesh_map_tag_string".to_string(), MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)))),
+                        func: Box::new(MirExpr::Var(
+                            "mesh_map_tag_string".to_string(),
+                            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+                        )),
                         args: vec![map_arg],
                         ty: MirType::Ptr,
                     };
@@ -6803,10 +8394,8 @@ impl<'a> Lowerer<'a> {
                     if self.trait_registry.has_impl("Hash", &ty_for_lookup) {
                         let type_name = mir_type_to_impl_name(&key_ty);
                         let hash_fn_name = format!("Hash__hash__{}", type_name);
-                        let hash_fn_ty = MirType::FnPtr(
-                            vec![key_ty.clone()],
-                            Box::new(MirType::Int),
-                        );
+                        let hash_fn_ty =
+                            MirType::FnPtr(vec![key_ty.clone()], Box::new(MirType::Int));
                         let mut new_args = args;
                         let key_arg = new_args.remove(1);
                         let hashed_key = MirExpr::Call {
@@ -6873,10 +8462,8 @@ impl<'a> Lowerer<'a> {
                 let type_name = mir_type_to_impl_name(&arg_ty);
                 let mangled = format!("Ord__compare__{}", type_name);
                 let ordering_ty = MirType::SumType("Ordering".to_string());
-                let fn_ty = MirType::FnPtr(
-                    vec![arg_ty.clone(), arg_ty],
-                    Box::new(ordering_ty.clone()),
-                );
+                let fn_ty =
+                    MirType::FnPtr(vec![arg_ty.clone(), arg_ty], Box::new(ordering_ty.clone()));
                 return MirExpr::Call {
                     func: Box::new(MirExpr::Var(mangled, fn_ty)),
                     args,
@@ -6917,7 +8504,9 @@ impl<'a> Lowerer<'a> {
                 // Look up the typeck Ty for the first argument from the call's AST
                 if let Some(arg_list) = call.arg_list() {
                     if let Some(first_arg_ast) = arg_list.args().next() {
-                        if let Some(typeck_ty) = self.get_ty(first_arg_ast.syntax().text_range()).cloned() {
+                        if let Some(typeck_ty) =
+                            self.get_ty(first_arg_ast.syntax().text_range()).cloned()
+                        {
                             if let Some(collection_call) =
                                 self.wrap_collection_to_string(&args[0], &typeck_ty)
                             {
@@ -6961,10 +8550,15 @@ impl<'a> Lowerer<'a> {
             if name == "Debug__inspect__String" && !args.is_empty() {
                 let val = args.into_iter().next().unwrap();
                 let quote = MirExpr::StringLit("\"".to_string(), MirType::String);
-                let concat_ty =
-                    MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::String));
+                let concat_ty = MirType::FnPtr(
+                    vec![MirType::String, MirType::String],
+                    Box::new(MirType::String),
+                );
                 let left = MirExpr::Call {
-                    func: Box::new(MirExpr::Var("mesh_string_concat".to_string(), concat_ty.clone())),
+                    func: Box::new(MirExpr::Var(
+                        "mesh_string_concat".to_string(),
+                        concat_ty.clone(),
+                    )),
                     args: vec![quote.clone(), val],
                     ty: MirType::String,
                 };
@@ -7164,10 +8758,7 @@ impl<'a> Lowerer<'a> {
                     // function names (e.g., Counter.start -> __service_counter_start).
                     // Must come before user_modules which would resolve to bare names.
                     if let Some(methods) = self.service_modules.get(&base_name).cloned() {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
                         for (method_name, generated_fn) in &methods {
                             if *method_name == field {
                                 let ty = self.resolve_range(fa.syntax().text_range());
@@ -7179,10 +8770,7 @@ impl<'a> Lowerer<'a> {
 
                     // Check user-defined modules (Phase 39) -- they shadow stdlib.
                     if let Some(func_names) = self.user_modules.get(&base_name) {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
                         if func_names.contains(&field) {
                             let ty = self.resolve_range(fa.syntax().text_range());
                             return MirExpr::Var(field, ty);
@@ -7191,10 +8779,7 @@ impl<'a> Lowerer<'a> {
 
                     // Check stdlib modules (after user modules so user code can shadow).
                     if STDLIB_MODULES.contains(&base_name.as_str()) {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
                         // Convert to prefixed name: String.length -> string_length
                         let prefixed = format!("{}_{}", base_name.to_lowercase(), field);
                         // Map to runtime name
@@ -7216,10 +8801,7 @@ impl<'a> Lowerer<'a> {
                     if self.registry.struct_defs.contains_key(&base_name)
                         || self.registry.sum_type_defs.contains_key(&base_name)
                     {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
                         if field == "from_json" {
                             let wrapper_name = format!("__json_decode__{}", base_name);
                             if let Some(fn_ty) = self.known_functions.get(&wrapper_name).cloned() {
@@ -7231,10 +8813,7 @@ impl<'a> Lowerer<'a> {
                     // Check if this is StructName.from_row (FromRow trait method).
                     // Resolves to FromRow__from_row__StructName.
                     if self.registry.struct_defs.contains_key(&base_name) {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
                         if field == "from_row" {
                             let fn_name = format!("FromRow__from_row__{}", base_name);
                             if let Some(fn_ty) = self.known_functions.get(&fn_name).cloned() {
@@ -7248,10 +8827,7 @@ impl<'a> Lowerer<'a> {
                     if self.registry.struct_defs.contains_key(&base_name)
                         || self.registry.sum_type_defs.contains_key(&base_name)
                     {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
                         if field == "from" {
                             // Find the From impl function by scanning known_functions
                             // for any key matching From_*__from__{base_name}.
@@ -7263,7 +8839,8 @@ impl<'a> Lowerer<'a> {
                             }
                             // Fallback: try unparameterized name.
                             let unparameterized = format!("From__from__{}", base_name);
-                            if let Some(fn_ty) = self.known_functions.get(&unparameterized).cloned() {
+                            if let Some(fn_ty) = self.known_functions.get(&unparameterized).cloned()
+                            {
                                 return MirExpr::Var(unparameterized, fn_ty);
                             }
                         }
@@ -7278,7 +8855,8 @@ impl<'a> Lowerer<'a> {
                             }
                             // Fallback: unparameterized name.
                             let unparameterized = format!("TryFrom__try_from__{}", base_name);
-                            if let Some(fn_ty) = self.known_functions.get(&unparameterized).cloned() {
+                            if let Some(fn_ty) = self.known_functions.get(&unparameterized).cloned()
+                            {
                                 return MirExpr::Var(unparameterized, fn_ty);
                             }
                         }
@@ -7288,13 +8866,13 @@ impl<'a> Lowerer<'a> {
                     // __field_types__ or __*_col__ (Schema metadata functions from deriving(Schema)).
                     // Mangled name: {Name}____{method} e.g. User____table__
                     if self.registry.struct_defs.contains_key(&base_name) {
-                        let field = fa
-                            .field()
-                            .map(|t| t.text().to_string())
-                            .unwrap_or_default();
-                        if field == "__table__" || field == "__fields__"
-                            || field == "__primary_key__" || field == "__relationships__"
-                            || field == "__field_types__" || field == "__relationship_meta__"
+                        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
+                        if field == "__table__"
+                            || field == "__fields__"
+                            || field == "__primary_key__"
+                            || field == "__relationships__"
+                            || field == "__field_types__"
+                            || field == "__relationship_meta__"
                             || (field.starts_with("__") && field.ends_with("_col__"))
                         {
                             let fn_name = format!("{}__{}", base_name, field);
@@ -7312,10 +8890,7 @@ impl<'a> Lowerer<'a> {
             .map(|e| self.lower_expr(&e))
             .unwrap_or(MirExpr::Unit);
 
-        let field = fa
-            .field()
-            .map(|t| t.text().to_string())
-            .unwrap_or_default();
+        let field = fa.field().map(|t| t.text().to_string()).unwrap_or_default();
 
         let ty = self.resolve_range(fa.syntax().text_range());
 
@@ -7440,7 +9015,8 @@ impl<'a> Lowerer<'a> {
             let iter_fn_name = format!("Iterable__iter__{}", type_name);
 
             // Resolve Iter type from Iterable impl to get the iterator type name.
-            let iter_type = self.trait_registry
+            let iter_type = self
+                .trait_registry
                 .resolve_associated_type("Iterable", "Iter", ty)
                 .unwrap_or_else(|| Ty::Con(mesh_typeck::ty::TyCon::new("Unknown")));
 
@@ -7460,7 +9036,8 @@ impl<'a> Lowerer<'a> {
             let next_fn_name = format!("Iterator__next__{}", iter_type_name);
 
             // Resolve Item type from Iterable impl.
-            let item_ty = self.trait_registry
+            let item_ty = self
+                .trait_registry
                 .resolve_associated_type("Iterable", "Item", ty)
                 .unwrap_or(Ty::int());
 
@@ -7468,7 +9045,8 @@ impl<'a> Lowerer<'a> {
         } else {
             // Direct Iterator path: no iter() call, just next().
             let next_fn_name = format!("Iterator__next__{}", type_name);
-            let item_ty = self.trait_registry
+            let item_ty = self
+                .trait_registry
                 .resolve_associated_type("Iterator", "Item", ty)
                 .unwrap_or(Ty::int());
 
@@ -7485,9 +9063,7 @@ impl<'a> Lowerer<'a> {
 
         self.push_scope();
         self.insert_var(var_name.clone(), elem_mir_ty.clone());
-        let filter = for_in
-            .filter()
-            .map(|f| Box::new(self.lower_expr(&f)));
+        let filter = for_in.filter().map(|f| Box::new(self.lower_expr(&f)));
         let body = for_in
             .body()
             .map(|b| self.lower_block(&b))
@@ -7525,9 +9101,7 @@ impl<'a> Lowerer<'a> {
 
         self.push_scope();
         self.insert_var(var_name.clone(), MirType::Int);
-        let filter = for_in
-            .filter()
-            .map(|f| Box::new(self.lower_expr(&f)));
+        let filter = for_in.filter().map(|f| Box::new(self.lower_expr(&f)));
         let body = for_in
             .body()
             .map(|b| self.lower_block(&b))
@@ -7559,9 +9133,7 @@ impl<'a> Lowerer<'a> {
 
         self.push_scope();
         self.insert_var(var_name.clone(), elem_mir_ty.clone());
-        let filter = for_in
-            .filter()
-            .map(|f| Box::new(self.lower_expr(&f)));
+        let filter = for_in.filter().map(|f| Box::new(self.lower_expr(&f)));
         let body = for_in
             .body()
             .map(|b| self.lower_block(&b))
@@ -7580,11 +9152,22 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn lower_for_in_map(&mut self, for_in: &ForInExpr, key_ty_src: &Ty, val_ty_src: &Ty) -> MirExpr {
+    fn lower_for_in_map(
+        &mut self,
+        for_in: &ForInExpr,
+        key_ty_src: &Ty,
+        val_ty_src: &Ty,
+    ) -> MirExpr {
         let (key_var, val_var) = if let Some(destr) = for_in.destructure_binding() {
             let names = destr.names();
-            let k = names.first().and_then(|n| n.text()).unwrap_or_else(|| "_".to_string());
-            let v = names.get(1).and_then(|n| n.text()).unwrap_or_else(|| "_".to_string());
+            let k = names
+                .first()
+                .and_then(|n| n.text())
+                .unwrap_or_else(|| "_".to_string());
+            let v = names
+                .get(1)
+                .and_then(|n| n.text())
+                .unwrap_or_else(|| "_".to_string());
             (k, v)
         } else {
             let var_name = for_in
@@ -7605,9 +9188,7 @@ impl<'a> Lowerer<'a> {
         self.push_scope();
         self.insert_var(key_var.clone(), key_mir_ty.clone());
         self.insert_var(val_var.clone(), val_mir_ty.clone());
-        let filter = for_in
-            .filter()
-            .map(|f| Box::new(self.lower_expr(&f)));
+        let filter = for_in.filter().map(|f| Box::new(self.lower_expr(&f)));
         let body = for_in
             .body()
             .map(|b| self.lower_block(&b))
@@ -7643,9 +9224,7 @@ impl<'a> Lowerer<'a> {
 
         self.push_scope();
         self.insert_var(var_name.clone(), elem_mir_ty.clone());
-        let filter = for_in
-            .filter()
-            .map(|f| Box::new(self.lower_expr(&f)));
+        let filter = for_in.filter().map(|f| Box::new(self.lower_expr(&f)));
         let body = for_in
             .body()
             .map(|b| self.lower_block(&b))
@@ -7727,7 +9306,9 @@ impl<'a> Lowerer<'a> {
                 if name.starts_with(|c: char| c.is_uppercase()) {
                     if let Some(type_name) = find_type_for_variant(&name, self.registry) {
                         // Verify it's actually a nullary constructor (no fields).
-                        let is_nullary = self.registry.sum_type_defs
+                        let is_nullary = self
+                            .registry
+                            .sum_type_defs
                             .get(&type_name)
                             .and_then(|info| info.variants.iter().find(|v| v.name == name))
                             .map(|v| v.fields.is_empty())
@@ -7755,21 +9336,13 @@ impl<'a> Lowerer<'a> {
                         let text = t.text().to_string();
                         match t.kind() {
                             SyntaxKind::INT_LITERAL => {
-                                MirPattern::Literal(MirLiteral::Int(
-                                    text.parse().unwrap_or(0),
-                                ))
+                                MirPattern::Literal(MirLiteral::Int(text.parse().unwrap_or(0)))
                             }
                             SyntaxKind::FLOAT_LITERAL => {
-                                MirPattern::Literal(MirLiteral::Float(
-                                    text.parse().unwrap_or(0.0),
-                                ))
+                                MirPattern::Literal(MirLiteral::Float(text.parse().unwrap_or(0.0)))
                             }
-                            SyntaxKind::TRUE_KW => {
-                                MirPattern::Literal(MirLiteral::Bool(true))
-                            }
-                            SyntaxKind::FALSE_KW => {
-                                MirPattern::Literal(MirLiteral::Bool(false))
-                            }
+                            SyntaxKind::TRUE_KW => MirPattern::Literal(MirLiteral::Bool(true)),
+                            SyntaxKind::FALSE_KW => MirPattern::Literal(MirLiteral::Bool(false)),
                             SyntaxKind::STRING_START => {
                                 // Extract string content from the literal pattern node.
                                 let content = extract_simple_string_content(lit.syntax());
@@ -7792,8 +9365,7 @@ impl<'a> Lowerer<'a> {
                     tn.text().to_string()
                 } else {
                     // Find the type name from the registry for unqualified constructors.
-                    find_type_for_variant(&variant_name, self.registry)
-                        .unwrap_or_default()
+                    find_type_for_variant(&variant_name, self.registry).unwrap_or_default()
                 };
 
                 let fields: Vec<MirPattern> =
@@ -7844,22 +9416,25 @@ impl<'a> Lowerer<'a> {
                 // List cons pattern: head :: tail
                 // Extract the element type from the typeck List<T> type.
                 let _list_ty = self.resolve_range(cons_pat.syntax().text_range());
-                let elem_mir_ty = if let Some(typeck_ty) = self.get_ty(cons_pat.syntax().text_range()).cloned() {
-                    if let Some(elem_ty) = extract_list_elem_type(&typeck_ty) {
-                        resolve_type(&elem_ty, self.registry, false)
+                let elem_mir_ty =
+                    if let Some(typeck_ty) = self.get_ty(cons_pat.syntax().text_range()).cloned() {
+                        if let Some(elem_ty) = extract_list_elem_type(&typeck_ty) {
+                            resolve_type(&elem_ty, self.registry, false)
+                        } else {
+                            // Fallback: if the list type is not properly resolved,
+                            // use Int as a default element type.
+                            MirType::Int
+                        }
                     } else {
-                        // Fallback: if the list type is not properly resolved,
-                        // use Int as a default element type.
                         MirType::Int
-                    }
-                } else {
-                    MirType::Int
-                };
+                    };
 
-                let head_pat = cons_pat.head()
+                let head_pat = cons_pat
+                    .head()
                     .map(|p| self.lower_pattern(&p))
                     .unwrap_or(MirPattern::Wildcard);
-                let tail_pat = cons_pat.tail()
+                let tail_pat = cons_pat
+                    .tail()
                     .map(|p| self.lower_pattern(&p))
                     .unwrap_or(MirPattern::Wildcard);
 
@@ -7884,7 +9459,11 @@ impl<'a> Lowerer<'a> {
         let closure_fn_name = if self.module_name.is_empty() {
             format!("__closure_{}", self.closure_counter)
         } else {
-            format!("{}__closure_{}", self.module_name.replace('.', "_"), self.closure_counter)
+            format!(
+                "{}__closure_{}",
+                self.module_name.replace('.', "_"),
+                self.closure_counter
+            )
         };
 
         let closure_range = closure.syntax().text_range();
@@ -7999,7 +9578,11 @@ impl<'a> Lowerer<'a> {
         let closure_fn_name = if self.module_name.is_empty() {
             format!("__closure_{}", self.closure_counter)
         } else {
-            format!("{}__closure_{}", self.module_name.replace('.', "_"), self.closure_counter)
+            format!(
+                "{}__closure_{}",
+                self.module_name.replace('.', "_"),
+                self.closure_counter
+            )
         };
 
         let closure_range = closure.syntax().text_range();
@@ -8249,10 +9832,7 @@ impl<'a> Lowerer<'a> {
                 else_body = Some(body);
             } else {
                 // Build condition: check all param patterns.
-                let cond = self.build_closure_clause_condition(
-                    &clause_data.param_list,
-                    mir_params,
-                );
+                let cond = self.build_closure_clause_condition(&clause_data.param_list, mir_params);
                 let guard = clause_data
                     .guard
                     .as_ref()
@@ -8549,8 +10129,9 @@ impl<'a> Lowerer<'a> {
                 // Display trait dispatch: check if the type has a Display impl
                 // and emit a mangled Display__to_string__TypeName call.
                 let ty_for_lookup = mir_type_to_ty(expr.ty());
-                let matching =
-                    self.trait_registry.find_method_traits("to_string", &ty_for_lookup);
+                let matching = self
+                    .trait_registry
+                    .find_method_traits("to_string", &ty_for_lookup);
                 if !matching.is_empty() {
                     let trait_name = &matching[0];
                     let type_name = mir_type_to_impl_name(expr.ty());
@@ -8558,10 +10139,7 @@ impl<'a> Lowerer<'a> {
                     MirExpr::Call {
                         func: Box::new(MirExpr::Var(
                             mangled,
-                            MirType::FnPtr(
-                                vec![expr.ty().clone()],
-                                Box::new(MirType::String),
-                            ),
+                            MirType::FnPtr(vec![expr.ty().clone()], Box::new(MirType::String)),
                         )),
                         args: vec![expr],
                         ty: MirType::String,
@@ -8575,10 +10153,7 @@ impl<'a> Lowerer<'a> {
                         MirExpr::Call {
                             func: Box::new(MirExpr::Var(
                                 mono_mangled,
-                                MirType::FnPtr(
-                                    vec![expr.ty().clone()],
-                                    Box::new(MirType::String),
-                                ),
+                                MirType::FnPtr(vec![expr.ty().clone()], Box::new(MirType::String)),
                             )),
                             args: vec![expr],
                             ty: MirType::String,
@@ -8678,10 +10253,7 @@ impl<'a> Lowerer<'a> {
                 Some(MirExpr::Call {
                     func: Box::new(MirExpr::Var(
                         "mesh_list_to_string".to_string(),
-                        MirType::FnPtr(
-                            vec![MirType::Ptr, MirType::Ptr],
-                            Box::new(MirType::String),
-                        ),
+                        MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::String)),
                     )),
                     args: vec![expr.clone(), fn_ptr_expr],
                     ty: MirType::String,
@@ -8722,10 +10294,7 @@ impl<'a> Lowerer<'a> {
                 Some(MirExpr::Call {
                     func: Box::new(MirExpr::Var(
                         "mesh_set_to_string".to_string(),
-                        MirType::FnPtr(
-                            vec![MirType::Ptr, MirType::Ptr],
-                            Box::new(MirType::String),
-                        ),
+                        MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::String)),
                     )),
                     args: vec![expr.clone(), fn_ptr_expr],
                     ty: MirType::String,
@@ -8749,8 +10318,18 @@ impl<'a> Lowerer<'a> {
                 "Bool" => "mesh_bool_to_string".to_string(),
                 "String" => "mesh_string_to_string".to_string(),
                 // Bare collection type without type args -- default to Int callback
-                "List" => self.generate_display_collection_wrapper("list", "mesh_list_to_string", &Ty::int(), None),
-                "Set" => self.generate_display_collection_wrapper("set", "mesh_set_to_string", &Ty::int(), None),
+                "List" => self.generate_display_collection_wrapper(
+                    "list",
+                    "mesh_list_to_string",
+                    &Ty::int(),
+                    None,
+                ),
+                "Set" => self.generate_display_collection_wrapper(
+                    "set",
+                    "mesh_set_to_string",
+                    &Ty::int(),
+                    None,
+                ),
                 "Map" => self.generate_display_map_wrapper(&Ty::int(), &Ty::int()),
                 name => {
                     // Check if this user type has a Display impl
@@ -8777,11 +10356,21 @@ impl<'a> Lowerer<'a> {
                     match con.name.as_str() {
                         "List" => {
                             let inner_ty = args.first().cloned().unwrap_or_else(Ty::int);
-                            self.generate_display_collection_wrapper("list", "mesh_list_to_string", &inner_ty, None)
+                            self.generate_display_collection_wrapper(
+                                "list",
+                                "mesh_list_to_string",
+                                &inner_ty,
+                                None,
+                            )
                         }
                         "Set" => {
                             let inner_ty = args.first().cloned().unwrap_or_else(Ty::int);
-                            self.generate_display_collection_wrapper("set", "mesh_set_to_string", &inner_ty, None)
+                            self.generate_display_collection_wrapper(
+                                "set",
+                                "mesh_set_to_string",
+                                &inner_ty,
+                                None,
+                            )
                         }
                         "Map" => {
                             let key_ty = args.first().cloned().unwrap_or_else(Ty::int);
@@ -8863,8 +10452,8 @@ impl<'a> Lowerer<'a> {
     /// Returns the name of the wrapper function.
     fn generate_display_collection_wrapper(
         &mut self,
-        collection_kind: &str,   // "list" or "set"
-        runtime_fn: &str,        // "mesh_list_to_string" or "mesh_set_to_string"
+        collection_kind: &str, // "list" or "set"
+        runtime_fn: &str,      // "mesh_list_to_string" or "mesh_set_to_string"
         inner_ty: &Ty,
         _extra: Option<&str>,
     ) -> String {
@@ -8881,17 +10470,15 @@ impl<'a> Lowerer<'a> {
 
         // Register the wrapper before generating body (prevents infinite recursion)
         let wrapper_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
-        self.known_functions.insert(wrapper_name.clone(), wrapper_ty);
+        self.known_functions
+            .insert(wrapper_name.clone(), wrapper_ty);
 
         // Build the wrapper function MIR:
         //   fn __display_list_Int_to_str(__elem: Ptr) -> Ptr {
         //       mesh_list_to_string(__elem, mesh_int_to_string)
         //   }
         let param_name = "__elem".to_string();
-        let fn_ptr_ty = MirType::FnPtr(
-            vec![MirType::Ptr, MirType::Ptr],
-            Box::new(MirType::Ptr),
-        );
+        let fn_ptr_ty = MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr));
         let body = MirExpr::Call {
             func: Box::new(MirExpr::Var(runtime_fn.to_string(), fn_ptr_ty)),
             args: vec![
@@ -8937,7 +10524,8 @@ impl<'a> Lowerer<'a> {
 
         // Register the wrapper
         let wrapper_ty = MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr));
-        self.known_functions.insert(wrapper_name.clone(), wrapper_ty);
+        self.known_functions
+            .insert(wrapper_name.clone(), wrapper_ty);
 
         // Build the wrapper function MIR:
         //   fn __display_map_Int_String_to_str(__elem: Ptr) -> Ptr {
@@ -9050,7 +10638,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: name.clone(),
-            params: vec![("__a".to_string(), MirType::Int), ("__b".to_string(), MirType::Int)],
+            params: vec![
+                ("__a".to_string(), MirType::Int),
+                ("__b".to_string(), MirType::Int),
+            ],
             return_type: MirType::Bool,
             body,
             is_closure_fn: false,
@@ -9066,7 +10657,10 @@ impl<'a> Lowerer<'a> {
         if self.known_functions.contains_key(&name) {
             return name;
         }
-        let fn_ty = MirType::FnPtr(vec![MirType::Float, MirType::Float], Box::new(MirType::Bool));
+        let fn_ty = MirType::FnPtr(
+            vec![MirType::Float, MirType::Float],
+            Box::new(MirType::Bool),
+        );
         self.known_functions.insert(name.clone(), fn_ty);
 
         let body = MirExpr::BinOp {
@@ -9078,7 +10672,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: name.clone(),
-            params: vec![("__a".to_string(), MirType::Float), ("__b".to_string(), MirType::Float)],
+            params: vec![
+                ("__a".to_string(), MirType::Float),
+                ("__b".to_string(), MirType::Float),
+            ],
             return_type: MirType::Bool,
             body,
             is_closure_fn: false,
@@ -9106,7 +10703,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: name.clone(),
-            params: vec![("__a".to_string(), MirType::Bool), ("__b".to_string(), MirType::Bool)],
+            params: vec![
+                ("__a".to_string(), MirType::Bool),
+                ("__b".to_string(), MirType::Bool),
+            ],
             return_type: MirType::Bool,
             body,
             is_closure_fn: false,
@@ -9122,13 +10722,19 @@ impl<'a> Lowerer<'a> {
         if self.known_functions.contains_key(&name) {
             return name;
         }
-        let fn_ty = MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool));
+        let fn_ty = MirType::FnPtr(
+            vec![MirType::String, MirType::String],
+            Box::new(MirType::Bool),
+        );
         self.known_functions.insert(name.clone(), fn_ty);
 
         let body = MirExpr::Call {
             func: Box::new(MirExpr::Var(
                 "mesh_string_eq".to_string(),
-                MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+                MirType::FnPtr(
+                    vec![MirType::String, MirType::String],
+                    Box::new(MirType::Bool),
+                ),
             )),
             args: vec![
                 MirExpr::Var("__a".to_string(), MirType::String),
@@ -9139,7 +10745,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: name.clone(),
-            params: vec![("__a".to_string(), MirType::String), ("__b".to_string(), MirType::String)],
+            params: vec![
+                ("__a".to_string(), MirType::String),
+                ("__b".to_string(), MirType::String),
+            ],
             return_type: MirType::Bool,
             body,
             is_closure_fn: false,
@@ -9188,7 +10797,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: name.clone(),
-            params: vec![("__a".to_string(), MirType::Int), ("__b".to_string(), MirType::Int)],
+            params: vec![
+                ("__a".to_string(), MirType::Int),
+                ("__b".to_string(), MirType::Int),
+            ],
             return_type: MirType::Int,
             body,
             is_closure_fn: false,
@@ -9210,14 +10822,20 @@ impl<'a> Lowerer<'a> {
         if self.known_functions.contains_key(&name) {
             return name;
         }
-        let fn_ty = MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Int));
+        let fn_ty = MirType::FnPtr(
+            vec![MirType::String, MirType::String],
+            Box::new(MirType::Int),
+        );
         self.known_functions.insert(name.clone(), fn_ty);
 
         // if mesh_string_eq(a, b) { 0 } else { -1 }
         let eq_call = MirExpr::Call {
             func: Box::new(MirExpr::Var(
                 "mesh_string_eq".to_string(),
-                MirType::FnPtr(vec![MirType::String, MirType::String], Box::new(MirType::Bool)),
+                MirType::FnPtr(
+                    vec![MirType::String, MirType::String],
+                    Box::new(MirType::Bool),
+                ),
             )),
             args: vec![
                 MirExpr::Var("__a".to_string(), MirType::String),
@@ -9234,7 +10852,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: name.clone(),
-            params: vec![("__a".to_string(), MirType::String), ("__b".to_string(), MirType::String)],
+            params: vec![
+                ("__a".to_string(), MirType::String),
+                ("__b".to_string(), MirType::String),
+            ],
             return_type: MirType::Int,
             body,
             is_closure_fn: false,
@@ -9278,7 +10899,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: wrapper_name.clone(),
-            params: vec![("__a".to_string(), MirType::Ptr), ("__b".to_string(), MirType::Ptr)],
+            params: vec![
+                ("__a".to_string(), MirType::Ptr),
+                ("__b".to_string(), MirType::Ptr),
+            ],
             return_type: MirType::Bool,
             body,
             is_closure_fn: false,
@@ -9322,7 +10946,10 @@ impl<'a> Lowerer<'a> {
 
         self.functions.push(MirFunction {
             name: wrapper_name.clone(),
-            params: vec![("__a".to_string(), MirType::Ptr), ("__b".to_string(), MirType::Ptr)],
+            params: vec![
+                ("__a".to_string(), MirType::Ptr),
+                ("__b".to_string(), MirType::Ptr),
+            ],
             return_type: MirType::Int,
             body,
             is_closure_fn: false,
@@ -9426,9 +11053,7 @@ impl<'a> Lowerer<'a> {
     /// Find the base type name to use for the function return's early-return construction.
     fn fn_return_sum_type_name(&self, fn_ret_ty: &MirType) -> String {
         match fn_ret_ty {
-            MirType::SumType(name) => {
-                self.sum_type_base_name(name).to_string()
-            }
+            MirType::SumType(name) => self.sum_type_base_name(name).to_string(),
             _ => "Result".to_string(),
         }
     }
@@ -9489,7 +11114,8 @@ impl<'a> Lowerer<'a> {
         let fn_return_type_name = self.fn_return_sum_type_name(fn_ret_ty);
 
         // Find the error type from the sum type definition.
-        let error_ty = self.find_variant_field_type(&pattern_type_name, "Err")
+        let error_ty = self
+            .find_variant_field_type(&pattern_type_name, "Err")
             .unwrap_or(MirType::Ptr);
 
         // Check if From-based error conversion is needed by comparing the
@@ -9536,7 +11162,10 @@ impl<'a> Lowerer<'a> {
             (converted_err, effective_err_ty)
         } else {
             // Error types match -- use original error directly.
-            (MirExpr::Var(err_name.clone(), error_ty.clone()), error_ty.clone())
+            (
+                MirExpr::Var(err_name.clone(), error_ty.clone()),
+                error_ty.clone(),
+            )
         };
 
         // Use the correct error type for the Err arm's pattern binding.
@@ -9749,9 +11378,7 @@ impl<'a> Lowerer<'a> {
     /// The codegen will stack-allocate an array, store elements, and call
     /// mesh_list_from_array(arr_ptr, count).
     fn lower_list_literal(&mut self, list_lit: &ListLiteral) -> MirExpr {
-        let elements: Vec<MirExpr> = list_lit.elements()
-            .map(|e| self.lower_expr(&e))
-            .collect();
+        let elements: Vec<MirExpr> = list_lit.elements().map(|e| self.lower_expr(&e)).collect();
 
         if elements.is_empty() {
             // Empty list: call mesh_list_new()
@@ -9780,10 +11407,7 @@ impl<'a> Lowerer<'a> {
         let fields: Vec<(String, MirExpr)> = sl
             .fields()
             .map(|f| {
-                let field_name = f
-                    .name()
-                    .and_then(|n| n.text())
-                    .unwrap_or_default();
+                let field_name = f.name().and_then(|n| n.text()).unwrap_or_default();
                 let value = f
                     .value()
                     .map(|e| self.lower_expr(&e))
@@ -9826,10 +11450,7 @@ impl<'a> Lowerer<'a> {
             .override_fields()
             .iter()
             .map(|f| {
-                let field_name = f
-                    .name()
-                    .and_then(|n| n.text())
-                    .unwrap_or_default();
+                let field_name = f.name().and_then(|n| n.text()).unwrap_or_default();
                 let value = f
                     .value()
                     .map(|e| self.lower_expr(&e))
@@ -9935,10 +11556,7 @@ impl<'a> Lowerer<'a> {
         if let Some(ref cb_name) = terminate_callback_name {
             self.known_functions.insert(
                 cb_name.clone(),
-                MirType::FnPtr(
-                    vec![MirType::Ptr, MirType::Ptr],
-                    Box::new(MirType::Unit),
-                ),
+                MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)),
             );
         }
 
@@ -10145,7 +11763,9 @@ impl<'a> Lowerer<'a> {
                                 shutdown_ms = tokens[j].text().parse().unwrap_or(5000);
                                 break;
                             }
-                            if tokens[j].kind() == SyntaxKind::IDENT && tokens[j].text() == "brutal_kill" {
+                            if tokens[j].kind() == SyntaxKind::IDENT
+                                && tokens[j].text() == "brutal_kill"
+                            {
                                 shutdown_ms = 0; // 0 = brutal kill
                                 break;
                             }
@@ -10245,11 +11865,16 @@ impl<'a> Lowerer<'a> {
             let mut param_types: Vec<MirType> = Vec::new();
             if let Some(pl) = handler.params() {
                 for p in pl.params() {
-                    let p_name = p.name()
+                    let p_name = p
+                        .name()
                         .map(|t| t.text().to_string())
                         .unwrap_or_else(|| format!("arg{}", 0));
                     let p_ty = self.resolve_range(p.syntax().text_range());
-                    let mir_ty = if matches!(p_ty, MirType::Unit) { MirType::Int } else { p_ty };
+                    let mir_ty = if matches!(p_ty, MirType::Unit) {
+                        MirType::Int
+                    } else {
+                        p_ty
+                    };
                     param_names.push(p_name);
                     param_types.push(mir_ty);
                 }
@@ -10262,7 +11887,8 @@ impl<'a> Lowerer<'a> {
             // itself — only for expressions within it. We must use the tail
             // expression (last expr in the block) to get the (state, reply)
             // tuple type.
-            let reply_type = handler.body()
+            let reply_type = handler
+                .body()
                 .and_then(|block| block.tail_expr())
                 .map(|expr| self.resolve_range(expr.syntax().text_range()))
                 .and_then(|ty| {
@@ -10278,7 +11904,13 @@ impl<'a> Lowerer<'a> {
                 })
                 // Tuples are heap-allocated pointers at runtime, so collapse
                 // Tuple(...) to Ptr to match the LLVM representation.
-                .map(|ty| if matches!(ty, MirType::Tuple(_)) { MirType::Ptr } else { ty })
+                .map(|ty| {
+                    if matches!(ty, MirType::Tuple(_)) {
+                        MirType::Ptr
+                    } else {
+                        ty
+                    }
+                })
                 .unwrap_or(MirType::Int);
 
             call_infos.push(CallInfo {
@@ -10303,11 +11935,16 @@ impl<'a> Lowerer<'a> {
             let mut param_types: Vec<MirType> = Vec::new();
             if let Some(pl) = handler.params() {
                 for p in pl.params() {
-                    let p_name = p.name()
+                    let p_name = p
+                        .name()
                         .map(|t| t.text().to_string())
                         .unwrap_or_else(|| format!("arg{}", 0));
                     let p_ty = self.resolve_range(p.syntax().text_range());
-                    let mir_ty = if matches!(p_ty, MirType::Unit) { MirType::Int } else { p_ty };
+                    let mir_ty = if matches!(p_ty, MirType::Unit) {
+                        MirType::Int
+                    } else {
+                        p_ty
+                    };
                     param_names.push(p_name);
                     param_types.push(mir_ty);
                 }
@@ -10367,7 +12004,11 @@ impl<'a> Lowerer<'a> {
 
         let init_fn_name = format!("__service_{}_init", name_lower);
         let init_ret_ty = effective_return_type(&init_body);
-        let init_ret_ty = if matches!(init_ret_ty, MirType::Unit) { MirType::Int } else { init_ret_ty };
+        let init_ret_ty = if matches!(init_ret_ty, MirType::Unit) {
+            MirType::Int
+        } else {
+            init_ret_ty
+        };
         self.functions.push(MirFunction {
             name: init_fn_name.clone(),
             params: init_params.clone(),
@@ -10392,15 +12033,16 @@ impl<'a> Lowerer<'a> {
 
         for (i, handler) in call_handlers.iter().enumerate() {
             let info = &call_infos[i];
-            let handler_fn_name = format!(
-                "__service_{}_handle_call_{}",
-                name_lower, info.snake_name
-            );
+            let handler_fn_name =
+                format!("__service_{}_handle_call_{}", name_lower, info.snake_name);
 
             self.push_scope();
 
             // State param: use the actual init return type (e.g. Int for PoolHandle, Struct for WriterState).
-            let state_param_name = info.state_param.clone().unwrap_or_else(|| "state".to_string());
+            let state_param_name = info
+                .state_param
+                .clone()
+                .unwrap_or_else(|| "state".to_string());
             self.insert_var(state_param_name.clone(), init_ret_ty.clone());
             let mut params = vec![(state_param_name, init_ret_ty.clone())];
 
@@ -10412,7 +12054,11 @@ impl<'a> Lowerer<'a> {
                         .map(|t| t.text().to_string())
                         .unwrap_or_else(|| "_".to_string());
                     let p_ty = self.resolve_range(param.syntax().text_range());
-                    let mir_ty = if matches!(p_ty, MirType::Unit) { MirType::Int } else { p_ty };
+                    let mir_ty = if matches!(p_ty, MirType::Unit) {
+                        MirType::Int
+                    } else {
+                        p_ty
+                    };
                     self.insert_var(p_name.clone(), mir_ty.clone());
                     params.push((p_name, mir_ty));
                 }
@@ -10442,22 +12088,21 @@ impl<'a> Lowerer<'a> {
                 captures: Vec::new(),
                 has_tail_calls: false,
             });
-            self.known_functions.insert(
-                handler_fn_name,
-                MirType::FnPtr(vec![], Box::new(ret_ty)),
-            );
+            self.known_functions
+                .insert(handler_fn_name, MirType::FnPtr(vec![], Box::new(ret_ty)));
         }
 
         for (i, handler) in cast_handlers.iter().enumerate() {
             let info = &cast_infos[i];
-            let handler_fn_name = format!(
-                "__service_{}_handle_cast_{}",
-                name_lower, info.snake_name
-            );
+            let handler_fn_name =
+                format!("__service_{}_handle_cast_{}", name_lower, info.snake_name);
 
             self.push_scope();
 
-            let state_param_name = info.state_param.clone().unwrap_or_else(|| "state".to_string());
+            let state_param_name = info
+                .state_param
+                .clone()
+                .unwrap_or_else(|| "state".to_string());
             self.insert_var(state_param_name.clone(), init_ret_ty.clone());
             let mut params = vec![(state_param_name, init_ret_ty.clone())];
 
@@ -10468,7 +12113,11 @@ impl<'a> Lowerer<'a> {
                         .map(|t| t.text().to_string())
                         .unwrap_or_else(|| "_".to_string());
                     let p_ty = self.resolve_range(param.syntax().text_range());
-                    let mir_ty = if matches!(p_ty, MirType::Unit) { MirType::Int } else { p_ty };
+                    let mir_ty = if matches!(p_ty, MirType::Unit) {
+                        MirType::Int
+                    } else {
+                        p_ty
+                    };
                     self.insert_var(p_name.clone(), mir_ty.clone());
                     params.push((p_name, mir_ty));
                 }
@@ -10486,7 +12135,11 @@ impl<'a> Lowerer<'a> {
             // Cast handler returns new state. Use effective_return_type to walk
             // through Let wrappers and find the actual return type.
             let cast_ret_ty = effective_return_type(&body);
-            let cast_ret_ty = if matches!(cast_ret_ty, MirType::Unit) { MirType::Int } else { cast_ret_ty };
+            let cast_ret_ty = if matches!(cast_ret_ty, MirType::Unit) {
+                MirType::Int
+            } else {
+                cast_ret_ty
+            };
             self.functions.push(MirFunction {
                 name: handler_fn_name.clone(),
                 params,
@@ -10769,7 +12422,10 @@ impl<'a> Lowerer<'a> {
                         loop_fn_name.clone(),
                         MirType::FnPtr(vec![init_ret_ty.clone()], Box::new(MirType::Unit)),
                     )),
-                    args: vec![MirExpr::Var("__init_state".to_string(), init_ret_ty.clone())],
+                    args: vec![MirExpr::Var(
+                        "__init_state".to_string(),
+                        init_ret_ty.clone(),
+                    )],
                     priority: 1,
                     terminate_callback: None,
                     ty: MirType::Pid(None),
@@ -10833,19 +12489,13 @@ impl<'a> Lowerer<'a> {
         // Build handler dispatch info for codegen.
         let mut call_dispatch_info = Vec::new();
         for info in &call_infos {
-            let handler_fn = format!(
-                "__service_{}_handle_call_{}",
-                name_lower, info.snake_name
-            );
+            let handler_fn = format!("__service_{}_handle_call_{}", name_lower, info.snake_name);
             call_dispatch_info.push((info.tag, handler_fn, info.param_names.len()));
         }
 
         let mut cast_dispatch_info = Vec::new();
         for info in &cast_infos {
-            let handler_fn = format!(
-                "__service_{}_handle_cast_{}",
-                name_lower, info.snake_name
-            );
+            let handler_fn = format!("__service_{}_handle_cast_{}", name_lower, info.snake_name);
             cast_dispatch_info.push((info.tag, handler_fn, info.param_names.len()));
         }
 
@@ -10963,10 +12613,7 @@ impl<'a> Lowerer<'a> {
             if self.known_functions.contains_key(&cb_name) {
                 Some(Box::new(MirExpr::Var(
                     cb_name.clone(),
-                    MirType::FnPtr(
-                        vec![MirType::Ptr, MirType::Ptr],
-                        Box::new(MirType::Unit),
-                    ),
+                    MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)),
                 )))
             } else {
                 None
@@ -11081,10 +12728,7 @@ impl<'a> Lowerer<'a> {
         match &ty {
             MirType::String => expr,
             MirType::Int => {
-                let fn_ty = MirType::FnPtr(
-                    vec![MirType::Int],
-                    Box::new(MirType::String),
-                );
+                let fn_ty = MirType::FnPtr(vec![MirType::Int], Box::new(MirType::String));
                 MirExpr::Call {
                     func: Box::new(MirExpr::Var("mesh_int_to_string".to_string(), fn_ty)),
                     args: vec![expr],
@@ -11092,10 +12736,7 @@ impl<'a> Lowerer<'a> {
                 }
             }
             MirType::Float => {
-                let fn_ty = MirType::FnPtr(
-                    vec![MirType::Float],
-                    Box::new(MirType::String),
-                );
+                let fn_ty = MirType::FnPtr(vec![MirType::Float], Box::new(MirType::String));
                 MirExpr::Call {
                     func: Box::new(MirExpr::Var("mesh_float_to_string".to_string(), fn_ty)),
                     args: vec![expr],
@@ -11103,10 +12744,7 @@ impl<'a> Lowerer<'a> {
                 }
             }
             MirType::Bool => {
-                let fn_ty = MirType::FnPtr(
-                    vec![MirType::Bool],
-                    Box::new(MirType::String),
-                );
+                let fn_ty = MirType::FnPtr(vec![MirType::Bool], Box::new(MirType::String));
                 MirExpr::Call {
                     func: Box::new(MirExpr::Var("mesh_bool_to_string".to_string(), fn_ty)),
                     args: vec![expr],
@@ -11123,20 +12761,42 @@ impl<'a> Lowerer<'a> {
 
 /// Set of known stdlib module names for qualified access lowering.
 const STDLIB_MODULES: &[&str] = &[
-    "String", "IO", "Env", "File", "List", "Map", "Set", "Tuple", "Range", "Queue", "HTTP", "JSON", "Json", "Request", "Job",
-    "Math", "Int", "Float", "Timer", "Sqlite", "Pg", "Ws", "Pool",
-    "Node", "Process",  // Phase 67
-    "Global",  // Phase 68
-    "Iter",  // Phase 76
-    "Orm",  // Phase 97
-    "Query",  // Phase 98
-    "Repo",  // Phase 98
-    "Changeset",  // Phase 99
-    "Migration",  // Phase 101
-    "Regex",  // Phase 119
-    "Crypto",  // Phase 135
-    "Base64",  // Phase 135
-    "Hex",     // Phase 135
+    "String",
+    "IO",
+    "Env",
+    "File",
+    "List",
+    "Map",
+    "Set",
+    "Tuple",
+    "Range",
+    "Queue",
+    "HTTP",
+    "JSON",
+    "Json",
+    "Request",
+    "Job",
+    "Math",
+    "Int",
+    "Float",
+    "Timer",
+    "Sqlite",
+    "Pg",
+    "Ws",
+    "Pool",
+    "Node",
+    "Process",   // Phase 67
+    "Global",    // Phase 68
+    "Iter",      // Phase 76
+    "Orm",       // Phase 97
+    "Query",     // Phase 98
+    "Repo",      // Phase 98
+    "Changeset", // Phase 99
+    "Migration", // Phase 101
+    "Regex",     // Phase 119
+    "Crypto",    // Phase 135
+    "Base64",    // Phase 135
+    "Hex",       // Phase 135
     "DateTime",  // Phase 136
     "Http",      // Phase 137
     "Test",      // Phase 138
@@ -11189,61 +12849,61 @@ fn map_builtin_name(name: &str) -> String {
         "regex_replace" => "mesh_regex_replace".to_string(),
         "regex_split" => "mesh_regex_split".to_string(),
         // Crypto functions (Phase 135)
-        "crypto_sha256"         => "mesh_crypto_sha256".to_string(),
-        "crypto_sha512"         => "mesh_crypto_sha512".to_string(),
-        "crypto_hmac_sha256"    => "mesh_crypto_hmac_sha256".to_string(),
-        "crypto_hmac_sha512"    => "mesh_crypto_hmac_sha512".to_string(),
+        "crypto_sha256" => "mesh_crypto_sha256".to_string(),
+        "crypto_sha512" => "mesh_crypto_sha512".to_string(),
+        "crypto_hmac_sha256" => "mesh_crypto_hmac_sha256".to_string(),
+        "crypto_hmac_sha512" => "mesh_crypto_hmac_sha512".to_string(),
         "crypto_secure_compare" => "mesh_crypto_secure_compare".to_string(),
-        "crypto_uuid4"          => "mesh_crypto_uuid4".to_string(),
+        "crypto_uuid4" => "mesh_crypto_uuid4".to_string(),
         // Base64 functions (Phase 135)
-        "base64_encode"         => "mesh_base64_encode".to_string(),
-        "base64_decode"         => "mesh_base64_decode".to_string(),
-        "base64_encode_url"     => "mesh_base64_encode_url".to_string(),
-        "base64_decode_url"     => "mesh_base64_decode_url".to_string(),
+        "base64_encode" => "mesh_base64_encode".to_string(),
+        "base64_decode" => "mesh_base64_decode".to_string(),
+        "base64_encode_url" => "mesh_base64_encode_url".to_string(),
+        "base64_decode_url" => "mesh_base64_decode_url".to_string(),
         // Hex functions (Phase 135)
-        "hex_encode"            => "mesh_hex_encode".to_string(),
-        "hex_decode"            => "mesh_hex_decode".to_string(),
+        "hex_encode" => "mesh_hex_encode".to_string(),
+        "hex_decode" => "mesh_hex_decode".to_string(),
         // DateTime functions (Phase 136)
-        "datetime_utc_now"        => "mesh_datetime_utc_now".to_string(),
-        "datetime_from_iso8601"   => "mesh_datetime_from_iso8601".to_string(),
-        "datetime_to_iso8601"     => "mesh_datetime_to_iso8601".to_string(),
-        "datetime_from_unix_ms"   => "mesh_datetime_from_unix_ms".to_string(),
-        "datetime_to_unix_ms"     => "mesh_datetime_to_unix_ms".to_string(),
+        "datetime_utc_now" => "mesh_datetime_utc_now".to_string(),
+        "datetime_from_iso8601" => "mesh_datetime_from_iso8601".to_string(),
+        "datetime_to_iso8601" => "mesh_datetime_to_iso8601".to_string(),
+        "datetime_from_unix_ms" => "mesh_datetime_from_unix_ms".to_string(),
+        "datetime_to_unix_ms" => "mesh_datetime_to_unix_ms".to_string(),
         "datetime_from_unix_secs" => "mesh_datetime_from_unix_secs".to_string(),
-        "datetime_to_unix_secs"   => "mesh_datetime_to_unix_secs".to_string(),
-        "datetime_add"            => "mesh_datetime_add".to_string(),
-        "datetime_diff"           => "mesh_datetime_diff".to_string(),
-        "datetime_is_before"      => "mesh_datetime_before".to_string(),
-        "datetime_is_after"       => "mesh_datetime_after".to_string(),
+        "datetime_to_unix_secs" => "mesh_datetime_to_unix_secs".to_string(),
+        "datetime_add" => "mesh_datetime_add".to_string(),
+        "datetime_diff" => "mesh_datetime_diff".to_string(),
+        "datetime_is_before" => "mesh_datetime_before".to_string(),
+        "datetime_is_after" => "mesh_datetime_after".to_string(),
         // Http client functions (Phase 137)
-        "http_build"   => "mesh_http_build".to_string(),
-        "http_header"  => "mesh_http_header".to_string(),
-        "http_body"    => "mesh_http_body".to_string(),
+        "http_build" => "mesh_http_build".to_string(),
+        "http_header" => "mesh_http_header".to_string(),
+        "http_body" => "mesh_http_body".to_string(),
         "http_timeout" => "mesh_http_timeout".to_string(),
-        "http_query"   => "mesh_http_query".to_string(),
-        "http_json"    => "mesh_http_json".to_string(),
-        "http_send"    => "mesh_http_send".to_string(),
+        "http_query" => "mesh_http_query".to_string(),
+        "http_json" => "mesh_http_json".to_string(),
+        "http_send" => "mesh_http_send".to_string(),
         // Http streaming + cancel + keep-alive (Phase 137 Plan 02)
-        "http_stream"       => "mesh_http_stream".to_string(),
+        "http_stream" => "mesh_http_stream".to_string(),
         "http_stream_bytes" => "mesh_http_stream_bytes".to_string(),
-        "http_cancel"       => "mesh_http_cancel".to_string(),
-        "http_client"       => "mesh_http_client".to_string(),
-        "http_send_with"    => "mesh_http_send_with".to_string(),
+        "http_cancel" => "mesh_http_cancel".to_string(),
+        "http_client" => "mesh_http_client".to_string(),
+        "http_send_with" => "mesh_http_send_with".to_string(),
         "http_client_close" => "mesh_http_client_close".to_string(),
         // Test DSL assertion builtins (Phase 138) — lowercase with test_ prefix
-        "test_assert"         => "mesh_test_assert".to_string(),
-        "test_assert_eq"      => "mesh_test_assert_eq".to_string(),
-        "test_assert_ne"      => "mesh_test_assert_ne".to_string(),
-        "test_assert_raises"  => "mesh_test_assert_raises".to_string(),
-        "test_begin"          => "mesh_test_begin".to_string(),
-        "test_pass"           => "mesh_test_pass".to_string(),
-        "test_fail_msg"       => "mesh_test_fail_msg".to_string(),
-        "test_summary"        => "mesh_test_summary".to_string(),
+        "test_assert" => "mesh_test_assert".to_string(),
+        "test_assert_eq" => "mesh_test_assert_eq".to_string(),
+        "test_assert_ne" => "mesh_test_assert_ne".to_string(),
+        "test_assert_raises" => "mesh_test_assert_raises".to_string(),
+        "test_begin" => "mesh_test_begin".to_string(),
+        "test_pass" => "mesh_test_pass".to_string(),
+        "test_fail_msg" => "mesh_test_fail_msg".to_string(),
+        "test_summary" => "mesh_test_summary".to_string(),
         "test_cleanup_actors" => "mesh_test_cleanup_actors".to_string(),
-        "test_run_body"       => "mesh_test_run_body".to_string(),
-        "test_mock_actor"     => "mesh_test_mock_actor".to_string(),
-        "test_pass_count"     => "mesh_test_pass_count".to_string(),
-        "test_fail_count"     => "mesh_test_fail_count".to_string(),
+        "test_run_body" => "mesh_test_run_body".to_string(),
+        "test_mock_actor" => "mesh_test_mock_actor".to_string(),
+        "test_pass_count" => "mesh_test_pass_count".to_string(),
+        "test_fail_count" => "mesh_test_fail_count".to_string(),
         // Bare name for compile (from Regex import compile)
         "compile" => "mesh_regex_compile".to_string(),
         // Names that have already been resolved via from-import and lowered
@@ -11637,7 +13297,11 @@ fn apply_heredoc_content(text: String, is_first: bool, trim_level: usize) -> Str
     let mut lines: Vec<&str> = s.split('\n').collect();
 
     // Drop last line if it's purely whitespace (closing indent line before closing """)
-    if lines.last().map(|l| l.chars().all(|c| c == ' ' || c == '\t')).unwrap_or(false) {
+    if lines
+        .last()
+        .map(|l| l.chars().all(|c| c == ' ' || c == '\t'))
+        .unwrap_or(false)
+    {
         lines.pop();
     }
 
@@ -11645,10 +13309,7 @@ fn apply_heredoc_content(text: String, is_first: bool, trim_level: usize) -> Str
         .iter()
         .map(|line| {
             // Count actual leading whitespace on this line
-            let leading_ws: usize = line
-                .chars()
-                .take_while(|c| *c == ' ' || *c == '\t')
-                .count();
+            let leading_ws: usize = line.chars().take_while(|c| *c == ' ' || *c == '\t').count();
             // Only strip up to trim_level if the line actually starts with whitespace.
             // If a line has no leading whitespace (e.g. a middle-of-line segment after
             // an interpolation), leave it untouched.
@@ -11801,7 +13462,12 @@ fn collect_free_vars(
         MirExpr::UnaryOp { operand, .. } => {
             collect_free_vars(operand, params, outer_vars, captures);
         }
-        MirExpr::Call { func, args, .. } | MirExpr::ClosureCall { closure: func, args, .. } => {
+        MirExpr::Call { func, args, .. }
+        | MirExpr::ClosureCall {
+            closure: func,
+            args,
+            ..
+        } => {
             collect_free_vars(func, params, outer_vars, captures);
             for arg in args {
                 collect_free_vars(arg, params, outer_vars, captures);
@@ -11842,7 +13508,9 @@ fn collect_free_vars(
                 collect_free_vars(val, params, outer_vars, captures);
             }
         }
-        MirExpr::StructUpdate { base, overrides, .. } => {
+        MirExpr::StructUpdate {
+            base, overrides, ..
+        } => {
             collect_free_vars(base, params, outer_vars, captures);
             for (_, val) in overrides {
                 collect_free_vars(val, params, outer_vars, captures);
@@ -11871,7 +13539,12 @@ fn collect_free_vars(
         | MirExpr::Panic { .. }
         | MirExpr::Unit => {}
         // Actor primitives
-        MirExpr::ActorSpawn { func, args, terminate_callback, .. } => {
+        MirExpr::ActorSpawn {
+            func,
+            args,
+            terminate_callback,
+            ..
+        } => {
             collect_free_vars(func, params, outer_vars, captures);
             for arg in args {
                 collect_free_vars(arg, params, outer_vars, captures);
@@ -11880,11 +13553,18 @@ fn collect_free_vars(
                 collect_free_vars(cb, params, outer_vars, captures);
             }
         }
-        MirExpr::ActorSend { target, message, .. } => {
+        MirExpr::ActorSend {
+            target, message, ..
+        } => {
             collect_free_vars(target, params, outer_vars, captures);
             collect_free_vars(message, params, outer_vars, captures);
         }
-        MirExpr::ActorReceive { arms, timeout_ms, timeout_body, .. } => {
+        MirExpr::ActorReceive {
+            arms,
+            timeout_ms,
+            timeout_body,
+            ..
+        } => {
             for arm in arms {
                 if let Some(guard) = &arm.guard {
                     collect_free_vars(guard, params, outer_vars, captures);
@@ -11915,7 +13595,14 @@ fn collect_free_vars(
             collect_free_vars(body, params, outer_vars, captures);
         }
         MirExpr::Break | MirExpr::Continue => {}
-        MirExpr::ForInRange { var, start, end, filter, body, .. } => {
+        MirExpr::ForInRange {
+            var,
+            start,
+            end,
+            filter,
+            body,
+            ..
+        } => {
             collect_free_vars(start, params, outer_vars, captures);
             collect_free_vars(end, params, outer_vars, captures);
             // The loop variable is locally bound -- exclude it from free vars.
@@ -11926,7 +13613,13 @@ fn collect_free_vars(
             }
             collect_free_vars(body, &inner_params, outer_vars, captures);
         }
-        MirExpr::ForInList { var, collection, filter, body, .. } => {
+        MirExpr::ForInList {
+            var,
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             collect_free_vars(collection, params, outer_vars, captures);
             let mut inner_params = params.clone();
             inner_params.insert(var.as_str());
@@ -11935,7 +13628,14 @@ fn collect_free_vars(
             }
             collect_free_vars(body, &inner_params, outer_vars, captures);
         }
-        MirExpr::ForInMap { key_var, val_var, collection, filter, body, .. } => {
+        MirExpr::ForInMap {
+            key_var,
+            val_var,
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             collect_free_vars(collection, params, outer_vars, captures);
             let mut inner_params = params.clone();
             inner_params.insert(key_var.as_str());
@@ -11945,7 +13645,13 @@ fn collect_free_vars(
             }
             collect_free_vars(body, &inner_params, outer_vars, captures);
         }
-        MirExpr::ForInSet { var, collection, filter, body, .. } => {
+        MirExpr::ForInSet {
+            var,
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             collect_free_vars(collection, params, outer_vars, captures);
             let mut inner_params = params.clone();
             inner_params.insert(var.as_str());
@@ -11954,7 +13660,13 @@ fn collect_free_vars(
             }
             collect_free_vars(body, &inner_params, outer_vars, captures);
         }
-        MirExpr::ForInIterator { var, iterator, filter, body, .. } => {
+        MirExpr::ForInIterator {
+            var,
+            iterator,
+            filter,
+            body,
+            ..
+        } => {
             collect_free_vars(iterator, params, outer_vars, captures);
             let mut inner_params = params.clone();
             inner_params.insert(var.as_str());
@@ -11984,7 +13696,10 @@ fn rewrite_tail_calls(expr: &mut MirExpr, current_fn_name: &str) -> bool {
                 if name == current_fn_name {
                     let taken_args = std::mem::take(args);
                     let taken_ty = ty.clone();
-                    *expr = MirExpr::TailCall { args: taken_args, ty: taken_ty };
+                    *expr = MirExpr::TailCall {
+                        args: taken_args,
+                        ty: taken_ty,
+                    };
                     return true;
                 }
             }
@@ -12002,7 +13717,11 @@ fn rewrite_tail_calls(expr: &mut MirExpr, current_fn_name: &str) -> bool {
             // The body (continuation) of a let is in tail position; the value is NOT
             rewrite_tail_calls(body, current_fn_name)
         }
-        MirExpr::If { then_body, else_body, .. } => {
+        MirExpr::If {
+            then_body,
+            else_body,
+            ..
+        } => {
             // BOTH branches are in tail position; the condition is NOT
             let a = rewrite_tail_calls(then_body, current_fn_name);
             let b = rewrite_tail_calls(else_body, current_fn_name);
@@ -12018,7 +13737,9 @@ fn rewrite_tail_calls(expr: &mut MirExpr, current_fn_name: &str) -> bool {
             }
             any
         }
-        MirExpr::ActorReceive { arms, timeout_body, .. } => {
+        MirExpr::ActorReceive {
+            arms, timeout_body, ..
+        } => {
             // All receive arm bodies and timeout body are in tail position
             let mut any = false;
             for arm in arms.iter_mut() {
@@ -12052,7 +13773,12 @@ fn rewrite_tail_calls(expr: &mut MirExpr, current_fn_name: &str) -> bool {
 /// This is the main entry point for AST-to-MIR conversion. It walks the
 /// typed AST, desugars pipe operators and string interpolation, lifts closures,
 /// and produces a flat MIR module.
-pub fn lower_to_mir(parse: &Parse, typeck: &TypeckResult, module_name: &str, pub_fns: &HashSet<String>) -> Result<MirModule, String> {
+pub fn lower_to_mir(
+    parse: &Parse,
+    typeck: &TypeckResult,
+    module_name: &str,
+    pub_fns: &HashSet<String>,
+) -> Result<MirModule, String> {
     let tree = parse.syntax();
     let source_file = match SourceFile::cast(tree.clone()) {
         Some(sf) => sf,
@@ -12111,7 +13837,7 @@ pub fn lower_to_mir(parse: &Parse, typeck: &TypeckResult, module_name: &str, pub
         name: "HttpResponse".to_string(),
         fields: vec![
             ("status".to_string(), MirType::Int),
-            ("body".to_string(), MirType::Ptr),    // *mut MeshString
+            ("body".to_string(), MirType::Ptr), // *mut MeshString
             ("headers".to_string(), MirType::Ptr), // *mut MeshMap
         ],
     });
@@ -12192,10 +13918,9 @@ pub fn lower_to_mir(parse: &Parse, typeck: &TypeckResult, module_name: &str, pub
                 let struct_ty = Ty::Con(mesh_typeck::ty::TyCon::new(name));
                 if typeck.trait_registry.has_impl("Schema", &struct_ty) {
                     // __table__() -> String
-                    lowerer.known_functions.insert(
-                        table_fn,
-                        MirType::FnPtr(vec![], Box::new(MirType::String)),
-                    );
+                    lowerer
+                        .known_functions
+                        .insert(table_fn, MirType::FnPtr(vec![], Box::new(MirType::String)));
                     // __fields__() -> Ptr (List<String>)
                     lowerer.known_functions.insert(
                         format!("{}____fields__", name),
@@ -12242,7 +13967,8 @@ pub fn lower_to_mir(parse: &Parse, typeck: &TypeckResult, module_name: &str, pub
     for func in &lowerer.functions {
         if func.name.starts_with("__service_") && func.name.ends_with("_loop") {
             // Extract service name from __service_{name}_loop
-            let service_name = func.name
+            let service_name = func
+                .name
                 .strip_prefix("__service_")
                 .and_then(|s| s.strip_suffix("_loop"))
                 .unwrap_or("")
@@ -12257,12 +13983,18 @@ pub fn lower_to_mir(parse: &Parse, typeck: &TypeckResult, module_name: &str, pub
 
                 if f.name.starts_with(&call_prefix) {
                     // params: (state, arg0, arg1, ...) -- num_args = params.len() - 1
-                    let num_args = if f.params.len() > 1 { f.params.len() - 1 } else { 0 };
+                    let num_args = if f.params.len() > 1 {
+                        f.params.len() - 1
+                    } else {
+                        0
+                    };
                     // Find the tag from the matching call helper function.
                     let method_name = f.name.strip_prefix(&call_prefix).unwrap_or("");
                     let call_fn = format!("__service_{}_call_{}", service_name, method_name);
                     // Find the tag by looking at the call helper's IntLit arg.
-                    let tag = lowerer.functions.iter()
+                    let tag = lowerer
+                        .functions
+                        .iter()
                         .find(|cf| cf.name == call_fn)
                         .and_then(|cf| {
                             if let MirExpr::Call { args, .. } = &cf.body {
@@ -12277,10 +14009,16 @@ pub fn lower_to_mir(parse: &Parse, typeck: &TypeckResult, module_name: &str, pub
                         .unwrap_or(0);
                     call_handlers.push((tag, f.name.clone(), num_args));
                 } else if f.name.starts_with(&cast_prefix) {
-                    let num_args = if f.params.len() > 1 { f.params.len() - 1 } else { 0 };
+                    let num_args = if f.params.len() > 1 {
+                        f.params.len() - 1
+                    } else {
+                        0
+                    };
                     let method_name = f.name.strip_prefix(&cast_prefix).unwrap_or("");
                     let cast_fn = format!("__service_{}_cast_{}", service_name, method_name);
-                    let tag = lowerer.functions.iter()
+                    let tag = lowerer
+                        .functions
+                        .iter()
                         .find(|cf| cf.name == cast_fn)
                         .and_then(|cf| {
                             if let MirExpr::Call { args, .. } = &cf.body {
@@ -12399,9 +14137,7 @@ end
                     false
                 }
                 MirExpr::Block(exprs, _) => exprs.iter().any(has_concat_call),
-                MirExpr::Let { value, body, .. } => {
-                    has_concat_call(value) || has_concat_call(body)
-                }
+                MirExpr::Let { value, body, .. } => has_concat_call(value) || has_concat_call(body),
                 _ => false,
             }
         }
@@ -12425,7 +14161,10 @@ end
         let mir = lower(source);
 
         // Should have a lifted closure function
-        let closure_fn = mir.functions.iter().find(|f| f.name.starts_with("__closure_"));
+        let closure_fn = mir
+            .functions
+            .iter()
+            .find(|f| f.name.starts_with("__closure_"));
         assert!(
             closure_fn.is_some(),
             "Expected lifted closure function, got functions: {:?}",
@@ -12468,8 +14207,11 @@ end
         let mir = lower(source);
         // The actor should produce a function named "counter"
         let actor_fn = mir.functions.iter().find(|f| f.name == "counter");
-        assert!(actor_fn.is_some(), "Expected 'counter' actor function in MIR, got: {:?}",
-            mir.functions.iter().map(|f| &f.name).collect::<Vec<_>>());
+        assert!(
+            actor_fn.is_some(),
+            "Expected 'counter' actor function in MIR, got: {:?}",
+            mir.functions.iter().map(|f| &f.name).collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -12502,7 +14244,8 @@ end
         }
         assert!(
             has_actor_spawn(&main.body),
-            "Expected ActorSpawn in main body: {:?}", main.body
+            "Expected ActorSpawn in main body: {:?}",
+            main.body
         );
     }
 
@@ -12571,37 +14314,51 @@ end
 
         // Should have generated init, loop, start, call helper, cast helper, and handler functions.
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_init")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_init")),
             "Missing init function. Functions: {:?}",
             fn_names
         );
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_loop")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_loop")),
             "Missing loop function. Functions: {:?}",
             fn_names
         );
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_start")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_start")),
             "Missing start function. Functions: {:?}",
             fn_names
         );
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_call_get_count")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_call_get_count")),
             "Missing call helper function. Functions: {:?}",
             fn_names
         );
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_cast_reset")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_cast_reset")),
             "Missing cast helper function. Functions: {:?}",
             fn_names
         );
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_handle_call_get_count")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_handle_call_get_count")),
             "Missing call handler function. Functions: {:?}",
             fn_names
         );
         assert!(
-            fn_names.iter().any(|n| n.contains("__service_counter_handle_cast_reset")),
+            fn_names
+                .iter()
+                .any(|n| n.contains("__service_counter_handle_cast_reset")),
             "Missing cast handler function. Functions: {:?}",
             fn_names
         );
@@ -12858,12 +14615,8 @@ end
 
         fn has_binop_add(expr: &MirExpr) -> bool {
             match expr {
-                MirExpr::BinOp {
-                    op: BinOp::Add, ..
-                } => true,
-                MirExpr::Let { value, body, .. } => {
-                    has_binop_add(value) || has_binop_add(body)
-                }
+                MirExpr::BinOp { op: BinOp::Add, .. } => true,
+                MirExpr::Let { value, body, .. } => has_binop_add(value) || has_binop_add(body),
                 MirExpr::Block(exprs, _) => exprs.iter().any(has_binop_add),
                 _ => false,
             }
@@ -12894,9 +14647,7 @@ fn main() do bar(42) end
                 MirExpr::Panic { .. } => true,
                 MirExpr::Let { value, body, .. } => has_panic(value) || has_panic(body),
                 MirExpr::Block(exprs, _) => exprs.iter().any(has_panic),
-                MirExpr::Call { func, args, .. } => {
-                    has_panic(func) || args.iter().any(has_panic)
-                }
+                MirExpr::Call { func, args, .. } => has_panic(func) || args.iter().any(has_panic),
                 MirExpr::BinOp { lhs, rhs, .. } => has_panic(lhs) || has_panic(rhs),
                 MirExpr::If {
                     cond,
@@ -12912,7 +14663,8 @@ fn main() do bar(42) end
             assert!(
                 !has_panic(&func.body),
                 "Normal program should not have Panic nodes, but found one in '{}': {:?}",
-                func.name, func.body
+                func.name,
+                func.body
             );
         }
     }
@@ -13202,9 +14954,10 @@ end
         let typeck = mesh_typeck::check(&parse);
 
         // Typeck should report TraitNotSatisfied error for Int not implementing Displayable.
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             has_trait_error,
             "Expected TraitNotSatisfied error from typeck when calling show(42) without \
@@ -13243,9 +14996,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             has_trait_error,
             "Expected TraitNotSatisfied when calling aliased constrained function f(42). Errors: {:?}",
@@ -13275,9 +15029,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             has_trait_error,
             "Expected TraitNotSatisfied when calling chain-aliased constrained function g(42). Errors: {:?}",
@@ -13307,9 +15062,10 @@ end
         let parse = mesh_parser::parse(source_bad);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             has_trait_error,
             "Expected TraitNotSatisfied for user-defined trait Greetable via alias. Errors: {:?}",
@@ -13345,9 +15101,10 @@ end
         let parse_good = mesh_parser::parse(source_good);
         let typeck_good = mesh_typeck::check(&parse_good);
 
-        let has_trait_error_good = typeck_good.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error_good = typeck_good
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             !has_trait_error_good,
             "Should NOT get TraitNotSatisfied when calling aliased constrained function with conforming type. Errors: {:?}",
@@ -13385,9 +15142,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             !has_trait_error,
             "Should NOT get TraitNotSatisfied when passing show to apply with conforming type. Errors: {:?}",
@@ -13419,9 +15177,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             has_trait_error,
             "Expected TraitNotSatisfied when passing constrained function to apply with non-conforming type. Errors: {:?}",
@@ -13463,9 +15222,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             !has_trait_error,
             "Should NOT get TraitNotSatisfied for nested higher-order constraint propagation. Errors: {:?}",
@@ -13504,9 +15264,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             !has_trait_error,
             "Should NOT get TraitNotSatisfied with conforming type in higher-order apply. Errors: {:?}",
@@ -13545,9 +15306,10 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
 
-        let has_trait_error = typeck.errors.iter().any(|e| {
-            matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. })
-        });
+        let has_trait_error = typeck
+            .errors
+            .iter()
+            .any(|e| matches!(e, mesh_typeck::error::TypeError::TraitNotSatisfied { .. }));
         assert!(
             !has_trait_error,
             "Should NOT get TraitNotSatisfied when passing let-aliased constrained function to apply. Errors: {:?}",
@@ -13588,9 +15350,7 @@ end
                 MirExpr::Panic { .. } => true,
                 MirExpr::Let { value, body, .. } => has_panic(value) || has_panic(body),
                 MirExpr::Block(exprs, _) => exprs.iter().any(has_panic),
-                MirExpr::Call { func, args, .. } => {
-                    has_panic(func) || args.iter().any(has_panic)
-                }
+                MirExpr::Call { func, args, .. } => has_panic(func) || args.iter().any(has_panic),
                 MirExpr::BinOp { lhs, rhs, .. } => has_panic(lhs) || has_panic(rhs),
                 MirExpr::If {
                     cond,
@@ -13606,7 +15366,8 @@ end
             assert!(
                 !has_panic(&func.body),
                 "Normal trait program should not have Panic nodes, found in '{}': {:?}",
-                func.name, func.body
+                func.name,
+                func.body
             );
         }
 
@@ -13616,7 +15377,8 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
         let empty_pub_fns = HashSet::new();
-        let _mir = lower_to_mir(&parse, &typeck, "", &empty_pub_fns).expect("MIR lowering with depth tracking");
+        let _mir = lower_to_mir(&parse, &typeck, "", &empty_pub_fns)
+            .expect("MIR lowering with depth tracking");
     }
 
     #[test]
@@ -13633,7 +15395,10 @@ fn main() do
 end
 "#;
         let mir = lower(source);
-        let inspect_fn = mir.functions.iter().find(|f| f.name == "Debug__inspect__Point");
+        let inspect_fn = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Debug__inspect__Point");
         assert!(
             inspect_fn.is_some(),
             "Expected Debug__inspect__Point function in MIR. Functions: {:?}",
@@ -13659,7 +15424,10 @@ fn main() do
 end
 "#;
         let mir = lower(source);
-        let inspect_fn = mir.functions.iter().find(|f| f.name == "Debug__inspect__Color");
+        let inspect_fn = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Debug__inspect__Color");
         assert!(
             inspect_fn.is_some(),
             "Expected Debug__inspect__Color function in MIR. Functions: {:?}",
@@ -14070,7 +15838,10 @@ end
 "#;
         let mir = lower(source);
         let hash_fn = mir.functions.iter().find(|f| f.name == "Hash__hash__Point");
-        assert!(hash_fn.is_some(), "Expected Hash__hash__Point function in MIR");
+        assert!(
+            hash_fn.is_some(),
+            "Expected Hash__hash__Point function in MIR"
+        );
         let hash_fn = hash_fn.unwrap();
         assert_eq!(hash_fn.params.len(), 1);
         assert_eq!(hash_fn.params[0].0, "self");
@@ -14090,7 +15861,11 @@ fn main() do
 end
 "#;
         let mir = lower(source);
-        let hash_fn = mir.functions.iter().find(|f| f.name == "Hash__hash__Point").unwrap();
+        let hash_fn = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Hash__hash__Point")
+            .unwrap();
         // Body should contain a mesh_hash_combine call (chaining two field hashes).
         fn has_combine(expr: &MirExpr) -> bool {
             match expr {
@@ -14105,7 +15880,10 @@ end
                 _ => false,
             }
         }
-        assert!(has_combine(&hash_fn.body), "Hash body should contain mesh_hash_combine for multi-field struct");
+        assert!(
+            has_combine(&hash_fn.body),
+            "Hash body should contain mesh_hash_combine for multi-field struct"
+        );
     }
 
     #[test]
@@ -14120,7 +15898,10 @@ end
 "#;
         let mir = lower(source);
         let hash_fn = mir.functions.iter().find(|f| f.name == "Hash__hash__Empty");
-        assert!(hash_fn.is_some(), "Expected Hash__hash__Empty function in MIR");
+        assert!(
+            hash_fn.is_some(),
+            "Expected Hash__hash__Empty function in MIR"
+        );
         let hash_fn = hash_fn.unwrap();
         // Empty struct hash should be a constant (FNV offset basis)
         assert!(matches!(hash_fn.body, MirExpr::IntLit(_, MirType::Int)));
@@ -14156,13 +15937,14 @@ end
                     }
                     args.iter().any(has_hash_call) || has_hash_call(func)
                 }
-                MirExpr::Let { value, body, .. } => {
-                    has_hash_call(value) || has_hash_call(body)
-                }
+                MirExpr::Let { value, body, .. } => has_hash_call(value) || has_hash_call(body),
                 _ => false,
             }
         }
-        assert!(has_hash_call(&main_fn.unwrap().body), "Map.put with struct key should emit Hash__hash__Point call");
+        assert!(
+            has_hash_call(&main_fn.unwrap().body),
+            "Map.put with struct key should emit Hash__hash__Point call"
+        );
     }
 
     // ── Default MIR lowering tests ──────────────────────────────────
@@ -14187,7 +15969,10 @@ end
                 _ => false,
             }
         }
-        assert!(has_int_zero(&main_fn.unwrap().body), "default() for Int should produce IntLit(0)");
+        assert!(
+            has_int_zero(&main_fn.unwrap().body),
+            "default() for Int should produce IntLit(0)"
+        );
     }
 
     #[test]
@@ -14209,7 +15994,10 @@ end
                 _ => false,
             }
         }
-        assert!(has_float_zero(&main_fn.unwrap().body), "default() for Float should produce FloatLit(0.0)");
+        assert!(
+            has_float_zero(&main_fn.unwrap().body),
+            "default() for Float should produce FloatLit(0.0)"
+        );
     }
 
     #[test]
@@ -14226,12 +16014,17 @@ end
         fn has_empty_string(expr: &MirExpr) -> bool {
             match expr {
                 MirExpr::StringLit(s, MirType::String) if s.is_empty() => true,
-                MirExpr::Let { value, body, .. } => has_empty_string(value) || has_empty_string(body),
+                MirExpr::Let { value, body, .. } => {
+                    has_empty_string(value) || has_empty_string(body)
+                }
                 MirExpr::Call { args, .. } => args.iter().any(has_empty_string),
                 _ => false,
             }
         }
-        assert!(has_empty_string(&main_fn.unwrap().body), "default() for String should produce StringLit(\"\")");
+        assert!(
+            has_empty_string(&main_fn.unwrap().body),
+            "default() for String should produce StringLit(\"\")"
+        );
     }
 
     #[test]
@@ -14253,7 +16046,10 @@ end
                 _ => false,
             }
         }
-        assert!(has_bool_false(&main_fn.unwrap().body), "default() for Bool should produce BoolLit(false)");
+        assert!(
+            has_bool_false(&main_fn.unwrap().body),
+            "default() for Bool should produce BoolLit(false)"
+        );
     }
 
     // ── Default method body tests (21-03) ────────────────────────────
@@ -14279,17 +16075,26 @@ end
         let parse = mesh_parser::parse(source);
         let typeck = mesh_typeck::check(&parse);
         // Check that there are no MissingTraitMethod errors.
-        let missing_errors: Vec<_> = typeck.errors.iter().filter(|e| {
-            matches!(e, mesh_typeck::error::TypeError::MissingTraitMethod { .. })
-        }).collect();
-        assert!(missing_errors.is_empty(),
-            "Expected no MissingTraitMethod errors, got: {:?}", missing_errors);
+        let missing_errors: Vec<_> = typeck
+            .errors
+            .iter()
+            .filter(|e| matches!(e, mesh_typeck::error::TypeError::MissingTraitMethod { .. }))
+            .collect();
+        assert!(
+            missing_errors.is_empty(),
+            "Expected no MissingTraitMethod errors, got: {:?}",
+            missing_errors
+        );
         // Should also lower to MIR without failure.
         let empty_pub_fns = HashSet::new();
         let mir = lower_to_mir(&parse, &typeck, "", &empty_pub_fns).expect("MIR lowering failed");
-        assert!(mir.functions.iter().any(|f| f.name == "Describable__describe__Point"),
+        assert!(
+            mir.functions
+                .iter()
+                .any(|f| f.name == "Describable__describe__Point"),
             "Expected default method function Describable__describe__Point in MIR, got: {:?}",
-            mir.functions.iter().map(|f| &f.name).collect::<Vec<_>>());
+            mir.functions.iter().map(|f| &f.name).collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -14312,10 +16117,15 @@ impl Describable for Point do
 end
 "#;
         let mir = lower(source);
-        let func = mir.functions.iter().find(|f| f.name == "Describable__describe__Point");
-        assert!(func.is_some(),
+        let func = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Describable__describe__Point");
+        assert!(
+            func.is_some(),
             "Expected Describable__describe__Point function in MIR, got: {:?}",
-            mir.functions.iter().map(|f| &f.name).collect::<Vec<_>>());
+            mir.functions.iter().map(|f| &f.name).collect::<Vec<_>>()
+        );
         let func = func.unwrap();
         // The self parameter should be present and typed to the concrete type.
         assert!(!func.params.is_empty(), "Expected at least self parameter");
@@ -14345,12 +16155,17 @@ end
 "#;
         let mir = lower(source);
         // There should be exactly one Describable__describe__Point function (the override).
-        let funcs: Vec<_> = mir.functions.iter()
+        let funcs: Vec<_> = mir
+            .functions
+            .iter()
             .filter(|f| f.name == "Describable__describe__Point")
             .collect();
-        assert_eq!(funcs.len(), 1,
+        assert_eq!(
+            funcs.len(),
+            1,
             "Expected exactly 1 Describable__describe__Point, got {}",
-            funcs.len());
+            funcs.len()
+        );
         // The body should contain the override string "point", not "unknown".
         fn has_string(expr: &MirExpr, s: &str) -> bool {
             match expr {
@@ -14360,10 +16175,15 @@ end
                 _ => false,
             }
         }
-        assert!(has_string(&funcs[0].body, "point"),
-            "Override body should contain 'point', got: {:?}", funcs[0].body);
-        assert!(!has_string(&funcs[0].body, "unknown"),
-            "Override body should NOT contain 'unknown'");
+        assert!(
+            has_string(&funcs[0].body, "point"),
+            "Override body should contain 'point', got: {:?}",
+            funcs[0].body
+        );
+        assert!(
+            !has_string(&funcs[0].body, "unknown"),
+            "Override body should NOT contain 'unknown'"
+        );
     }
 
     // ── Collection Display tests (Phase 21 Plan 04) ─────────────────
@@ -14378,8 +16198,7 @@ end
                         return true;
                     }
                 }
-                args.iter().any(|a| has_call_to(a, fn_name))
-                    || has_call_to(func, fn_name)
+                args.iter().any(|a| has_call_to(a, fn_name)) || has_call_to(func, fn_name)
             }
             MirExpr::Block(exprs, _) => exprs.iter().any(|e| has_call_to(e, fn_name)),
             MirExpr::Let { value, body, .. } => {
@@ -14555,16 +16374,35 @@ end
         // Ord__compare__Int, Ord__compare__Float, Ord__compare__String should exist.
         let mir = lower("fn main() do 1 end");
         let fns: Vec<&str> = mir.functions.iter().map(|f| f.name.as_str()).collect();
-        assert!(fns.contains(&"Ord__compare__Int"), "Missing Ord__compare__Int. Fns: {:?}", fns);
-        assert!(fns.contains(&"Ord__compare__Float"), "Missing Ord__compare__Float. Fns: {:?}", fns);
-        assert!(fns.contains(&"Ord__compare__String"), "Missing Ord__compare__String. Fns: {:?}", fns);
+        assert!(
+            fns.contains(&"Ord__compare__Int"),
+            "Missing Ord__compare__Int. Fns: {:?}",
+            fns
+        );
+        assert!(
+            fns.contains(&"Ord__compare__Float"),
+            "Missing Ord__compare__Float. Fns: {:?}",
+            fns
+        );
+        assert!(
+            fns.contains(&"Ord__compare__String"),
+            "Missing Ord__compare__String. Fns: {:?}",
+            fns
+        );
 
         // Check Ord__compare__Int signature
-        let compare_int = mir.functions.iter().find(|f| f.name == "Ord__compare__Int").unwrap();
+        let compare_int = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Ord__compare__Int")
+            .unwrap();
         assert_eq!(compare_int.params.len(), 2);
         assert_eq!(compare_int.params[0].1, MirType::Int);
         assert_eq!(compare_int.params[1].1, MirType::Int);
-        assert_eq!(compare_int.return_type, MirType::SumType("Ordering".to_string()));
+        assert_eq!(
+            compare_int.return_type,
+            MirType::SumType("Ordering".to_string())
+        );
     }
 
     #[test]
@@ -14601,7 +16439,10 @@ fn main() do
 end
 "#;
         let mir = lower(source);
-        let compare_fn = mir.functions.iter().find(|f| f.name == "Ord__compare__Point");
+        let compare_fn = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Ord__compare__Point");
         assert!(
             compare_fn.is_some(),
             "Expected Ord__compare__Point function in MIR. Functions: {:?}",
@@ -14609,7 +16450,10 @@ end
         );
         let compare_fn = compare_fn.unwrap();
         assert_eq!(compare_fn.params.len(), 2);
-        assert_eq!(compare_fn.return_type, MirType::SumType("Ordering".to_string()));
+        assert_eq!(
+            compare_fn.return_type,
+            MirType::SumType("Ordering".to_string())
+        );
     }
 
     #[test]
@@ -14627,7 +16471,10 @@ fn main() do
 end
 "#;
         let mir = lower(source);
-        let compare_fn = mir.functions.iter().find(|f| f.name == "Ord__compare__Color");
+        let compare_fn = mir
+            .functions
+            .iter()
+            .find(|f| f.name == "Ord__compare__Color");
         assert!(
             compare_fn.is_some(),
             "Expected Ord__compare__Color function in MIR. Functions: {:?}",
@@ -14635,7 +16482,10 @@ end
         );
         let compare_fn = compare_fn.unwrap();
         assert_eq!(compare_fn.params.len(), 2);
-        assert_eq!(compare_fn.return_type, MirType::SumType("Ordering".to_string()));
+        assert_eq!(
+            compare_fn.return_type,
+            MirType::SumType("Ordering".to_string())
+        );
     }
 
     #[test]
@@ -14781,7 +16631,11 @@ end
             match expr {
                 MirExpr::Call { func, args, .. } => {
                     let mut n = if let MirExpr::Var(name, _) = func.as_ref() {
-                        if name == target { 1 } else { 0 }
+                        if name == target {
+                            1
+                        } else {
+                            0
+                        }
                     } else {
                         0
                     };
@@ -14795,8 +16649,15 @@ end
                     count_calls(value, target) + count_calls(body, target)
                 }
                 MirExpr::Block(exprs, _) => exprs.iter().map(|e| count_calls(e, target)).sum(),
-                MirExpr::If { cond, then_body, else_body, .. } => {
-                    count_calls(cond, target) + count_calls(then_body, target) + count_calls(else_body, target)
+                MirExpr::If {
+                    cond,
+                    then_body,
+                    else_body,
+                    ..
+                } => {
+                    count_calls(cond, target)
+                        + count_calls(then_body, target)
+                        + count_calls(else_body, target)
                 }
                 _ => 0,
             }
@@ -14880,7 +16741,8 @@ end
                 }
                 MirExpr::Block(exprs, _) => exprs.iter().any(|e| has_field_access(e, field_name)),
                 MirExpr::Call { func, args, .. } => {
-                    has_field_access(func, field_name) || args.iter().any(|a| has_field_access(a, field_name))
+                    has_field_access(func, field_name)
+                        || args.iter().any(|a| has_field_access(a, field_name))
                 }
                 _ => false,
             }
@@ -14974,10 +16836,24 @@ end
         assert!(func.is_some(), "Expected 'test' function in MIR");
         let func = func.unwrap();
         match &func.body {
-            MirExpr::ForInRange { var, start, end, ty, .. } => {
+            MirExpr::ForInRange {
+                var,
+                start,
+                end,
+                ty,
+                ..
+            } => {
                 assert_eq!(var, "i");
-                assert!(matches!(start.as_ref(), MirExpr::IntLit(0, _)), "Expected start=0, got {:?}", start);
-                assert!(matches!(end.as_ref(), MirExpr::IntLit(10, _)), "Expected end=10, got {:?}", end);
+                assert!(
+                    matches!(start.as_ref(), MirExpr::IntLit(0, _)),
+                    "Expected start=0, got {:?}",
+                    start
+                );
+                assert!(
+                    matches!(end.as_ref(), MirExpr::IntLit(10, _)),
+                    "Expected end=10, got {:?}",
+                    end
+                );
                 assert_eq!(*ty, MirType::Ptr);
             }
             other => panic!("Expected MirExpr::ForInRange, got {:?}", other),

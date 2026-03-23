@@ -59,9 +59,7 @@ fn assert_has_error<F: Fn(&TypeError) -> bool>(result: &TypeckResult, pred: F, d
 /// resolves to the sum type.
 #[test]
 fn test_sum_type_nullary_constructor() {
-    let result = check_source(
-        "type Color do\n  Red\n  Green\n  Blue\nend\nColor.Red",
-    );
+    let result = check_source("type Color do\n  Red\n  Green\n  Blue\nend\nColor.Red");
     assert_result_type(
         &result,
         Ty::App(Box::new(Ty::Con(TyCon::new("Color"))), vec![]),
@@ -72,9 +70,7 @@ fn test_sum_type_nullary_constructor() {
 /// Shape.Circle(5.0) should type-check to Shape.
 #[test]
 fn test_sum_type_positional_constructor() {
-    let result = check_source(
-        "type Shape do\n  Circle(Float)\n  Point\nend\nShape.Circle(5.0)",
-    );
+    let result = check_source("type Shape do\n  Circle(Float)\n  Point\nend\nShape.Circle(5.0)");
     assert_result_type(
         &result,
         Ty::App(Box::new(Ty::Con(TyCon::new("Shape"))), vec![]),
@@ -84,9 +80,8 @@ fn test_sum_type_positional_constructor() {
 /// Test 3: Generic sum type -- Option.Some(42) should infer Option<Int>.
 #[test]
 fn test_generic_sum_type_constructor() {
-    let result = check_source(
-        "type MyOption<T> do\n  MySome(T)\n  MyNone\nend\nMyOption.MySome(42)",
-    );
+    let result =
+        check_source("type MyOption<T> do\n  MySome(T)\n  MyNone\nend\nMyOption.MySome(42)");
     assert_result_type(&result, Ty::option_like("MyOption", Ty::int()));
 }
 
@@ -109,9 +104,7 @@ fn test_builtin_option_still_works() {
 /// Test 6: Wrong argument type to variant constructor produces error.
 #[test]
 fn test_sum_type_wrong_arg_type() {
-    let result = check_source(
-        "type Shape do\n  Circle(Float)\nend\nShape.Circle(\"bad\")",
-    );
+    let result = check_source("type Shape do\n  Circle(Float)\nend\nShape.Circle(\"bad\")");
     assert_has_error(
         &result,
         |e| matches!(e, TypeError::Mismatch { .. }),
@@ -122,9 +115,8 @@ fn test_sum_type_wrong_arg_type() {
 /// Test 7: Multiple field constructor.
 #[test]
 fn test_sum_type_multiple_fields() {
-    let result = check_source(
-        "type Shape do\n  Rect(Float, Float)\n  Point\nend\nShape.Rect(3.0, 4.0)",
-    );
+    let result =
+        check_source("type Shape do\n  Rect(Float, Float)\n  Point\nend\nShape.Rect(3.0, 4.0)");
     assert_result_type(
         &result,
         Ty::App(Box::new(Ty::Con(TyCon::new("Shape"))), vec![]),
@@ -268,21 +260,45 @@ fn test_option_is_sum_type() {
 fn test_result_is_sum_type() {
     // Unqualified Ok(42) still works
     let result = check_source("Ok(42)");
-    assert!(result.errors.is_empty(), "expected no errors, got: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "expected no errors, got: {:?}",
+        result.errors
+    );
     let actual_str = format!("{}", result.result_type.as_ref().unwrap());
-    assert!(actual_str.starts_with("Result<Int"), "expected Result<Int, ...>, got `{}`", actual_str);
+    assert!(
+        actual_str.starts_with("Result<Int"),
+        "expected Result<Int, ...>, got `{}`",
+        actual_str
+    );
 
     // Qualified Result.Ok(42) works
     let result2 = check_source("Result.Ok(42)");
-    assert!(result2.errors.is_empty(), "expected no errors, got: {:?}", result2.errors);
+    assert!(
+        result2.errors.is_empty(),
+        "expected no errors, got: {:?}",
+        result2.errors
+    );
     let actual_str2 = format!("{}", result2.result_type.as_ref().unwrap());
-    assert!(actual_str2.starts_with("Result<Int"), "expected Result<Int, ...>, got `{}`", actual_str2);
+    assert!(
+        actual_str2.starts_with("Result<Int"),
+        "expected Result<Int, ...>, got `{}`",
+        actual_str2
+    );
 
     // Qualified Result.Err("oops") works
     let result3 = check_source("Result.Err(\"oops\")");
-    assert!(result3.errors.is_empty(), "expected no errors, got: {:?}", result3.errors);
+    assert!(
+        result3.errors.is_empty(),
+        "expected no errors, got: {:?}",
+        result3.errors
+    );
     let actual_str3 = format!("{}", result3.result_type.as_ref().unwrap());
-    assert!(actual_str3.contains("Result"), "expected Result<...>, got `{}`", actual_str3);
+    assert!(
+        actual_str3.contains("Result"),
+        "expected Result<...>, got `{}`",
+        actual_str3
+    );
 }
 
 /// Test 19: Option pattern matching (Some + None = exhaustive).

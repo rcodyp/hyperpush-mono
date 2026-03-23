@@ -77,32 +77,14 @@ const SNIPPETS: &[(&str, &str)] = &[
     ("fn", "fn ${1:name}(${2:params}) do\n  ${0}\nend"),
     ("let", "let ${1:name} = ${0}"),
     ("struct", "struct ${1:Name} do\n  ${0}\nend"),
-    (
-        "case",
-        "case ${1:expr} do\n  ${2:pattern} -> ${0}\nend",
-    ),
-    (
-        "for",
-        "for ${1:item} in ${2:collection} do\n  ${0}\nend",
-    ),
+    ("case", "case ${1:expr} do\n  ${2:pattern} -> ${0}\nend"),
+    ("for", "for ${1:item} in ${2:collection} do\n  ${0}\nend"),
     ("while", "while ${1:condition} do\n  ${0}\nend"),
-    (
-        "actor",
-        "actor ${1:Name}(${2:state}) do\n  ${0}\nend",
-    ),
+    ("actor", "actor ${1:Name}(${2:state}) do\n  ${0}\nend"),
     ("interface", "interface ${1:Name} do\n  ${0}\nend"),
-    (
-        "impl",
-        "impl ${1:Trait} for ${2:Type} do\n  ${0}\nend",
-    ),
-    (
-        "type",
-        "type ${1:Alias} = ${0:ExistingType}",
-    ),
-    (
-        "json",
-        "json {\n  ${1:key}: ${0:value}\n}",
-    ),
+    ("impl", "impl ${1:Trait} for ${2:Type} do\n  ${0}\nend"),
+    ("type", "type ${1:Alias} = ${0:ExistingType}"),
+    ("json", "json {\n  ${1:key}: ${0:value}\n}"),
 ];
 
 /// Compute completion items at the given position.
@@ -440,14 +422,8 @@ mod tests {
             "should contain 'while', got: {:?}",
             keyword_labels
         );
-        assert!(
-            !keyword_labels.contains(&"fn"),
-            "should not contain 'fn'"
-        );
-        assert!(
-            !keyword_labels.contains(&"let"),
-            "should not contain 'let'"
-        );
+        assert!(!keyword_labels.contains(&"fn"), "should not contain 'fn'");
+        assert!(!keyword_labels.contains(&"let"), "should not contain 'let'");
     }
 
     #[test]

@@ -240,10 +240,7 @@ impl<'src> Parser<'src> {
             forward_parent: None,
         });
         // Link the completed node's Open event to point forward to this new event.
-        if let Event::Open {
-            forward_parent, ..
-        } = &mut self.events[completed.index]
-        {
+        if let Event::Open { forward_parent, .. } = &mut self.events[completed.index] {
             *forward_parent = Some(mark.index);
         }
         mark
@@ -357,8 +354,12 @@ impl<'src> Parser<'src> {
         related_msg: &str,
     ) {
         let span = self.current_span();
-        self.errors
-            .push(ParseError::with_related(message, span, related_msg, related_span));
+        self.errors.push(ParseError::with_related(
+            message,
+            span,
+            related_msg,
+            related_span,
+        ));
         self.has_error = true;
     }
 
@@ -538,8 +539,7 @@ impl<'src> Parser<'src> {
                     if token_pos < self.tokens.len() {
                         let token = &self.tokens[token_pos];
                         let syntax_kind = SyntaxKind::from(token.kind.clone());
-                        let text =
-                            &self.source[token.span.start as usize..token.span.end as usize];
+                        let text = &self.source[token.span.start as usize..token.span.end as usize];
                         builder.token(rowan::SyntaxKind(syntax_kind as u16), text);
                         token_pos += 1;
                     }
@@ -628,10 +628,18 @@ pub(crate) fn parse_item_or_stmt(p: &mut Parser) {
                     let mut depth = 1u32;
                     while depth > 0 {
                         match p.nth(lookahead) {
-                            SyntaxKind::LT => { depth += 1; lookahead += 1; }
-                            SyntaxKind::GT => { depth -= 1; lookahead += 1; }
+                            SyntaxKind::LT => {
+                                depth += 1;
+                                lookahead += 1;
+                            }
+                            SyntaxKind::GT => {
+                                depth -= 1;
+                                lookahead += 1;
+                            }
                             SyntaxKind::EOF => break,
-                            _ => { lookahead += 1; }
+                            _ => {
+                                lookahead += 1;
+                            }
                         }
                     }
                 }
@@ -690,10 +698,18 @@ pub(crate) fn parse_item_or_stmt(p: &mut Parser) {
                 let mut depth = 1u32;
                 while depth > 0 {
                     match p.nth(lookahead) {
-                        SyntaxKind::LT => { depth += 1; lookahead += 1; }
-                        SyntaxKind::GT => { depth -= 1; lookahead += 1; }
+                        SyntaxKind::LT => {
+                            depth += 1;
+                            lookahead += 1;
+                        }
+                        SyntaxKind::GT => {
+                            depth -= 1;
+                            lookahead += 1;
+                        }
                         SyntaxKind::EOF => break,
-                        _ => { lookahead += 1; }
+                        _ => {
+                            lookahead += 1;
+                        }
                     }
                 }
             }

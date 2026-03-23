@@ -18,7 +18,7 @@
 
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU16, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -29,7 +29,9 @@ use ring::signature::{self, EcdsaKeyPair, KeyPair};
 use rustc_hash::FxHashMap;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
-use rustls::{ClientConfig, DigitallySignedStruct, Error, ServerConfig, SignatureScheme, StreamOwned};
+use rustls::{
+    ClientConfig, DigitallySignedStruct, Error, ServerConfig, SignatureScheme, StreamOwned,
+};
 use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -358,7 +360,8 @@ fn send_peer_list(session: &Arc<NodeSession>) {
     };
 
     let sessions = state.sessions.read();
-    let peers: Vec<&String> = sessions.keys()
+    let peers: Vec<&String> = sessions
+        .keys()
         .filter(|name| *name != &session.remote_name)
         .collect();
 
@@ -386,7 +389,9 @@ fn send_peer_list(session: &Arc<NodeSession>) {
 /// then spawns a thread to connect to the remaining peers. The thread spawn
 /// avoids deadlock (see Pitfall 7 in RESEARCH.md).
 fn handle_peer_list(data: &[u8]) {
-    if data.len() < 2 { return; }
+    if data.len() < 2 {
+        return;
+    }
     let count = u16::from_le_bytes(data[0..2].try_into().unwrap()) as usize;
     let mut pos = 2;
     let mut to_connect = Vec::new();
@@ -397,11 +402,15 @@ fn handle_peer_list(data: &[u8]) {
     };
 
     for _ in 0..count {
-        if pos + 2 > data.len() { break; }
-        let name_len = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap()) as usize;
+        if pos + 2 > data.len() {
+            break;
+        }
+        let name_len = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap()) as usize;
         pos += 2;
-        if pos + name_len > data.len() { break; }
-        if let Ok(peer_name) = std::str::from_utf8(&data[pos..pos+name_len]) {
+        if pos + name_len > data.len() {
+            break;
+        }
+        if let Ok(peer_name) = std::str::from_utf8(&data[pos..pos + name_len]) {
             // Skip self and already-connected nodes
             if peer_name != state.name {
                 let sessions = state.sessions.read();
@@ -612,10 +621,7 @@ fn spawn_session_threads(session: &Arc<NodeSession>) {
 ///
 /// Uses a 100ms read timeout to allow periodic shutdown checks without
 /// busy-waiting.
-fn reader_loop_session(
-    session: Arc<NodeSession>,
-    heartbeat_state: Arc<Mutex<HeartbeatState>>,
-) {
+fn reader_loop_session(session: Arc<NodeSession>, heartbeat_state: Arc<Mutex<HeartbeatState>>) {
     // Set read timeout to 100ms for periodic shutdown checks.
     {
         let s = session.stream.lock().unwrap();
@@ -661,9 +667,7 @@ fn reader_loop_session(
                     DIST_SEND => {
                         // Wire format: [tag][u64 target_pid LE][raw message bytes]
                         if msg.len() >= 9 {
-                            let target_pid = u64::from_le_bytes(
-                                msg[1..9].try_into().unwrap(),
-                            );
+                            let target_pid = u64::from_le_bytes(msg[1..9].try_into().unwrap());
                             let msg_data = &msg[9..];
                             crate::actor::local_send(
                                 target_pid,
@@ -675,12 +679,13 @@ fn reader_loop_session(
                     DIST_REG_SEND => {
                         // Wire format: [tag][u16 name_len LE][name bytes][raw message bytes]
                         if msg.len() >= 3 {
-                            let name_len = u16::from_le_bytes(
-                                msg[1..3].try_into().unwrap(),
-                            ) as usize;
+                            let name_len =
+                                u16::from_le_bytes(msg[1..3].try_into().unwrap()) as usize;
                             if msg.len() >= 3 + name_len {
                                 if let Ok(name) = std::str::from_utf8(&msg[3..3 + name_len]) {
-                                    if let Some(pid) = crate::actor::registry::global_registry().whereis(name) {
+                                    if let Some(pid) =
+                                        crate::actor::registry::global_registry().whereis(name)
+                                    {
                                         let msg_data = &msg[3 + name_len..];
                                         crate::actor::local_send(
                                             pid.as_u64(),
@@ -699,9 +704,11 @@ fn reader_loop_session(
                     DIST_MONITOR => {
                         // Wire format: [tag][u64 from_pid][u64 to_pid][u64 ref]
                         if msg.len() >= 25 {
-                            use crate::actor::process::{ProcessId, ProcessState, ExitReason};
-                            let from_pid = ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
-                            let to_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            use crate::actor::process::{ExitReason, ProcessId, ProcessState};
+                            let from_pid =
+                                ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
+                            let to_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             let monitor_ref = u64::from_le_bytes(msg[17..25].try_into().unwrap());
 
                             let sched = crate::actor::global_scheduler();
@@ -712,7 +719,13 @@ fn reader_loop_session(
                                         // Target already dead -- send DIST_MONITOR_EXIT back with noproc.
                                         drop(target_proc);
                                         let noproc = ExitReason::Error("noproc".to_string());
-                                        send_dist_monitor_exit(&session, to_pid, from_pid, monitor_ref, &noproc);
+                                        send_dist_monitor_exit(
+                                            &session,
+                                            to_pid,
+                                            from_pid,
+                                            monitor_ref,
+                                            &noproc,
+                                        );
                                     } else {
                                         // Register monitor on local target.
                                         target_proc.monitored_by.insert(monitor_ref, from_pid);
@@ -721,7 +734,13 @@ fn reader_loop_session(
                                 None => {
                                     // Target does not exist -- send DIST_MONITOR_EXIT back.
                                     let noproc = ExitReason::Error("noproc".to_string());
-                                    send_dist_monitor_exit(&session, to_pid, from_pid, monitor_ref, &noproc);
+                                    send_dist_monitor_exit(
+                                        &session,
+                                        to_pid,
+                                        from_pid,
+                                        monitor_ref,
+                                        &noproc,
+                                    );
                                 }
                             }
                         }
@@ -730,8 +749,10 @@ fn reader_loop_session(
                         // Wire format: [tag][u64 from_pid][u64 to_pid][u64 ref]
                         if msg.len() >= 25 {
                             use crate::actor::process::ProcessId;
-                            let _from_pid = ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
-                            let to_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            let _from_pid =
+                                ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
+                            let to_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             let monitor_ref = u64::from_le_bytes(msg[17..25].try_into().unwrap());
 
                             let sched = crate::actor::global_scheduler();
@@ -743,12 +764,14 @@ fn reader_loop_session(
                     DIST_MONITOR_EXIT => {
                         // Wire format: [tag][u64 monitored_pid][u64 monitoring_pid][u64 ref][reason_bytes]
                         if msg.len() >= 25 {
-                            use crate::actor::process::{ProcessId, ProcessState, Message};
                             use crate::actor::heap::MessageBuffer;
                             use crate::actor::link;
+                            use crate::actor::process::{Message, ProcessId, ProcessState};
 
-                            let monitored_pid = ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
-                            let monitoring_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            let monitored_pid =
+                                ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
+                            let monitoring_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             let monitor_ref = u64::from_le_bytes(msg[17..25].try_into().unwrap());
                             let reason_bytes = &msg[25..];
 
@@ -762,7 +785,8 @@ fn reader_loop_session(
                             if let Some(mon_arc) = sched.get_process(monitoring_pid) {
                                 let mut mon_proc = mon_arc.lock();
                                 mon_proc.monitors.remove(&monitor_ref);
-                                let down_data = link::encode_down_signal(monitor_ref, monitored_pid, &reason);
+                                let down_data =
+                                    link::encode_down_signal(monitor_ref, monitored_pid, &reason);
                                 let buffer = MessageBuffer::new(down_data, link::DOWN_SIGNAL_TAG);
                                 mon_proc.mailbox.push(Message { buffer });
                                 if matches!(mon_proc.state, ProcessState::Waiting) {
@@ -777,8 +801,10 @@ fn reader_loop_session(
                         // Wire format: [tag][u64 from_pid][u64 to_pid]
                         if msg.len() >= 17 {
                             use crate::actor::process::ProcessId;
-                            let from_pid = ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
-                            let to_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            let from_pid =
+                                ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
+                            let to_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             // Add from_pid to the local process's links set
                             let sched = crate::actor::global_scheduler();
                             if let Some(proc_arc) = sched.get_process(to_pid) {
@@ -790,8 +816,10 @@ fn reader_loop_session(
                         // Wire format: [tag][u64 from_pid][u64 to_pid]
                         if msg.len() >= 17 {
                             use crate::actor::process::ProcessId;
-                            let from_pid = ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
-                            let to_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            let from_pid =
+                                ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
+                            let to_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             let sched = crate::actor::global_scheduler();
                             if let Some(proc_arc) = sched.get_process(to_pid) {
                                 proc_arc.lock().links.remove(&from_pid);
@@ -801,12 +829,16 @@ fn reader_loop_session(
                     DIST_EXIT => {
                         // Wire format: [tag][u64 from_pid][u64 to_pid][reason_bytes]
                         if msg.len() >= 17 {
-                            use crate::actor::process::{ProcessId, ProcessState, ExitReason, Message};
                             use crate::actor::heap::MessageBuffer;
                             use crate::actor::link;
+                            use crate::actor::process::{
+                                ExitReason, Message, ProcessId, ProcessState,
+                            };
 
-                            let from_pid = ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
-                            let to_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            let from_pid =
+                                ProcessId(u64::from_le_bytes(msg[1..9].try_into().unwrap()));
+                            let to_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             let reason_bytes = &msg[17..];
                             if let Some((reason, _)) = link::decode_reason(reason_bytes) {
                                 let sched = crate::actor::global_scheduler();
@@ -816,10 +848,13 @@ fn reader_loop_session(
                                         continue; // Already dead, skip
                                     }
                                     proc.links.remove(&from_pid);
-                                    let is_non_crashing = matches!(reason, ExitReason::Normal | ExitReason::Shutdown);
+                                    let is_non_crashing =
+                                        matches!(reason, ExitReason::Normal | ExitReason::Shutdown);
                                     if is_non_crashing || proc.trap_exit {
-                                        let signal_data = link::encode_exit_signal(from_pid, &reason);
-                                        let buffer = MessageBuffer::new(signal_data, link::EXIT_SIGNAL_TAG);
+                                        let signal_data =
+                                            link::encode_exit_signal(from_pid, &reason);
+                                        let buffer =
+                                            MessageBuffer::new(signal_data, link::EXIT_SIGNAL_TAG);
                                         proc.mailbox.push(Message { buffer });
                                         if matches!(proc.state, ProcessState::Waiting) {
                                             proc.state = ProcessState::Ready;
@@ -843,12 +878,15 @@ fn reader_loop_session(
                             use crate::actor::process::ProcessId;
 
                             let req_id = u64::from_le_bytes(msg[1..9].try_into().unwrap());
-                            let requester_pid = ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
+                            let requester_pid =
+                                ProcessId(u64::from_le_bytes(msg[9..17].try_into().unwrap()));
                             let link_flag = msg[17];
-                            let fn_name_len = u16::from_le_bytes(msg[18..20].try_into().unwrap()) as usize;
+                            let fn_name_len =
+                                u16::from_le_bytes(msg[18..20].try_into().unwrap()) as usize;
 
                             if msg.len() >= 20 + fn_name_len {
-                                let fn_name = std::str::from_utf8(&msg[20..20 + fn_name_len]).unwrap_or("");
+                                let fn_name =
+                                    std::str::from_utf8(&msg[20..20 + fn_name_len]).unwrap_or("");
                                 let args_data = &msg[20 + fn_name_len..];
 
                                 match lookup_function(fn_name) {
@@ -881,7 +919,11 @@ fn reader_loop_session(
                                             // the reverse link. from=spawned (local), to=requester (remote).
                                             // We send the local spawned PID as-is; the remote side will
                                             // use its own session info to qualify it.
-                                            send_dist_link_via_session(&session, spawned, requester_pid);
+                                            send_dist_link_via_session(
+                                                &session,
+                                                spawned,
+                                                requester_pid,
+                                            );
                                         }
 
                                         // Reply with the spawned process's local_id.
@@ -898,12 +940,13 @@ fn reader_loop_session(
                     DIST_SPAWN_REPLY => {
                         // Wire format: [tag][u64 req_id][u8 status][u64 spawned_local_id]
                         if msg.len() >= 18 {
-                            use crate::actor::process::{ProcessState, Message};
                             use crate::actor::heap::MessageBuffer;
+                            use crate::actor::process::{Message, ProcessState};
 
                             let req_id = u64::from_le_bytes(msg[1..9].try_into().unwrap());
                             let status = msg[9];
-                            let spawned_local_id = u64::from_le_bytes(msg[10..18].try_into().unwrap());
+                            let spawned_local_id =
+                                u64::from_le_bytes(msg[10..18].try_into().unwrap());
 
                             // Look up which process is waiting for this spawn reply.
                             let requester = session.pending_spawns.lock().unwrap().remove(&req_id);
@@ -934,7 +977,8 @@ fn reader_loop_session(
                     DIST_GLOBAL_REGISTER => {
                         // Wire format: [tag][u16 name_len][name][u64 pid][u16 node_name_len][node_name]
                         if msg.len() >= 3 {
-                            let name_len = u16::from_le_bytes(msg[1..3].try_into().unwrap()) as usize;
+                            let name_len =
+                                u16::from_le_bytes(msg[1..3].try_into().unwrap()) as usize;
                             if msg.len() >= 3 + name_len + 8 + 2 {
                                 if let Ok(name) = std::str::from_utf8(&msg[3..3 + name_len]) {
                                     let pid_raw = u64::from_le_bytes(
@@ -944,7 +988,8 @@ fn reader_loop_session(
                                         msg[3 + name_len + 8..3 + name_len + 10]
                                             .try_into()
                                             .unwrap(),
-                                    ) as usize;
+                                    )
+                                        as usize;
                                     if msg.len() >= 3 + name_len + 10 + node_name_len {
                                         if let Ok(node_name) = std::str::from_utf8(
                                             &msg[3 + name_len + 10
@@ -978,7 +1023,8 @@ fn reader_loop_session(
                     DIST_GLOBAL_UNREGISTER => {
                         // Wire format: [tag][u16 name_len][name]
                         if msg.len() >= 3 {
-                            let name_len = u16::from_le_bytes(msg[1..3].try_into().unwrap()) as usize;
+                            let name_len =
+                                u16::from_le_bytes(msg[1..3].try_into().unwrap()) as usize;
                             if msg.len() >= 3 + name_len {
                                 if let Ok(name) = std::str::from_utf8(&msg[3..3 + name_len]) {
                                     crate::dist::global::global_name_registry().unregister(name);
@@ -990,42 +1036,37 @@ fn reader_loop_session(
                         // Wire format: [tag][u32 count][(u16 name_len, name, u64 pid, u16 node_len, node)*]
                         if msg.len() >= 5 {
                             use crate::actor::process::ProcessId;
-                            let count =
-                                u32::from_le_bytes(msg[1..5].try_into().unwrap()) as usize;
+                            let count = u32::from_le_bytes(msg[1..5].try_into().unwrap()) as usize;
                             let mut pos = 5;
                             let mut entries = Vec::with_capacity(count);
                             for _ in 0..count {
                                 if pos + 2 > msg.len() {
                                     break;
                                 }
-                                let name_len = u16::from_le_bytes(
-                                    msg[pos..pos + 2].try_into().unwrap(),
-                                ) as usize;
+                                let name_len =
+                                    u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap())
+                                        as usize;
                                 pos += 2;
                                 if pos + name_len + 8 + 2 > msg.len() {
                                     break;
                                 }
-                                let name = match std::str::from_utf8(
-                                    &msg[pos..pos + name_len],
-                                ) {
+                                let name = match std::str::from_utf8(&msg[pos..pos + name_len]) {
                                     Ok(s) => s,
                                     Err(_) => break,
                                 };
                                 pos += name_len;
-                                let pid_raw = u64::from_le_bytes(
-                                    msg[pos..pos + 8].try_into().unwrap(),
-                                );
+                                let pid_raw =
+                                    u64::from_le_bytes(msg[pos..pos + 8].try_into().unwrap());
                                 pos += 8;
-                                let node_len = u16::from_le_bytes(
-                                    msg[pos..pos + 2].try_into().unwrap(),
-                                ) as usize;
+                                let node_len =
+                                    u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap())
+                                        as usize;
                                 pos += 2;
                                 if pos + node_len > msg.len() {
                                     break;
                                 }
-                                let node_name = match std::str::from_utf8(
-                                    &msg[pos..pos + node_len],
-                                ) {
+                                let node_name = match std::str::from_utf8(&msg[pos..pos + node_len])
+                                {
                                     Ok(s) => s,
                                     Err(_) => break,
                                 };
@@ -1040,14 +1081,9 @@ fn reader_loop_session(
                                         pid.local_id(),
                                     );
                                 }
-                                entries.push((
-                                    name.to_string(),
-                                    pid,
-                                    node_name.to_string(),
-                                ));
+                                entries.push((name.to_string(), pid, node_name.to_string()));
                             }
-                            crate::dist::global::global_name_registry()
-                                .merge_snapshot(entries);
+                            crate::dist::global::global_name_registry().merge_snapshot(entries);
                         }
                     }
                     DIST_ROOM_BROADCAST => {
@@ -1055,13 +1091,12 @@ fn reader_loop_session(
                         // Deliver to local room members only -- do NOT re-forward to other
                         // nodes (prevents infinite broadcast storms; see RESEARCH.md Pitfall 1).
                         if msg.len() >= 3 {
-                            let room_name_len = u16::from_le_bytes(
-                                msg[1..3].try_into().unwrap(),
-                            ) as usize;
+                            let room_name_len =
+                                u16::from_le_bytes(msg[1..3].try_into().unwrap()) as usize;
                             if msg.len() >= 3 + room_name_len + 4 {
-                                if let Ok(room_name) = std::str::from_utf8(
-                                    &msg[3..3 + room_name_len],
-                                ) {
+                                if let Ok(room_name) =
+                                    std::str::from_utf8(&msg[3..3 + room_name_len])
+                                {
                                     let msg_len = u32::from_le_bytes(
                                         msg[3 + room_name_len..7 + room_name_len]
                                             .try_into()
@@ -1069,12 +1104,9 @@ fn reader_loop_session(
                                     ) as usize;
                                     if msg.len() >= 7 + room_name_len + msg_len {
                                         if let Ok(text) = std::str::from_utf8(
-                                            &msg[7 + room_name_len
-                                                ..7 + room_name_len + msg_len],
+                                            &msg[7 + room_name_len..7 + room_name_len + msg_len],
                                         ) {
-                                            crate::ws::rooms::local_room_broadcast(
-                                                room_name, text,
-                                            );
+                                            crate::ws::rooms::local_room_broadcast(room_name, text);
                                         }
                                     }
                                 }
@@ -1191,9 +1223,9 @@ fn cleanup_session(remote_name: &str) {
 /// 1. Under process table READ lock, collect all actions to take
 /// 2. Drop lock, then execute collected actions
 fn handle_node_disconnect(node_name: &str, node_id: u16) {
-    use crate::actor::process::{ExitReason, Message, ProcessId, ProcessState};
-    use crate::actor::link;
     use crate::actor::heap::MessageBuffer;
+    use crate::actor::link;
+    use crate::actor::process::{ExitReason, Message, ProcessId, ProcessState};
 
     let sched = match crate::actor::GLOBAL_SCHEDULER.get() {
         Some(s) => s,
@@ -1214,7 +1246,9 @@ fn handle_node_disconnect(node_name: &str, node_id: u16) {
             let proc = proc_arc.lock();
 
             // Collect remote links to the disconnected node.
-            let remote_links: Vec<ProcessId> = proc.links.iter()
+            let remote_links: Vec<ProcessId> = proc
+                .links
+                .iter()
                 .filter(|linked_pid| linked_pid.node_id() == node_id)
                 .cloned()
                 .collect();
@@ -1224,7 +1258,9 @@ fn handle_node_disconnect(node_name: &str, node_id: u16) {
             }
 
             // Collect remote monitors to the disconnected node.
-            let remote_monitors: Vec<(u64, ProcessId)> = proc.monitors.iter()
+            let remote_monitors: Vec<(u64, ProcessId)> = proc
+                .monitors
+                .iter()
                 .filter(|(_, monitored_pid)| monitored_pid.node_id() == node_id)
                 .map(|(ref_id, pid)| (*ref_id, *pid))
                 .collect();
@@ -1296,7 +1332,8 @@ fn handle_node_disconnect(node_name: &str, node_id: u16) {
 
             for (monitor_ref, monitored_pid) in monitors {
                 proc.monitors.remove(monitor_ref);
-                let down_data = link::encode_down_signal(*monitor_ref, *monitored_pid, &noconnection);
+                let down_data =
+                    link::encode_down_signal(*monitor_ref, *monitored_pid, &noconnection);
                 let buffer = MessageBuffer::new(down_data, link::DOWN_SIGNAL_TAG);
                 proc.mailbox.push(Message { buffer });
             }
@@ -1345,8 +1382,8 @@ fn deliver_node_event(
     type_tag: u64,
     sched: &crate::actor::Scheduler,
 ) {
-    use crate::actor::process::{Message, ProcessState};
     use crate::actor::heap::MessageBuffer;
+    use crate::actor::process::{Message, ProcessState};
 
     let data = node_name.as_bytes().to_vec();
     let buffer = MessageBuffer::new(data, type_tag);
@@ -1492,7 +1529,10 @@ fn read_msg(stream: &mut impl Read) -> io::Result<Vec<u8>> {
     if len > MAX_HANDSHAKE_MSG {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("handshake message too large: {} bytes (max {})", len, MAX_HANDSHAKE_MSG),
+            format!(
+                "handshake message too large: {} bytes (max {})",
+                len, MAX_HANDSHAKE_MSG
+            ),
         ));
     }
     let mut buf = vec![0u8; len as usize];
@@ -1519,7 +1559,10 @@ pub(crate) fn read_dist_msg(stream: &mut impl Read) -> io::Result<Vec<u8>> {
     if len > MAX_DIST_MSG {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("dist message too large: {} bytes (max {})", len, MAX_DIST_MSG),
+            format!(
+                "dist message too large: {} bytes (max {})",
+                len, MAX_DIST_MSG
+            ),
         ));
     }
     let mut buf = vec![0u8; len as usize];
@@ -1540,8 +1583,8 @@ fn generate_challenge() -> [u8; 32] {
 ///
 /// Follows the pattern from `db/pg.rs` SCRAM-SHA-256 authentication.
 fn compute_response(cookie: &str, challenge: &[u8; 32]) -> [u8; 32] {
-    let mut mac = HmacSha256::new_from_slice(cookie.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(cookie.as_bytes()).expect("HMAC can take key of any size");
     mac.update(challenge);
     let result = mac.finalize().into_bytes();
     let mut out = [0u8; 32];
@@ -1554,8 +1597,8 @@ fn compute_response(cookie: &str, challenge: &[u8; 32]) -> [u8; 32] {
 /// Uses `Mac::verify_slice` for constant-time comparison, preventing
 /// timing attacks (research pitfall 3).
 fn verify_response(cookie: &str, challenge: &[u8; 32], response: &[u8; 32]) -> bool {
-    let mut mac = HmacSha256::new_from_slice(cookie.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(cookie.as_bytes()).expect("HMAC can take key of any size");
     mac.update(challenge);
     mac.verify_slice(response).is_ok()
 }
@@ -1806,7 +1849,10 @@ fn register_session(
         // Lexicographically smaller name wins
         if state.name < remote_name {
             // We are smaller -- keep our existing connection, reject this one
-            return Err(format!("duplicate connection to {}: keeping existing", remote_name));
+            return Err(format!(
+                "duplicate connection to {}: keeping existing",
+                remote_name
+            ));
         } else {
             // We are larger -- this new connection wins, remove old
             sessions.remove(&remote_name);
@@ -1855,11 +1901,9 @@ fn generate_ephemeral_cert() -> (CertificateDer<'static>, PrivateKeyDer<'static>
     let rng = SystemRandom::new();
 
     // Generate ECDSA P-256 key pair in PKCS#8 format
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(
-        &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
-        &rng,
-    )
-    .expect("ECDSA P-256 key generation failed");
+    let pkcs8_bytes =
+        EcdsaKeyPair::generate_pkcs8(&signature::ECDSA_P256_SHA256_ASN1_SIGNING, &rng)
+            .expect("ECDSA P-256 key generation failed");
 
     let key_pair = EcdsaKeyPair::from_pkcs8(
         &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
@@ -1879,9 +1923,9 @@ fn generate_ephemeral_cert() -> (CertificateDer<'static>, PrivateKeyDer<'static>
 
     let cert_der = wrap_signed_certificate(&tbs_cert, signature_bytes.as_ref());
 
-    let key_der = PrivateKeyDer::Pkcs8(
-        rustls::pki_types::PrivatePkcs8KeyDer::from(pkcs8_bytes.as_ref().to_vec()),
-    );
+    let key_der = PrivateKeyDer::Pkcs8(rustls::pki_types::PrivatePkcs8KeyDer::from(
+        pkcs8_bytes.as_ref().to_vec(),
+    ));
 
     (CertificateDer::from(cert_der), key_der)
 }
@@ -2149,9 +2193,9 @@ impl ServerCertVerifier for SkipCertVerification {
 ///
 /// Returns `Err` for invalid formats (no @, empty parts, invalid port).
 pub fn parse_node_name(name: &str) -> Result<(&str, &str, u16), String> {
-    let at_pos = name.find('@').ok_or_else(|| {
-        format!("invalid node name '{}': missing '@' separator", name)
-    })?;
+    let at_pos = name
+        .find('@')
+        .ok_or_else(|| format!("invalid node name '{}': missing '@' separator", name))?;
 
     let name_part = &name[..at_pos];
     let host_port = &name[at_pos + 1..];
@@ -2173,9 +2217,9 @@ pub fn parse_node_name(name: &str) -> Result<(&str, &str, u16), String> {
             return Err(format!("invalid node name '{}': empty host part", name));
         }
 
-        let port: u16 = port_str.parse().map_err(|_| {
-            format!("invalid node name '{}': invalid port '{}'", name, port_str)
-        })?;
+        let port: u16 = port_str
+            .parse()
+            .map_err(|_| format!("invalid node name '{}': invalid port '{}'", name, port_str))?;
 
         Ok((name_part, host, port))
     } else {
@@ -2213,15 +2257,14 @@ fn accept_loop(listener: TcpListener, state: &NodeState) {
                     .expect("set_nonblocking(false) failed on accepted stream");
 
                 // Wrap in TLS server connection
-                let server_conn = match rustls::ServerConnection::new(
-                    Arc::clone(&state.tls_server_config),
-                ) {
-                    Ok(conn) => conn,
-                    Err(e) => {
-                        eprintln!("mesh node: TLS server connection failed: {}", e);
-                        continue;
-                    }
-                };
+                let server_conn =
+                    match rustls::ServerConnection::new(Arc::clone(&state.tls_server_config)) {
+                        Ok(conn) => conn,
+                        Err(e) => {
+                            eprintln!("mesh node: TLS server connection failed: {}", e);
+                            continue;
+                        }
+                    };
                 let mut tls_stream = StreamOwned::new(server_conn, tcp_stream);
 
                 // Perform HMAC-SHA256 cookie handshake (acceptor side)
@@ -2378,10 +2421,7 @@ pub extern "C" fn mesh_node_start(
 /// - `-2` if TCP connection failed
 /// - `-3` if handshake failed (wrong cookie, I/O error, or invalid format)
 #[no_mangle]
-pub extern "C" fn mesh_node_connect(
-    name_ptr: *const u8,
-    name_len: u64,
-) -> i64 {
+pub extern "C" fn mesh_node_connect(name_ptr: *const u8, name_len: u64) -> i64 {
     // Check NODE_STATE is initialized
     let state = match NODE_STATE.get() {
         Some(s) => s,
@@ -2421,27 +2461,24 @@ pub extern "C" fn mesh_node_connect(
     // Wrap in TLS client connection.
     // Server name is "mesh-node" -- doesn't matter since we skip verification.
     let server_name: ServerName<'static> = "mesh-node".try_into().unwrap();
-    let client_conn = match rustls::ClientConnection::new(
-        Arc::clone(&state.tls_client_config),
-        server_name,
-    ) {
-        Ok(conn) => conn,
-        Err(e) => {
-            eprintln!("mesh node: TLS client connection failed: {}", e);
-            return -3;
-        }
-    };
-    let mut tls_stream = StreamOwned::new(client_conn, tcp_stream);
-
-    // Perform HMAC-SHA256 cookie handshake (initiator side)
-    let (remote_name, remote_creation) =
-        match perform_handshake(&mut tls_stream, state, true) {
-            Ok(result) => result,
+    let client_conn =
+        match rustls::ClientConnection::new(Arc::clone(&state.tls_client_config), server_name) {
+            Ok(conn) => conn,
             Err(e) => {
-                eprintln!("mesh node: handshake with {}:{} failed: {}", host, port, e);
+                eprintln!("mesh node: TLS client connection failed: {}", e);
                 return -3;
             }
         };
+    let mut tls_stream = StreamOwned::new(client_conn, tcp_stream);
+
+    // Perform HMAC-SHA256 cookie handshake (initiator side)
+    let (remote_name, remote_creation) = match perform_handshake(&mut tls_stream, state, true) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("mesh node: handshake with {}:{} failed: {}", host, port, e);
+            return -3;
+        }
+    };
 
     // Register the authenticated session
     let node_id = state.assign_node_id();
@@ -2474,12 +2511,8 @@ pub extern "C" fn mesh_node_connect(
 #[no_mangle]
 pub extern "C" fn mesh_node_self() -> *const u8 {
     match node_state() {
-        Some(state) => {
-            crate::string::mesh_string_new(
-                state.name.as_ptr(),
-                state.name.len() as u64,
-            ) as *const u8
-        }
+        Some(state) => crate::string::mesh_string_new(state.name.as_ptr(), state.name.len() as u64)
+            as *const u8,
         None => {
             // Return an empty string instead of null to prevent null pointer
             // dereference when Mesh code compares the result (e.g., `Node.self() != ""`).
@@ -2517,10 +2550,7 @@ pub extern "C" fn mesh_node_list() -> *mut u8 {
         string_ptrs.push(s as u64);
     }
 
-    crate::collections::list::mesh_list_from_array(
-        string_ptrs.as_ptr(),
-        string_ptrs.len() as i64,
-    )
+    crate::collections::list::mesh_list_from_array(string_ptrs.as_ptr(), string_ptrs.len() as i64)
 }
 
 // ---------------------------------------------------------------------------
@@ -2569,15 +2599,21 @@ pub extern "C" fn mesh_node_spawn(
     };
 
     let node_name = unsafe {
-        if node_ptr.is_null() { return 0; }
-        std::str::from_utf8(std::slice::from_raw_parts(node_ptr, node_len as usize))
-            .unwrap_or("")
+        if node_ptr.is_null() {
+            return 0;
+        }
+        std::str::from_utf8(std::slice::from_raw_parts(node_ptr, node_len as usize)).unwrap_or("")
     };
 
     let fn_name = unsafe {
-        if fn_name_ptr.is_null() { return 0; }
-        std::str::from_utf8(std::slice::from_raw_parts(fn_name_ptr, fn_name_len as usize))
-            .unwrap_or("")
+        if fn_name_ptr.is_null() {
+            return 0;
+        }
+        std::str::from_utf8(std::slice::from_raw_parts(
+            fn_name_ptr,
+            fn_name_len as usize,
+        ))
+        .unwrap_or("")
     };
 
     if node_name.is_empty() || fn_name.is_empty() {
@@ -2597,7 +2633,11 @@ pub extern "C" fn mesh_node_spawn(
     let req_id = SPAWN_REQUEST_ID.fetch_add(1, Ordering::Relaxed);
 
     // Register pending spawn so the reader thread can route the reply.
-    session.pending_spawns.lock().unwrap().insert(req_id, my_pid);
+    session
+        .pending_spawns
+        .lock()
+        .unwrap()
+        .insert(req_id, my_pid);
 
     // Copy args data immediately (do NOT retain pointer to GC heap).
     let args_data = if args_ptr.is_null() || args_size == 0 {
@@ -2641,17 +2681,14 @@ pub extern "C" fn mesh_node_spawn(
                 if msg.buffer.data.len() < 17 {
                     return false;
                 }
-                let msg_req_id = u64::from_le_bytes(
-                    msg.buffer.data[0..8].try_into().unwrap(),
-                );
+                let msg_req_id = u64::from_le_bytes(msg.buffer.data[0..8].try_into().unwrap());
                 msg_req_id == req_id
             });
 
             if let Some(reply_msg) = reply {
                 let status = reply_msg.buffer.data[8];
-                let spawned_local_id = u64::from_le_bytes(
-                    reply_msg.buffer.data[9..17].try_into().unwrap(),
-                );
+                let spawned_local_id =
+                    u64::from_le_bytes(reply_msg.buffer.data[9..17].try_into().unwrap());
 
                 if status == 0 {
                     // Construct the remote PID using session's node_id and creation.
@@ -2849,10 +2886,7 @@ mod tests {
     #[test]
     fn test_heartbeat_state_timing() {
         // Short intervals for test speed: 100ms ping, 50ms pong timeout.
-        let mut hs = HeartbeatState::new(
-            Duration::from_millis(100),
-            Duration::from_millis(50),
-        );
+        let mut hs = HeartbeatState::new(Duration::from_millis(100), Duration::from_millis(50));
 
         // Initially: should_send_ping is false (just created).
         assert!(!hs.should_send_ping());
@@ -3004,8 +3038,12 @@ mod tests {
         let (stream_a, stream_b) = UnixStream::pair().unwrap();
 
         // Set a read timeout so the test doesn't hang on failure.
-        stream_a.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
-        stream_b.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        stream_a
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        stream_b
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
 
         let state_a = NodeState {
             name: "alice@127.0.0.1".to_string(),
@@ -3358,7 +3396,11 @@ mod tests {
         use std::io::Cursor;
 
         // Test 1: Multiple peers
-        let peers = vec!["alpha@10.0.0.1:9000", "beta@10.0.0.2:9001", "gamma@10.0.0.3:9002"];
+        let peers = vec![
+            "alpha@10.0.0.1:9000",
+            "beta@10.0.0.2:9001",
+            "gamma@10.0.0.3:9002",
+        ];
 
         let mut payload = Vec::new();
         payload.push(DIST_PEER_LIST);
@@ -3383,9 +3425,9 @@ mod tests {
         let mut pos = 3;
         let mut decoded_peers = Vec::new();
         for _ in 0..count {
-            let name_len = u16::from_le_bytes(msg[pos..pos+2].try_into().unwrap()) as usize;
+            let name_len = u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
-            let name = std::str::from_utf8(&msg[pos..pos+name_len]).unwrap();
+            let name = std::str::from_utf8(&msg[pos..pos + name_len]).unwrap();
             decoded_peers.push(name.to_string());
             pos += name_len;
         }
@@ -3463,7 +3505,10 @@ mod tests {
         // test may have initialized it. We test both cases:
         let result = mesh_node_self();
         // Should always return a valid (non-null) pointer, even when node not started.
-        assert!(!result.is_null(), "expected non-null pointer from mesh_node_self");
+        assert!(
+            !result.is_null(),
+            "expected non-null pointer from mesh_node_self"
+        );
         if node_state().is_none() {
             // Not initialized: should return empty string
             let s = unsafe { &*(result as *const crate::string::MeshString) };
@@ -3489,7 +3534,11 @@ mod tests {
         // We verify the parsing inline since handle_peer_list requires NODE_STATE
         // and spawns threads. This tests the same byte-reading code path.
 
-        let peers = vec!["node_a@10.0.0.1:9000", "node_b@10.0.0.2:9001", "node_c@10.0.0.3:9002"];
+        let peers = vec![
+            "node_a@10.0.0.1:9000",
+            "node_b@10.0.0.2:9001",
+            "node_c@10.0.0.3:9002",
+        ];
 
         // Build the peer list payload (the data AFTER the DIST_PEER_LIST tag)
         let mut data = Vec::new();
@@ -3507,9 +3556,9 @@ mod tests {
         let mut pos = 2;
         let mut decoded = Vec::new();
         for _ in 0..count {
-            let name_len = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap()) as usize;
+            let name_len = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
-            let name = std::str::from_utf8(&data[pos..pos+name_len]).unwrap();
+            let name = std::str::from_utf8(&data[pos..pos + name_len]).unwrap();
             decoded.push(name.to_string());
             pos += name_len;
         }
@@ -3520,7 +3569,8 @@ mod tests {
         let self_name = "node_a@10.0.0.1:9000";
         let known_names: Vec<&str> = vec!["node_b@10.0.0.2:9001"];
 
-        let to_connect: Vec<&str> = decoded.iter()
+        let to_connect: Vec<&str> = decoded
+            .iter()
             .filter(|name| name.as_str() != self_name)
             .filter(|name| !known_names.contains(&name.as_str()))
             .map(|s| s.as_str())
@@ -3564,7 +3614,8 @@ mod tests {
         let receiving_node = "receiving_node@10.0.0.12:5002";
 
         // Filter like send_peer_list does
-        let peers: Vec<&String> = all_sessions.iter()
+        let peers: Vec<&String> = all_sessions
+            .iter()
             .filter(|name| name.as_str() != receiving_node)
             .collect();
 
@@ -3588,9 +3639,9 @@ mod tests {
         let mut pos = 2;
         let mut decoded = Vec::new();
         for _ in 0..count {
-            let name_len = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap()) as usize;
+            let name_len = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
-            let name = std::str::from_utf8(&data[pos..pos+name_len]).unwrap();
+            let name = std::str::from_utf8(&data[pos..pos + name_len]).unwrap();
             decoded.push(name.to_string());
             pos += name_len;
         }
@@ -3619,11 +3670,15 @@ mod tests {
         let mut pos = 2;
         let mut decoded = Vec::new();
         for _ in 0..count {
-            if pos + 2 > data.len() { break; }
-            let name_len = u16::from_le_bytes(data[pos..pos+2].try_into().unwrap()) as usize;
+            if pos + 2 > data.len() {
+                break;
+            }
+            let name_len = u16::from_le_bytes(data[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
-            if pos + name_len > data.len() { break; } // This should trigger
-            let name = std::str::from_utf8(&data[pos..pos+name_len]).unwrap();
+            if pos + name_len > data.len() {
+                break;
+            } // This should trigger
+            let name = std::str::from_utf8(&data[pos..pos + name_len]).unwrap();
             decoded.push(name.to_string());
             pos += name_len;
         }

@@ -46,11 +46,11 @@ pub use child_spec::{ChildSpec, ChildState, ChildType, RestartType, ShutdownType
 pub use heap::{ActorHeap, MessageBuffer};
 pub use link::{decode_exit_signal, encode_exit_signal, propagate_exit, EXIT_SIGNAL_TAG};
 pub use mailbox::Mailbox;
-pub use registry::{global_registry, ProcessRegistry};
 pub use process::{
     ExitReason, Message, Priority, Process, ProcessId, ProcessState, TerminateCallback,
     DEFAULT_REDUCTIONS, DEFAULT_STACK_SIZE,
 };
+pub use registry::{global_registry, ProcessRegistry};
 pub use scheduler::Scheduler;
 pub use stack::CoroutineHandle;
 
@@ -369,12 +369,10 @@ pub extern "C" fn mesh_actor_send_named(
     msg_ptr: *const u8,
     msg_size: u64,
 ) {
-    let name = unsafe {
-        std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_len as usize))
-    };
-    let node = unsafe {
-        std::str::from_utf8(std::slice::from_raw_parts(node_ptr, node_len as usize))
-    };
+    let name =
+        unsafe { std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_len as usize)) };
+    let node =
+        unsafe { std::str::from_utf8(std::slice::from_raw_parts(node_ptr, node_len as usize)) };
 
     let (name, node) = match (name, node) {
         (Ok(n), Ok(nd)) => (n, nd),
@@ -528,7 +526,11 @@ pub extern "C" fn mesh_actor_receive(timeout_ms: i64) -> *const u8 {
         if sched.is_shutdown() {
             // Count non-waiting, non-exited processes.
             let has_others = sched.process_table().read().iter().any(|(pid, p)| {
-                *pid != my_pid && !matches!(p.lock().state, ProcessState::Waiting | ProcessState::Exited(_))
+                *pid != my_pid
+                    && !matches!(
+                        p.lock().state,
+                        ProcessState::Waiting | ProcessState::Exited(_)
+                    )
             });
             if !has_others {
                 if let Some(proc_arc) = sched.get_process(my_pid) {
@@ -582,7 +584,12 @@ pub extern "C" fn mesh_timer_sleep(ms: i64) {
 /// The message bytes are deep-copied at call time so the caller's stack frame
 /// can be freed safely.
 #[no_mangle]
-pub extern "C" fn mesh_timer_send_after(target_pid: i64, ms: i64, msg_ptr: *const u8, msg_size: i64) {
+pub extern "C" fn mesh_timer_send_after(
+    target_pid: i64,
+    ms: i64,
+    msg_ptr: *const u8,
+    msg_size: i64,
+) {
     // Deep-copy message bytes before spawning thread
     let data = if msg_ptr.is_null() || msg_size <= 0 {
         Vec::new()
@@ -603,11 +610,7 @@ pub extern "C" fn mesh_timer_send_after(target_pid: i64, ms: i64, msg_ptr: *cons
 
 /// Deep-copy a message into the actor's heap and return a pointer to the
 /// heap-allocated layout: `[u64 type_tag, u64 data_len, u8... data]`.
-pub(crate) fn copy_msg_to_actor_heap(
-    sched: &Scheduler,
-    pid: ProcessId,
-    msg: Message,
-) -> *const u8 {
+pub(crate) fn copy_msg_to_actor_heap(sched: &Scheduler, pid: ProcessId, msg: Message) -> *const u8 {
     if let Some(proc_arc) = sched.get_process(pid) {
         let mut proc = proc_arc.lock();
         // Layout: [u64 type_tag][u64 data_len][u8... data]
@@ -617,18 +620,10 @@ pub(crate) fn copy_msg_to_actor_heap(
 
         unsafe {
             // Write type_tag.
-            std::ptr::copy_nonoverlapping(
-                msg.buffer.type_tag.to_le_bytes().as_ptr(),
-                ptr,
-                8,
-            );
+            std::ptr::copy_nonoverlapping(msg.buffer.type_tag.to_le_bytes().as_ptr(), ptr, 8);
             // Write data_len.
             let data_len = msg.buffer.data.len() as u64;
-            std::ptr::copy_nonoverlapping(
-                data_len.to_le_bytes().as_ptr(),
-                ptr.add(8),
-                8,
-            );
+            std::ptr::copy_nonoverlapping(data_len.to_le_bytes().as_ptr(), ptr.add(8), 8);
             // Write data bytes.
             if !msg.buffer.data.is_empty() {
                 std::ptr::copy_nonoverlapping(
@@ -702,8 +697,7 @@ pub extern "C" fn mesh_actor_set_terminate(pid: u64, callback_fn_ptr: *const u8)
     let target = ProcessId(pid);
 
     if let Some(proc_arc) = sched.get_process(target) {
-        let cb: TerminateCallback =
-            unsafe { std::mem::transmute(callback_fn_ptr) };
+        let cb: TerminateCallback = unsafe { std::mem::transmute(callback_fn_ptr) };
         proc_arc.lock().terminate_callback = Some(cb);
     }
 }
@@ -867,17 +861,12 @@ pub extern "C" fn mesh_actor_whereis(name_ptr: *const u8, name_len: u64) -> u64 
 ///
 /// Returns the supervisor PID as `u64`, or `u64::MAX` on error.
 #[no_mangle]
-pub extern "C" fn mesh_supervisor_start(
-    config_ptr: *const u8,
-    config_size: u64,
-) -> u64 {
+pub extern "C" fn mesh_supervisor_start(config_ptr: *const u8, config_size: u64) -> u64 {
     if config_ptr.is_null() || config_size == 0 {
         return u64::MAX;
     }
 
-    let data = unsafe {
-        std::slice::from_raw_parts(config_ptr, config_size as usize)
-    };
+    let data = unsafe { std::slice::from_raw_parts(config_ptr, config_size as usize) };
 
     // Parse the config.
     let config = match parse_supervisor_config(data) {
@@ -888,11 +877,8 @@ pub extern "C" fn mesh_supervisor_start(
     let sched = global_scheduler();
 
     // Create the supervisor state.
-    let mut sup_state = supervisor::SupervisorState::new(
-        config.strategy,
-        config.max_restarts,
-        config.max_seconds,
-    );
+    let mut sup_state =
+        supervisor::SupervisorState::new(config.strategy, config.max_restarts, config.max_seconds);
     sup_state.children = config
         .child_specs
         .into_iter()
@@ -988,10 +974,7 @@ pub extern "C" fn mesh_supervisor_start_child(
 ///
 /// Returns 0 on success, 1 on failure.
 #[no_mangle]
-pub extern "C" fn mesh_supervisor_terminate_child(
-    sup_pid: u64,
-    child_pid: u64,
-) -> u64 {
+pub extern "C" fn mesh_supervisor_terminate_child(sup_pid: u64, child_pid: u64) -> u64 {
     let sup_pid = ProcessId(sup_pid);
     let child_pid = ProcessId(child_pid);
     let sched = global_scheduler();
@@ -1323,11 +1306,7 @@ pub extern "C" fn mesh_node_monitor(node_ptr: *const u8, node_len: u64) -> u64 {
 /// - `name_len`: length of the name in bytes
 /// - `pid`: raw u64 PID value
 #[no_mangle]
-pub extern "C" fn mesh_global_register(
-    name_ptr: *const u8,
-    name_len: u64,
-    pid: u64,
-) -> u64 {
+pub extern "C" fn mesh_global_register(name_ptr: *const u8, name_len: u64, pid: u64) -> u64 {
     if name_ptr.is_null() || name_len == 0 {
         return 1;
     }
@@ -1369,10 +1348,7 @@ pub extern "C" fn mesh_global_register(
 /// - `name_ptr`: pointer to UTF-8 name bytes
 /// - `name_len`: length of the name in bytes
 #[no_mangle]
-pub extern "C" fn mesh_global_whereis(
-    name_ptr: *const u8,
-    name_len: u64,
-) -> u64 {
+pub extern "C" fn mesh_global_whereis(name_ptr: *const u8, name_len: u64) -> u64 {
     if name_ptr.is_null() || name_len == 0 {
         return 0;
     }
@@ -1399,10 +1375,7 @@ pub extern "C" fn mesh_global_whereis(
 /// - `name_ptr`: pointer to UTF-8 name bytes
 /// - `name_len`: length of the name in bytes
 #[no_mangle]
-pub extern "C" fn mesh_global_unregister(
-    name_ptr: *const u8,
-    name_len: u64,
-) -> u64 {
+pub extern "C" fn mesh_global_unregister(name_ptr: *const u8, name_len: u64) -> u64 {
     if name_ptr.is_null() || name_len == 0 {
         return 1;
     }
@@ -1477,7 +1450,9 @@ fn parse_supervisor_config(data: &[u8]) -> Option<supervisor::SupervisorConfig> 
         if pos + id_len > data.len() {
             return None;
         }
-        let id = std::str::from_utf8(&data[pos..pos + id_len]).ok()?.to_string();
+        let id = std::str::from_utf8(&data[pos..pos + id_len])
+            .ok()?
+            .to_string();
         pos += id_len;
 
         // start_fn pointer (8 bytes LE)
@@ -1560,7 +1535,9 @@ fn parse_supervisor_config(data: &[u8]) -> Option<supervisor::SupervisorConfig> 
             if pos + node_name_len > data.len() {
                 return None;
             }
-            let node_name = std::str::from_utf8(&data[pos..pos + node_name_len]).ok()?.to_string();
+            let node_name = std::str::from_utf8(&data[pos..pos + node_name_len])
+                .ok()?
+                .to_string();
             pos += node_name_len;
 
             // fn_name_len (u16 LE)
@@ -1574,7 +1551,9 @@ fn parse_supervisor_config(data: &[u8]) -> Option<supervisor::SupervisorConfig> 
             if pos + fn_name_len > data.len() {
                 return None;
             }
-            let fn_name = std::str::from_utf8(&data[pos..pos + fn_name_len]).ok()?.to_string();
+            let fn_name = std::str::from_utf8(&data[pos..pos + fn_name_len])
+                .ok()?
+                .to_string();
             pos += fn_name_len;
 
             (Some(node_name), Some(fn_name))
@@ -1657,7 +1636,11 @@ mod tests {
         // Receive in order.
         for i in 0..5u8 {
             let msg = proc_arc.lock().mailbox.pop().unwrap();
-            assert_eq!(msg.buffer.type_tag, i as u64, "FIFO order violated at {}", i);
+            assert_eq!(
+                msg.buffer.type_tag, i as u64,
+                "FIFO order violated at {}",
+                i
+            );
             assert_eq!(msg.buffer.data, vec![i]);
         }
 
@@ -1802,8 +1785,7 @@ mod tests {
         assert_ne!(ptr_in_sender as usize, ptr_in_receiver as usize);
 
         // Data should be identical.
-        let receiver_data =
-            unsafe { std::slice::from_raw_parts(ptr_in_receiver, data.len()) };
+        let receiver_data = unsafe { std::slice::from_raw_parts(ptr_in_receiver, data.len()) };
         assert_eq!(receiver_data, &[10, 20, 30, 40]);
     }
 
@@ -1880,12 +1862,9 @@ mod tests {
         link::link(&proc_a, &proc_b, pid_a, pid_b);
 
         let linked_pids = std::mem::take(&mut proc_a.lock().links);
-        link::propagate_exit(
-            pid_a,
-            &ExitReason::Normal,
-            linked_pids,
-            |pid| sched.get_process(pid),
-        );
+        link::propagate_exit(pid_a, &ExitReason::Normal, linked_pids, |pid| {
+            sched.get_process(pid)
+        });
 
         // Process B should NOT be crashed.
         assert!(
@@ -2061,10 +2040,7 @@ mod tests {
     /// is true, appends has_target_node=1 + node name + fn name.
     /// If `include_has_target_node_byte` is true but `include_target_node` is
     /// false, appends has_target_node=0.
-    fn build_test_config(
-        include_has_target_node_byte: bool,
-        include_target_node: bool,
-    ) -> Vec<u8> {
+    fn build_test_config(include_has_target_node_byte: bool, include_target_node: bool) -> Vec<u8> {
         let mut buf = Vec::new();
 
         // Strategy: OneForOne (0)
@@ -2144,12 +2120,19 @@ mod tests {
     fn test_parse_supervisor_config_backward_compat() {
         // No has_target_node byte at all -- simulates old compiled programs.
         let data = build_test_config(false, false);
-        let config = parse_supervisor_config(&data).expect("parse should succeed with backward compat");
+        let config =
+            parse_supervisor_config(&data).expect("parse should succeed with backward compat");
 
         assert_eq!(config.child_specs.len(), 1);
         let spec = &config.child_specs[0];
         assert_eq!(spec.id, "worker1");
-        assert!(spec.target_node.is_none(), "backward compat should default to None");
-        assert!(spec.start_fn_name.is_none(), "backward compat should default to None");
+        assert!(
+            spec.target_node.is_none(),
+            "backward compat should default to None"
+        );
+        assert!(
+            spec.start_fn_name.is_none(),
+            "backward compat should default to None"
+        );
     }
 }

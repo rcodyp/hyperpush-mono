@@ -23,12 +23,12 @@
 use parking_lot::RwLock;
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
-use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
+use std::sync::OnceLock;
 
-use crate::string::MeshString;
 use super::server::WsConnection;
 use super::{write_frame, WsOpcode};
+use crate::string::MeshString;
 
 // ---------------------------------------------------------------------------
 // RoomRegistry
@@ -249,10 +249,7 @@ pub extern "C" fn mesh_ws_leave(conn: *mut u8, room_name: *const MeshString) -> 
 /// Returns the number of local write failures (0 = all succeeded), or -1 on
 /// null arguments.
 #[no_mangle]
-pub extern "C" fn mesh_ws_broadcast(
-    room_name: *const MeshString,
-    msg: *const MeshString,
-) -> i64 {
+pub extern "C" fn mesh_ws_broadcast(room_name: *const MeshString, msg: *const MeshString) -> i64 {
     if room_name.is_null() || msg.is_null() {
         return -1;
     }
@@ -514,12 +511,10 @@ mod tests {
         assert_eq!(payload[0], DIST_ROOM_BROADCAST);
         assert_eq!(payload[0], 0x1E);
 
-        let decoded_room_len =
-            u16::from_le_bytes(payload[1..3].try_into().unwrap()) as usize;
+        let decoded_room_len = u16::from_le_bytes(payload[1..3].try_into().unwrap()) as usize;
         assert_eq!(decoded_room_len, room.len());
 
-        let decoded_room =
-            std::str::from_utf8(&payload[3..3 + decoded_room_len]).unwrap();
+        let decoded_room = std::str::from_utf8(&payload[3..3 + decoded_room_len]).unwrap();
         assert_eq!(decoded_room, room);
 
         let decoded_msg_len = u32::from_le_bytes(
@@ -536,10 +531,7 @@ mod tests {
         assert_eq!(decoded_msg, msg);
 
         // Verify total payload length matches expected.
-        assert_eq!(
-            payload.len(),
-            1 + 2 + room.len() + 4 + msg.len()
-        );
+        assert_eq!(payload.len(), 1 + 2 + room.len() + 4 + msg.len());
     }
 
     #[test]
@@ -548,10 +540,10 @@ mod tests {
 
         // Test with various inputs: empty message, ASCII room, multi-byte UTF-8 room.
         let test_cases: Vec<(&str, &str)> = vec![
-            ("lobby", ""),                          // empty message
-            ("chat_room_42", "hello world"),         // ASCII room + message
-            ("\u{1F680}rocket", "blast off!"),       // multi-byte UTF-8 room name (rocket emoji)
-            ("room", "\u{00E9}\u{00E8}\u{00EA}"),   // multi-byte UTF-8 message (accented chars)
+            ("lobby", ""),                        // empty message
+            ("chat_room_42", "hello world"),      // ASCII room + message
+            ("\u{1F680}rocket", "blast off!"),    // multi-byte UTF-8 room name (rocket emoji)
+            ("room", "\u{00E9}\u{00E8}\u{00EA}"), // multi-byte UTF-8 message (accented chars)
         ];
 
         for (room, msg) in &test_cases {
@@ -559,9 +551,7 @@ mod tests {
             let msg_bytes = msg.as_bytes();
 
             // Encode using broadcast_room_to_cluster's logic
-            let mut payload = Vec::with_capacity(
-                1 + 2 + room_bytes.len() + 4 + msg_bytes.len(),
-            );
+            let mut payload = Vec::with_capacity(1 + 2 + room_bytes.len() + 4 + msg_bytes.len());
             payload.push(DIST_ROOM_BROADCAST);
             payload.extend_from_slice(&(room_bytes.len() as u16).to_le_bytes());
             payload.extend_from_slice(room_bytes);
@@ -571,13 +561,11 @@ mod tests {
             // Decode using reader loop logic
             assert_eq!(payload[0], DIST_ROOM_BROADCAST);
 
-            let decoded_room_len =
-                u16::from_le_bytes(payload[1..3].try_into().unwrap()) as usize;
+            let decoded_room_len = u16::from_le_bytes(payload[1..3].try_into().unwrap()) as usize;
             assert_eq!(decoded_room_len, room_bytes.len());
 
             if payload.len() >= 3 + decoded_room_len + 4 {
-                let decoded_room =
-                    std::str::from_utf8(&payload[3..3 + decoded_room_len]).unwrap();
+                let decoded_room = std::str::from_utf8(&payload[3..3 + decoded_room_len]).unwrap();
                 assert_eq!(decoded_room, *room);
 
                 let decoded_msg_len = u32::from_le_bytes(
@@ -589,8 +577,7 @@ mod tests {
 
                 if payload.len() >= 7 + decoded_room_len + decoded_msg_len {
                     let decoded_msg = std::str::from_utf8(
-                        &payload[7 + decoded_room_len
-                            ..7 + decoded_room_len + decoded_msg_len],
+                        &payload[7 + decoded_room_len..7 + decoded_room_len + decoded_msg_len],
                     )
                     .unwrap();
                     assert_eq!(decoded_msg, *msg);

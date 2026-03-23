@@ -104,10 +104,7 @@ fn find_mesh_rt() -> Result<PathBuf, String> {
         }
     }
 
-    Err(
-        "Could not locate libmesh_rt.a. Ensure `cargo build -p mesh-rt` has been run."
-            .to_string(),
-    )
+    Err("Could not locate libmesh_rt.a. Ensure `cargo build -p mesh-rt` has been run.".to_string())
 }
 
 /// Attempt to find the workspace target directory.

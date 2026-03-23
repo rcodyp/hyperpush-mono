@@ -253,11 +253,7 @@ fn infer_type_info_for_column(
 }
 
 /// Find the type_name of constructor patterns in a specific column.
-fn find_type_name_in_column(
-    matrix: &PatternMatrix,
-    row: &[Pat],
-    col: usize,
-) -> Option<String> {
+fn find_type_name_in_column(matrix: &PatternMatrix, row: &[Pat], col: usize) -> Option<String> {
     for mrow in &matrix.rows {
         if col < mrow.len() {
             if let Some(tn) = extract_type_name(&mrow[col]) {
@@ -277,13 +273,25 @@ fn find_type_name_in_column(
 fn check_column_for_bool(matrix: &PatternMatrix, row: &[Pat], col: usize) -> bool {
     for mrow in &matrix.rows {
         if col < mrow.len() {
-            if matches!(&mrow[col], Pat::Literal { ty: LitKind::Bool, .. }) {
+            if matches!(
+                &mrow[col],
+                Pat::Literal {
+                    ty: LitKind::Bool,
+                    ..
+                }
+            ) {
                 return true;
             }
         }
     }
     if col < row.len() {
-        if matches!(&row[col], Pat::Literal { ty: LitKind::Bool, .. }) {
+        if matches!(
+            &row[col],
+            Pat::Literal {
+                ty: LitKind::Bool,
+                ..
+            }
+        ) {
             return true;
         }
     }
@@ -293,9 +301,7 @@ fn check_column_for_bool(matrix: &PatternMatrix, row: &[Pat], col: usize) -> boo
 /// Extract the type_name from a pattern, if it is a constructor.
 fn extract_type_name(pat: &Pat) -> Option<String> {
     match pat {
-        Pat::Constructor { type_name, .. } if !type_name.is_empty() => {
-            Some(type_name.clone())
-        }
+        Pat::Constructor { type_name, .. } if !type_name.is_empty() => Some(type_name.clone()),
         Pat::Or { alternatives } => {
             for alt in alternatives {
                 if let Some(tn) = extract_type_name(alt) {
@@ -380,12 +386,13 @@ fn collect_types_from_pattern(pat: &Pat, registry: &mut TypeRegistry) {
             args,
         } => {
             if !type_name.is_empty() {
-                let entry = registry
-                    .types
-                    .entry(type_name.clone())
-                    .or_insert_with(|| TypeInfo::SumType {
-                        variants: Vec::new(),
-                    });
+                let entry =
+                    registry
+                        .types
+                        .entry(type_name.clone())
+                        .or_insert_with(|| TypeInfo::SumType {
+                            variants: Vec::new(),
+                        });
                 if let TypeInfo::SumType { variants } = entry {
                     if !variants.iter().any(|v| v.name == *name) {
                         variants.push(ConstructorSig {
@@ -419,11 +426,7 @@ fn collect_types_from_pattern(pat: &Pat, registry: &mut TypeRegistry) {
 /// Builds an internal type registry from the patterns for nested type
 /// resolution. For complete nested exhaustiveness, use the registry-based
 /// functions `check_exhaustiveness` and `check_redundancy` instead.
-pub fn is_useful(
-    matrix: &PatternMatrix,
-    row: &[Pat],
-    type_info: &[TypeInfo],
-) -> bool {
+pub fn is_useful(matrix: &PatternMatrix, row: &[Pat], type_info: &[TypeInfo]) -> bool {
     let mut registry = TypeRegistry::new();
     for mrow in &matrix.rows {
         for pat in mrow {
@@ -518,8 +521,7 @@ fn is_useful_inner(
                     let head_ctors = collect_head_constructors(matrix);
                     let head_keys: FxHashSet<String> =
                         head_ctors.iter().map(|c| c.name_key()).collect();
-                    let all_keys: FxHashSet<String> =
-                        ctors.iter().map(|c| c.name_key()).collect();
+                    let all_keys: FxHashSet<String> = ctors.iter().map(|c| c.name_key()).collect();
 
                     if all_keys.iter().all(|k| head_keys.contains(k)) {
                         // Complete: all constructors covered in matrix.
@@ -537,12 +539,7 @@ fn is_useful_inner(
                                 registry,
                             );
 
-                            is_useful_inner(
-                                &spec_matrix,
-                                &spec_row,
-                                &inner_type_info,
-                                registry,
-                            )
+                            is_useful_inner(&spec_matrix, &spec_row, &inner_type_info, registry)
                         })
                     } else {
                         // Incomplete: use default matrix.
@@ -666,11 +663,7 @@ pub fn check_redundancy(
 }
 
 /// Find witness patterns for non-exhaustive match.
-fn find_witnesses(
-    arms: &[Pat],
-    scrutinee_type: &TypeInfo,
-    registry: &TypeRegistry,
-) -> Vec<Pat> {
+fn find_witnesses(arms: &[Pat], scrutinee_type: &TypeInfo, registry: &TypeRegistry) -> Vec<Pat> {
     match scrutinee_type {
         TypeInfo::SumType { variants } => {
             let mut missing = Vec::new();
@@ -848,8 +841,7 @@ mod tests {
     #[test]
     fn test_bool_non_exhaustive() {
         // match x { true -> ... } is NOT exhaustive, missing false
-        let result =
-            check_exhaustiveness(&[lit_bool(true)], &bool_type(), &empty_registry());
+        let result = check_exhaustiveness(&[lit_bool(true)], &bool_type(), &empty_registry());
         assert!(result.is_some(), "Bool [true] should NOT be exhaustive");
         let witnesses = result.unwrap();
         assert!(!witnesses.is_empty());
@@ -858,8 +850,7 @@ mod tests {
     #[test]
     fn test_bool_wildcard_exhaustive() {
         // match x { _ -> ... } is exhaustive for Bool
-        let result =
-            check_exhaustiveness(&[wildcard()], &bool_type(), &empty_registry());
+        let result = check_exhaustiveness(&[wildcard()], &bool_type(), &empty_registry());
         assert!(result.is_none(), "Bool [_] should be exhaustive");
     }
 
@@ -899,8 +890,7 @@ mod tests {
     #[test]
     fn test_sum_type_wildcard_exhaustive() {
         // match shape { _ -> ... } is exhaustive
-        let result =
-            check_exhaustiveness(&[wildcard()], &shape_type(), &test_registry());
+        let result = check_exhaustiveness(&[wildcard()], &shape_type(), &test_registry());
         assert!(result.is_none(), "Shape [_] should be exhaustive");
     }
 
@@ -1054,19 +1044,15 @@ mod tests {
     #[test]
     fn test_literal_without_wildcard_non_exhaustive() {
         // match x { 1 -> ..., 2 -> ... } NOT exhaustive for Int (infinite)
-        let result = check_exhaustiveness(
-            &[lit_int(1), lit_int(2)],
-            &int_type(),
-            &empty_registry(),
-        );
+        let result =
+            check_exhaustiveness(&[lit_int(1), lit_int(2)], &int_type(), &empty_registry());
         assert!(result.is_some(), "Int [1, 2] should NOT be exhaustive");
     }
 
     #[test]
     fn test_literal_wildcard_only_exhaustive() {
         // match x { _ -> ... } is exhaustive for Int
-        let result =
-            check_exhaustiveness(&[wildcard()], &int_type(), &empty_registry());
+        let result = check_exhaustiveness(&[wildcard()], &int_type(), &empty_registry());
         assert!(result.is_none(), "Int [_] should be exhaustive");
     }
 
@@ -1195,11 +1181,7 @@ mod tests {
         // Patterns mention Circle and Point for Shape, so registry is complete.
         let result = is_useful(
             &m,
-            &[ctor(
-                "Some",
-                "Option",
-                vec![ctor("Point", "Shape", vec![])],
-            )],
+            &[ctor("Some", "Option", vec![ctor("Point", "Shape", vec![])])],
             &[option_shape_type()],
         );
         assert!(

@@ -215,8 +215,8 @@ mod tests {
         // A masked text frame "Hi" (2 bytes) from client
         // FIN=1, opcode=0x1 (text), MASK=1, len=2, mask_key=[0,0,0,0], payload="Hi"
         let frame_bytes: Vec<u8> = vec![
-            0x81,       // FIN=1, opcode=0x1
-            0x82,       // MASK=1, len=2
+            0x81, // FIN=1, opcode=0x1
+            0x82, // MASK=1, len=2
             0, 0, 0, 0, // mask key (all zeros = payload unchanged)
             b'H', b'i', // payload
         ];

@@ -214,11 +214,7 @@ impl AsPat {
     /// The binding is stored as an IDENT_PAT child; we get its IDENT token.
     pub fn binding_name(&self) -> Option<SyntaxToken> {
         // The binding is the last IDENT_PAT child (after the inner pattern)
-        let binding_pat = self
-            .syntax
-            .children()
-            .filter_map(Pattern::cast)
-            .last()?;
+        let binding_pat = self.syntax.children().filter_map(Pattern::cast).last()?;
         match binding_pat {
             Pattern::Ident(ident_pat) => ident_pat.name(),
             _ => None,

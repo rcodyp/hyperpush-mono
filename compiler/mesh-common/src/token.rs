@@ -355,7 +355,8 @@ mod tests {
         let literals = 9; // Added RegexLiteral(String, String)
         let ident_comments = 4;
         let special = 2;
-        let total = keywords + operators + delimiters + punctuation + literals + ident_comments + special;
+        let total =
+            keywords + operators + delimiters + punctuation + literals + ident_comments + special;
         assert_eq!(total, 100, "TokenKind should have 100 variants");
     }
 }

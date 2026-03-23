@@ -77,9 +77,7 @@ const CREATE_TRACKING_TABLE: &str = "CREATE TABLE IF NOT EXISTS _mesh_migrations
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now())";
 
 /// Query applied migration versions from the tracking table.
-fn query_applied_versions(
-    conn: &mut mesh_rt::db::pg::NativePgConn,
-) -> Result<Vec<i64>, String> {
+fn query_applied_versions(conn: &mut mesh_rt::db::pg::NativePgConn) -> Result<Vec<i64>, String> {
     let rows = native_pg_query(
         conn,
         "SELECT version FROM _mesh_migrations ORDER BY version",
@@ -163,8 +161,7 @@ fn compile_and_run_migration(
     migration: &MigrationInfo,
     direction: &str,
 ) -> Result<(), String> {
-    let tmp =
-        tempfile::tempdir().map_err(|e| format!("Failed to create temp directory: {}", e))?;
+    let tmp = tempfile::tempdir().map_err(|e| format!("Failed to create temp directory: {}", e))?;
     let tmp_path = tmp.path();
 
     // Copy migration file as migration.mpl
@@ -249,9 +246,8 @@ fn compile_and_run_migration(
 /// 3. Discovers migration files and queries applied versions
 /// 4. For each pending migration: compiles, runs, records in tracking table
 pub fn run_migrations_up(project_dir: &Path) -> Result<(), String> {
-    let url = std::env::var("DATABASE_URL").map_err(|_| {
-        "meshc migrate: DATABASE_URL environment variable is required".to_string()
-    })?;
+    let url = std::env::var("DATABASE_URL")
+        .map_err(|_| "meshc migrate: DATABASE_URL environment variable is required".to_string())?;
 
     let migrations_dir = project_dir.join("migrations");
     if !migrations_dir.exists() {
@@ -269,8 +265,8 @@ pub fn run_migrations_up(project_dir: &Path) -> Result<(), String> {
     }
 
     // Connect to PG for tracking table operations
-    let mut conn = native_pg_connect(&url)
-        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+    let mut conn =
+        native_pg_connect(&url).map_err(|e| format!("Failed to connect to database: {}", e))?;
 
     // Ensure tracking table exists
     native_pg_execute(&mut conn, CREATE_TRACKING_TABLE, &[])
@@ -330,15 +326,14 @@ pub fn run_migrations_up(project_dir: &Path) -> Result<(), String> {
 /// 3. Compiles and runs with direction "down"
 /// 4. Removes the tracking row
 pub fn run_migrations_down(project_dir: &Path) -> Result<(), String> {
-    let url = std::env::var("DATABASE_URL").map_err(|_| {
-        "meshc migrate: DATABASE_URL environment variable is required".to_string()
-    })?;
+    let url = std::env::var("DATABASE_URL")
+        .map_err(|_| "meshc migrate: DATABASE_URL environment variable is required".to_string())?;
 
     let migrations_dir = project_dir.join("migrations");
 
     // Connect to PG
-    let mut conn = native_pg_connect(&url)
-        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+    let mut conn =
+        native_pg_connect(&url).map_err(|e| format!("Failed to connect to database: {}", e))?;
 
     // Ensure tracking table exists
     native_pg_execute(&mut conn, CREATE_TRACKING_TABLE, &[])
@@ -358,12 +353,15 @@ pub fn run_migrations_down(project_dir: &Path) -> Result<(), String> {
 
     // Find the corresponding migration file
     let migrations = discover_migrations(&migrations_dir)?;
-    let migration = migrations.iter().find(|m| m.version == last_version).ok_or_else(|| {
-        format!(
-            "Migration file for version {} not found in migrations/",
-            last_version
-        )
-    })?;
+    let migration = migrations
+        .iter()
+        .find(|m| m.version == last_version)
+        .ok_or_else(|| {
+            format!(
+                "Migration file for version {} not found in migrations/",
+                last_version
+            )
+        })?;
 
     eprintln!("Rolling back: {}_{}", migration.version, migration.name);
 
@@ -394,9 +392,8 @@ pub fn run_migrations_down(project_dir: &Path) -> Result<(), String> {
 /// Connects to PG, discovers migration files, and prints a status table
 /// showing which migrations have been applied and which are pending.
 pub fn show_migration_status(project_dir: &Path) -> Result<(), String> {
-    let url = std::env::var("DATABASE_URL").map_err(|_| {
-        "meshc migrate: DATABASE_URL environment variable is required".to_string()
-    })?;
+    let url = std::env::var("DATABASE_URL")
+        .map_err(|_| "meshc migrate: DATABASE_URL environment variable is required".to_string())?;
 
     let migrations_dir = project_dir.join("migrations");
     if !migrations_dir.exists() {
@@ -414,8 +411,8 @@ pub fn show_migration_status(project_dir: &Path) -> Result<(), String> {
     }
 
     // Connect to PG
-    let mut conn = native_pg_connect(&url)
-        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+    let mut conn =
+        native_pg_connect(&url).map_err(|e| format!("Failed to connect to database: {}", e))?;
 
     // Ensure tracking table exists
     native_pg_execute(&mut conn, CREATE_TRACKING_TABLE, &[])

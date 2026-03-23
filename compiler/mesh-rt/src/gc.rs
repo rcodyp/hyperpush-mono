@@ -70,7 +70,11 @@ impl Arena {
         } else {
             // Allocate a new page. If the requested size exceeds the default
             // page size, allocate a page large enough to hold it.
-            let new_page_size = if size > PAGE_SIZE { size + align } else { PAGE_SIZE };
+            let new_page_size = if size > PAGE_SIZE {
+                size + align
+            } else {
+                PAGE_SIZE
+            };
             let mut page = vec![0u8; new_page_size];
             let aligned_start = {
                 let base = page.as_ptr() as usize;

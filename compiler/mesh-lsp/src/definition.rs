@@ -14,15 +14,14 @@
 //! offsets. We re-lex the source to build a mapping from source byte offsets to
 //! rowan tree offsets.
 
-use rowan::TextRange;
 use mesh_parser::SyntaxKind;
 use mesh_parser::SyntaxNode;
+use rowan::TextRange;
 
 /// Known built-in module names that have no source definition.
 const BUILTIN_MODULES: &[&str] = &[
-    "IO", "String", "List", "Map", "Set", "Queue", "Int", "Float", "Bool",
-    "Http", "Request", "Response", "Json", "Job", "File", "Math", "Result",
-    "Option",
+    "IO", "String", "List", "Map", "Set", "Queue", "Int", "Float", "Bool", "Http", "Request",
+    "Response", "Json", "Job", "File", "Math", "Result", "Option",
 ];
 
 /// Convert a source byte offset to a rowan tree offset.
@@ -108,7 +107,9 @@ pub fn find_definition(source: &str, root: &SyntaxNode, source_offset: usize) ->
             if grandparent.kind() == SyntaxKind::FIELD_ACCESS {
                 let name_text = token.text().to_string();
                 // Find the base (first child NAME_REF of the FIELD_ACCESS).
-                let base_ref = grandparent.children().find(|c| c.kind() == SyntaxKind::NAME_REF)?;
+                let base_ref = grandparent
+                    .children()
+                    .find(|c| c.kind() == SyntaxKind::NAME_REF)?;
                 let base_text = first_ident_text(&base_ref)?;
                 if BUILTIN_MODULES.contains(&base_text.as_str()) {
                     return None;
@@ -392,7 +393,10 @@ mod tests {
         let range = result.unwrap();
         // Convert the result back to source offset to verify.
         let def_source_offset = tree_range_to_source(source, range).unwrap();
-        assert_eq!(def_source_offset, 4, "Definition of x should be at source offset 4");
+        assert_eq!(
+            def_source_offset, 4,
+            "Definition of x should be at source offset 4"
+        );
     }
 
     #[test]
@@ -405,12 +409,16 @@ mod tests {
         let range = result.unwrap();
         let def_source_offset = tree_range_to_source(source, range).unwrap();
         // "fn add" -- NAME for "add" starts at source offset 3.
-        assert_eq!(def_source_offset, 3, "Definition of add should be at source offset 3");
+        assert_eq!(
+            def_source_offset, 3,
+            "Definition of add should be at source offset 3"
+        );
     }
 
     #[test]
     fn find_def_type_in_annotation() {
-        let source = "struct Point do\nx :: Int\ny :: Int\nend\nlet p :: Point = Point { x: 1, y: 2 }";
+        let source =
+            "struct Point do\nx :: Int\ny :: Int\nend\nlet p :: Point = Point { x: 1, y: 2 }";
         // Find "Point" in the type annotation `:: Point`.
         let after_let = source.find("let p").unwrap();
         let in_annotation = source[after_let..].find("Point").unwrap() + after_let;
@@ -424,7 +432,10 @@ mod tests {
         let source = "let x = 42";
         // Offset 0 is 'l' of 'let', which is a keyword, not a NAME_REF.
         let result = def_at(source, 0);
-        assert!(result.is_none(), "Keywords should not resolve to definitions");
+        assert!(
+            result.is_none(),
+            "Keywords should not resolve to definitions"
+        );
     }
 
     #[test]

@@ -115,7 +115,9 @@ fn compile_and_run_with_stdin(source: &str, stdin_input: &str) -> String {
 
     // Write stdin input and drop to signal EOF
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(stdin_input.as_bytes()).expect("failed to write stdin");
+        stdin
+            .write_all(stdin_input.as_bytes())
+            .expect("failed to write stdin");
         // stdin is dropped here, closing the pipe
     }
 
@@ -937,95 +939,111 @@ fn e2e_http_crash_isolation() {
 
 #[test]
 fn math_abs_int() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.abs(-42)}")
   println("${Math.abs(42)}")
   println("${Math.abs(0)}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "42\n42\n0");
 }
 
 #[test]
 fn math_abs_float() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.abs(-3.14)}")
   println("${Math.abs(3.14)}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("3.14"));
 }
 
 #[test]
 fn math_min_max_int() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.min(10, 20)}")
   println("${Math.max(10, 20)}")
   println("${Math.min(-5, 3)}")
   println("${Math.max(-5, 3)}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "10\n20\n-5\n3");
 }
 
 #[test]
 fn math_min_max_float() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.min(1.5, 2.5)}")
   println("${Math.max(1.5, 2.5)}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("1.5"));
     assert!(out.contains("2.5"));
 }
 
 #[test]
 fn math_pi_constant() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   let pi = Math.pi
   println("${pi}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("3.14159"));
 }
 
 #[test]
 fn int_to_float_conversion() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   let f = Int.to_float(42)
   println("${f}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("42"));
 }
 
 #[test]
 fn float_to_int_conversion() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Float.to_int(3.14)}")
   println("${Float.to_int(3.99)}")
   println("${Float.to_int(-2.7)}")
 end
-"#);
+"#,
+    );
     // fptosi truncates toward zero
     assert_eq!(out.trim(), "3\n3\n-2");
 }
 
 #[test]
 fn math_abs_with_variable() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   let x = -99
   println("${Math.abs(x)}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "99");
 }
 
@@ -1033,7 +1051,8 @@ end
 fn int_float_module_no_conflict_with_types() {
     // Verify Int/Float work as modules (Int.to_float, Float.to_int) while
     // Int and Float literals still work correctly (Pitfall 7: no name collision).
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   let x = 42
   let f = Int.to_float(x)
@@ -1041,7 +1060,8 @@ fn main() do
   println("${x}")
   println("${i}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "42\n42");
 }
 
@@ -1049,13 +1069,15 @@ end
 
 #[test]
 fn math_pow() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.pow(2.0, 10.0)}")
   println("${Math.pow(3.0, 2.0)}")
   println("${Math.pow(10.0, 0.0)}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("1024"));
     assert!(out.contains("9"));
     // 10^0 = 1
@@ -1064,13 +1086,15 @@ end
 
 #[test]
 fn math_sqrt() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.sqrt(144.0)}")
   println("${Math.sqrt(2.0)}")
   println("${Math.sqrt(0.0)}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("12"));
     assert!(out.contains("1.41421"));
     assert!(out.contains("0"));
@@ -1078,45 +1102,52 @@ end
 
 #[test]
 fn math_floor() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.floor(3.7)}")
   println("${Math.floor(3.0)}")
   println("${Math.floor(-2.3)}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "3\n3\n-3");
 }
 
 #[test]
 fn math_ceil() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.ceil(3.2)}")
   println("${Math.ceil(3.0)}")
   println("${Math.ceil(-2.7)}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "4\n3\n-2");
 }
 
 #[test]
 fn math_round() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   println("${Math.round(3.5)}")
   println("${Math.round(3.4)}")
   println("${Math.round(-2.5)}")
   println("${Math.round(0.5)}")
 end
-"#);
+"#,
+    );
     // llvm.round uses "round half away from zero"
     assert_eq!(out.trim(), "4\n3\n-3\n1");
 }
 
 #[test]
 fn math_combined_usage() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   let radius = 5.0
   let area = Math.pow(radius, 2.0)
@@ -1128,21 +1159,24 @@ fn main() do
   let converted = Float.to_int(Math.sqrt(Int.to_float(16)))
   println("${converted}")
 end
-"#);
+"#,
+    );
     assert!(out.contains("25"));
     assert!(out.contains("5"));
-    assert!(out.contains("3"));  // round(pi) = 3
-    assert!(out.contains("4"));  // sqrt(16) = 4
+    assert!(out.contains("3")); // round(pi) = 3
+    assert!(out.contains("4")); // sqrt(16) = 4
 }
 
 #[test]
 fn math_pow_with_conversion() {
-    let out = compile_and_run(r#"
+    let out = compile_and_run(
+        r#"
 fn main() do
   let result = Math.pow(Int.to_float(2), Int.to_float(8))
   println("${Float.to_int(result)}")
 end
-"#);
+"#,
+    );
     assert_eq!(out.trim(), "256");
 }
 
@@ -1328,12 +1362,15 @@ fn e2e_json_literal_basic() {
     let output = compile_and_run(&source);
     let lines: Vec<&str> = output.trim().lines().collect();
     assert!(lines.len() >= 3, "expected 3 output lines, got: {}", output);
-    let line0: serde_json::Value = serde_json::from_str(lines[0]).expect("line 0 must be valid JSON");
+    let line0: serde_json::Value =
+        serde_json::from_str(lines[0]).expect("line 0 must be valid JSON");
     assert_eq!(line0["status"], "ok");
-    let line1: serde_json::Value = serde_json::from_str(lines[1]).expect("line 1 must be valid JSON");
+    let line1: serde_json::Value =
+        serde_json::from_str(lines[1]).expect("line 1 must be valid JSON");
     assert_eq!(line1["count"], 42);
     assert_eq!(line1["active"], true);
-    let line2: serde_json::Value = serde_json::from_str(lines[2]).expect("line 2 must be valid JSON");
+    let line2: serde_json::Value =
+        serde_json::from_str(lines[2]).expect("line 2 must be valid JSON");
     assert!(line2["value"].is_null());
 }
 
@@ -1341,9 +1378,13 @@ fn e2e_json_literal_basic() {
 fn e2e_json_literal_nested() {
     let source = read_fixture("json_literal_nested.mpl");
     let output = compile_and_run(&source);
-    let parsed: serde_json::Value = serde_json::from_str(output.trim()).expect("output must be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(output.trim()).expect("output must be valid JSON");
     // result field must be an object (not a quoted string -- that would be double-encoding)
-    assert!(parsed["result"].is_object(), "nested json must be embedded raw, not double-encoded");
+    assert!(
+        parsed["result"].is_object(),
+        "nested json must be embedded raw, not double-encoded"
+    );
     assert_eq!(parsed["result"]["code"], 200);
     assert_eq!(parsed["ok"], true);
 }
@@ -1352,8 +1393,12 @@ fn e2e_json_literal_nested() {
 fn e2e_json_literal_list() {
     let source = read_fixture("json_literal_list.mpl");
     let output = compile_and_run(&source);
-    let parsed: serde_json::Value = serde_json::from_str(output.trim()).expect("output must be valid JSON");
-    assert!(parsed["tags"].is_array(), "List<String> must serialize as JSON array");
+    let parsed: serde_json::Value =
+        serde_json::from_str(output.trim()).expect("output must be valid JSON");
+    assert!(
+        parsed["tags"].is_array(),
+        "List<String> must serialize as JSON array"
+    );
     let tags = parsed["tags"].as_array().unwrap();
     assert_eq!(tags.len(), 2);
     assert_eq!(tags[0], "error");
@@ -1377,8 +1422,12 @@ fn e2e_json_literal_option() {
 fn e2e_json_literal_struct() {
     let source = read_fixture("json_literal_struct.mpl");
     let output = compile_and_run(&source);
-    let parsed: serde_json::Value = serde_json::from_str(output.trim()).expect("output must be valid JSON");
-    assert!(parsed["point"].is_object(), "deriving(Json) struct must embed as nested object");
+    let parsed: serde_json::Value =
+        serde_json::from_str(output.trim()).expect("output must be valid JSON");
+    assert!(
+        parsed["point"].is_object(),
+        "deriving(Json) struct must embed as nested object"
+    );
     assert_eq!(parsed["point"]["x"], 3);
     assert_eq!(parsed["point"]["y"], 4);
     assert_eq!(parsed["label"], "origin");
@@ -1670,9 +1719,15 @@ fn e2e_sqlite() {
     assert!(output.contains("Alice:30"), "Should find Alice with age 30");
     assert!(output.contains("Bob:25"), "Should find Bob with age 25");
     // Verify parameterized query
-    assert!(output.contains("filtered:Alice"), "Filtered query should find Alice");
+    assert!(
+        output.contains("filtered:Alice"),
+        "Filtered query should find Alice"
+    );
     // Verify completion
-    assert!(output.contains("done"), "Program should complete successfully");
+    assert!(
+        output.contains("done"),
+        "Program should complete successfully"
+    );
 }
 
 // ── Phase 107 Gap Closure: SQLite JOIN Runtime Tests ────────────────────
@@ -1687,18 +1742,45 @@ fn e2e_sqlite_join_runtime() {
     let source = read_fixture("sqlite_join_runtime.mpl");
     let output = compile_and_run(&source);
     // INNER JOIN: 2 rows with fields from both tables
-    assert!(output.contains("inner_join"), "Should have inner_join section");
-    assert!(output.contains("Alice:Engineer"), "Inner join should return Alice with Engineer bio");
-    assert!(output.contains("Bob:Designer"), "Inner join should return Bob with Designer bio");
+    assert!(
+        output.contains("inner_join"),
+        "Should have inner_join section"
+    );
+    assert!(
+        output.contains("Alice:Engineer"),
+        "Inner join should return Alice with Engineer bio"
+    );
+    assert!(
+        output.contains("Bob:Designer"),
+        "Inner join should return Bob with Designer bio"
+    );
     // LEFT JOIN: 3 rows, Charlie's bio is empty (NULL mapped to empty string)
-    assert!(output.contains("left_join"), "Should have left_join section");
-    assert!(output.contains("Charlie:"), "Left join should return Charlie with empty bio (NULL)");
+    assert!(
+        output.contains("left_join"),
+        "Should have left_join section"
+    );
+    assert!(
+        output.contains("Charlie:"),
+        "Left join should return Charlie with empty bio (NULL)"
+    );
     // Multi-table JOIN: columns from users, profiles, and departments
-    assert!(output.contains("multi_join"), "Should have multi_join section");
-    assert!(output.contains("Alice:Engineer:Engineering"), "Multi-join should return Alice with bio and dept");
-    assert!(output.contains("Bob:Designer:Design"), "Multi-join should return Bob with bio and dept");
+    assert!(
+        output.contains("multi_join"),
+        "Should have multi_join section"
+    );
+    assert!(
+        output.contains("Alice:Engineer:Engineering"),
+        "Multi-join should return Alice with bio and dept"
+    );
+    assert!(
+        output.contains("Bob:Designer:Design"),
+        "Multi-join should return Bob with bio and dept"
+    );
     // Success
-    assert!(output.contains("done"), "Program should complete successfully");
+    assert!(
+        output.contains("done"),
+        "Program should complete successfully"
+    );
 }
 
 // ── Phase 108: SQLite Aggregate Runtime Tests ───────────────────────────
@@ -1720,17 +1802,17 @@ fn e2e_sqlite_aggregate_runtime() {
     // AGG-02: sum=710, avg=118.333..., min=25, max=300
     assert_eq!(lines[2], "sum_avg_min_max");
     let agg_parts: Vec<&str> = lines[3].split(':').collect();
-    assert_eq!(agg_parts[0], "710");       // sum
-    // avg may be 118.333... or 118 depending on SQLite integer division
-    assert!(agg_parts[1].starts_with("118"));  // avg (118 or 118.333...)
-    assert_eq!(agg_parts[2], "25");        // min
-    assert_eq!(agg_parts[3], "300");       // max
+    assert_eq!(agg_parts[0], "710"); // sum
+                                     // avg may be 118.333... or 118 depending on SQLite integer division
+    assert!(agg_parts[1].starts_with("118")); // avg (118 or 118.333...)
+    assert_eq!(agg_parts[2], "25"); // min
+    assert_eq!(agg_parts[3], "300"); // max
 
     // AGG-03: GROUP BY -- 3 groups
     assert_eq!(lines[4], "group_by");
-    assert_eq!(lines[5], "books:2:60");           // books: 2 orders, sum=60
-    assert_eq!(lines[6], "clothing:1:50");        // clothing: 1 order, sum=50
-    assert_eq!(lines[7], "electronics:3:600");    // electronics: 3 orders, sum=600
+    assert_eq!(lines[5], "books:2:60"); // books: 2 orders, sum=60
+    assert_eq!(lines[6], "clothing:1:50"); // clothing: 1 order, sum=50
+    assert_eq!(lines[7], "electronics:3:600"); // electronics: 3 orders, sum=600
 
     // AGG-04: HAVING count > 1 -- only books and electronics
     assert_eq!(lines[8], "having");
@@ -1752,14 +1834,38 @@ fn e2e_sqlite_upsert_subquery_runtime() {
     let source = read_fixture("sqlite_upsert_subquery_runtime.mpl");
     let output = compile_and_run(&source);
     // UPS-01: Upsert via ON CONFLICT DO UPDATE SET RETURNING
-    assert!(output.contains("upsert_insert:Delta"), "upsert insert failed: {}", output);
-    assert!(output.contains("upsert_update:Delta-Updated"), "upsert update failed: {}", output);
-    assert!(output.contains("upsert_count:4"), "upsert count should be 4 (no duplicate): {}", output);
+    assert!(
+        output.contains("upsert_insert:Delta"),
+        "upsert insert failed: {}",
+        output
+    );
+    assert!(
+        output.contains("upsert_update:Delta-Updated"),
+        "upsert update failed: {}",
+        output
+    );
+    assert!(
+        output.contains("upsert_count:4"),
+        "upsert count should be 4 (no duplicate): {}",
+        output
+    );
     // UPS-02: DELETE with RETURNING
-    assert!(output.contains("delete_ret_name:Gamma"), "deleted row should be Gamma: {}", output);
-    assert!(output.contains("delete_after_count:0"), "p3 should be gone after delete: {}", output);
+    assert!(
+        output.contains("delete_ret_name:Gamma"),
+        "deleted row should be Gamma: {}",
+        output
+    );
+    assert!(
+        output.contains("delete_after_count:0"),
+        "p3 should be gone after delete: {}",
+        output
+    );
     // UPS-03: Subquery WHERE verification
-    assert!(output.contains("subquery_first:Alpha"), "subquery first should be Alpha: {}", output);
+    assert!(
+        output.contains("subquery_first:Alpha"),
+        "subquery first should be Alpha: {}",
+        output
+    );
     // Completion
     assert!(output.contains("done"), "did not complete: {}", output);
 }
@@ -1787,16 +1893,28 @@ fn e2e_pg() {
     let source = read_fixture("stdlib_pg.mpl");
     let output = compile_and_run(&source);
     // Verify DDL result (CREATE TABLE returns 0 rows affected in PostgreSQL)
-    assert!(output.contains("created: 0"), "CREATE TABLE should report 0 rows affected");
+    assert!(
+        output.contains("created: 0"),
+        "CREATE TABLE should report 0 rows affected"
+    );
     // Verify insert counts
     assert!(output.contains("inserted: 1"), "INSERT should affect 1 row");
     // Verify query results
-    assert!(output.contains("Alice is 30"), "Should find Alice with age 30");
+    assert!(
+        output.contains("Alice is 30"),
+        "Should find Alice with age 30"
+    );
     assert!(output.contains("Bob is 25"), "Should find Bob with age 25");
     // Verify parameterized query
-    assert!(output.contains("older: Alice"), "Filtered query should find Alice (age 30 > 26)");
+    assert!(
+        output.contains("older: Alice"),
+        "Filtered query should find Alice (age 30 > 26)"
+    );
     // Verify completion
-    assert!(output.contains("done"), "Program should complete successfully");
+    assert!(
+        output.contains("done"),
+        "Program should complete successfully"
+    );
 }
 
 // ── Phase 87.1: Codegen Bug Fixes ──────────────────────────────────────

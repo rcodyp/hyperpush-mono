@@ -7,14 +7,14 @@
 //! Uses `ureq` 3 for HTTP requests.
 
 use std::io::Read as IoRead;
-use std::time::Duration;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
+use crate::collections::map::{mesh_map_new_typed, mesh_map_put};
 use crate::gc::mesh_gc_alloc_actor;
 use crate::io::MeshResult;
 use crate::string::{mesh_string_new, MeshString};
-use crate::collections::map::{mesh_map_new_typed, mesh_map_put};
 use ureq::Agent;
 
 /// Allocate a MeshResult on the GC heap.
@@ -112,10 +112,7 @@ pub struct MeshClientResponse {
 /// Allocates a MeshRequestData on the Rust heap and returns it as an opaque u64.
 /// The method atom is passed as a string (atom lowered to string ABI).
 #[no_mangle]
-pub extern "C" fn mesh_http_build(
-    method: *const MeshString,
-    url: *const MeshString,
-) -> u64 {
+pub extern "C" fn mesh_http_build(method: *const MeshString, url: *const MeshString) -> u64 {
     unsafe {
         let method_str = (*method).as_str().to_lowercase();
         let url_str = (*url).as_str().to_string();
@@ -152,10 +149,7 @@ pub extern "C" fn mesh_http_header(
 
 /// Http.body(req: Int, body: String) -> Int (same handle)
 #[no_mangle]
-pub extern "C" fn mesh_http_body(
-    handle: u64,
-    body: *const MeshString,
-) -> u64 {
+pub extern "C" fn mesh_http_body(handle: u64, body: *const MeshString) -> u64 {
     unsafe {
         let data = &mut *(handle as *mut MeshRequestData);
         let body_str = (*body).as_str().as_bytes().to_vec();
@@ -194,10 +188,7 @@ pub extern "C" fn mesh_http_query(
 ///
 /// Sets the body and marks the request as JSON (sets Content-Type: application/json).
 #[no_mangle]
-pub extern "C" fn mesh_http_json(
-    handle: u64,
-    body: *const MeshString,
-) -> u64 {
+pub extern "C" fn mesh_http_json(handle: u64, body: *const MeshString) -> u64 {
     unsafe {
         let data = &mut *(handle as *mut MeshRequestData);
         let body_str = (*body).as_str().as_bytes().to_vec();
@@ -271,12 +262,15 @@ unsafe fn execute_with_agent(agent: &Agent, data: &MeshRequestData) -> *mut u8 {
     let result: Result<ureq::http::Response<ureq::Body>, ureq::Error> =
         if is_body_method || data.body.is_some() {
             let req = match method {
-                "post"  => agent.post(&url_with_query),
-                "put"   => agent.put(&url_with_query),
+                "post" => agent.post(&url_with_query),
+                "put" => agent.put(&url_with_query),
                 "patch" => agent.patch(&url_with_query),
-                _       => agent.post(&url_with_query),
+                _ => agent.post(&url_with_query),
             };
-            let req = data.headers.iter().fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
+            let req = data
+                .headers
+                .iter()
+                .fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
             let req = if data.is_json {
                 req.header("Content-Type", "application/json")
             } else {
@@ -289,13 +283,16 @@ unsafe fn execute_with_agent(agent: &Agent, data: &MeshRequestData) -> *mut u8 {
             }
         } else {
             let req = match method {
-                "get"     => agent.get(&url_with_query),
-                "head"    => agent.head(&url_with_query),
-                "delete"  => agent.delete(&url_with_query),
+                "get" => agent.get(&url_with_query),
+                "head" => agent.head(&url_with_query),
+                "delete" => agent.delete(&url_with_query),
                 "options" => agent.options(&url_with_query),
-                _         => agent.get(&url_with_query),
+                _ => agent.get(&url_with_query),
             };
-            let req = data.headers.iter().fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
+            let req = data
+                .headers
+                .iter()
+                .fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
             req.call()
         };
 
@@ -343,7 +340,9 @@ unsafe fn execute_with_agent(agent: &Agent, data: &MeshRequestData) -> *mut u8 {
 /// ':stop' in Mesh source lowers to a MeshString containing "stop" (no colon).
 fn is_stop_atom(result: *mut u8) -> bool {
     unsafe {
-        if result.is_null() { return false; }
+        if result.is_null() {
+            return false;
+        }
         let s = &*(result as *const MeshString);
         s.as_str() == "stop"
     }
@@ -395,12 +394,15 @@ pub extern "C" fn mesh_http_stream(
 
         let response = if is_body_method || req_data.body.is_some() {
             let req = match method {
-                "post"  => agent.post(&url_with_query),
-                "put"   => agent.put(&url_with_query),
+                "post" => agent.post(&url_with_query),
+                "put" => agent.put(&url_with_query),
                 "patch" => agent.patch(&url_with_query),
-                _       => agent.post(&url_with_query),
+                _ => agent.post(&url_with_query),
             };
-            let req = req_data.headers.iter().fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
+            let req = req_data
+                .headers
+                .iter()
+                .fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
             let req = if req_data.is_json {
                 req.header("Content-Type", "application/json")
             } else {
@@ -413,13 +415,16 @@ pub extern "C" fn mesh_http_stream(
             }
         } else {
             let req = match method {
-                "get"     => agent.get(&url_with_query),
-                "head"    => agent.head(&url_with_query),
-                "delete"  => agent.delete(&url_with_query),
+                "get" => agent.get(&url_with_query),
+                "head" => agent.head(&url_with_query),
+                "delete" => agent.delete(&url_with_query),
                 "options" => agent.options(&url_with_query),
-                _         => agent.get(&url_with_query),
+                _ => agent.get(&url_with_query),
             };
-            let req = req_data.headers.iter().fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
+            let req = req_data
+                .headers
+                .iter()
+                .fold(req, |r, (k, v)| r.header(k.as_str(), v.as_str()));
             req.call()
         };
 
@@ -447,7 +452,9 @@ pub extern "C" fn mesh_http_stream(
                     let mut reader = body.as_reader();
                     let mut buf = vec![0u8; 8192];
                     loop {
-                        if cancel_for_thread.load(Ordering::SeqCst) { break; }
+                        if cancel_for_thread.load(Ordering::SeqCst) {
+                            break;
+                        }
                         match reader.read(&mut buf) {
                             Ok(0) => break,
                             Ok(n) => {
@@ -461,7 +468,9 @@ pub extern "C" fn mesh_http_stream(
                                         std::mem::transmute(fn_ptr_usize);
                                     f(env_ptr_usize as *mut u8, chunk as *mut u8)
                                 };
-                                if is_stop_atom(result) { break; }
+                                if is_stop_atom(result) {
+                                    break;
+                                }
                             }
                             Err(_) => break,
                         }
@@ -498,7 +507,9 @@ pub extern "C" fn mesh_http_stream_bytes(
 #[no_mangle]
 pub extern "C" fn mesh_http_cancel(cancel_handle: u64) {
     unsafe {
-        if cancel_handle == 0 { return; }
+        if cancel_handle == 0 {
+            return;
+        }
         // Peek at the Arc without taking ownership — do NOT use Box::from_raw here
         // (that would drop the Arc on function exit, potentially freeing it while
         //  the stream thread still holds its own clone).
@@ -566,14 +577,21 @@ fn url_encode(s: &str) -> String {
     let mut encoded = String::with_capacity(s.len());
     for byte in s.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
-            | b'-' | b'_' | b'.' | b'~' => {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 encoded.push(byte as char);
             }
             b => {
                 encoded.push('%');
-                encoded.push(char::from_digit((b >> 4) as u32, 16).unwrap_or('0').to_ascii_uppercase());
-                encoded.push(char::from_digit((b & 0xf) as u32, 16).unwrap_or('0').to_ascii_uppercase());
+                encoded.push(
+                    char::from_digit((b >> 4) as u32, 16)
+                        .unwrap_or('0')
+                        .to_ascii_uppercase(),
+                );
+                encoded.push(
+                    char::from_digit((b & 0xf) as u32, 16)
+                        .unwrap_or('0')
+                        .to_ascii_uppercase(),
+                );
             }
         }
     }

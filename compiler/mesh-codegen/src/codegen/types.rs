@@ -53,9 +53,7 @@ pub fn llvm_type<'ctx>(
                 (*st).into()
             } else {
                 // Fallback: return opaque struct
-                context
-                    .opaque_struct_type(name)
-                    .as_basic_type_enum()
+                context.opaque_struct_type(name).as_basic_type_enum()
             }
         }
         MirType::SumType(name) => {
@@ -66,11 +64,15 @@ pub fn llvm_type<'ctx>(
                 if let Some(st) = sum_type_layouts.get(base) {
                     (*st).into()
                 } else {
-                    context.struct_type(&[context.i8_type().into()], false).into()
+                    context
+                        .struct_type(&[context.i8_type().into()], false)
+                        .into()
                 }
             } else {
                 // Fallback: just tag byte
-                context.struct_type(&[context.i8_type().into()], false).into()
+                context
+                    .struct_type(&[context.i8_type().into()], false)
+                    .into()
             }
         }
         MirType::FnPtr(_, _) => context.ptr_type(inkwell::AddressSpace::default()).into(),
@@ -152,7 +154,10 @@ pub fn create_sum_type_layout<'ctx>(
     let all_single_ptr = sum_type.variants.iter().all(|v| {
         v.fields.is_empty()
             || (v.fields.len() == 1
-                && matches!(v.fields[0], MirType::Ptr | MirType::String | MirType::Struct(_)))
+                && matches!(
+                    v.fields[0],
+                    MirType::Ptr | MirType::String | MirType::Struct(_)
+                ))
     });
 
     if all_single_ptr {
@@ -176,7 +181,8 @@ pub fn create_sum_type_layout<'ctx>(
                 // Just the tag byte
                 1u64
             } else {
-                let overlay = variant_struct_type(context, &v.fields, struct_types, sum_type_layouts);
+                let overlay =
+                    variant_struct_type(context, &v.fields, struct_types, sum_type_layouts);
                 target_data.get_store_size(&overlay)
             }
         })
@@ -406,12 +412,20 @@ mod tests {
             ],
         };
 
-        let generic_layout = create_sum_type_layout(&context, &generic_result, &structs, &sums, &td);
+        let generic_layout =
+            create_sum_type_layout(&context, &generic_result, &structs, &sums, &td);
         // Generic Result: all_single_ptr is true (both variants have one Ptr field)
         // Layout: {i8, ptr}
-        assert_eq!(generic_layout.count_fields(), 2, "Generic Result should have 2 fields (tag + ptr)");
+        assert_eq!(
+            generic_layout.count_fields(),
+            2,
+            "Generic Result should have 2 fields (tag + ptr)"
+        );
         assert!(
-            generic_layout.get_field_type_at_index(1).unwrap().is_pointer_type(),
+            generic_layout
+                .get_field_type_at_index(1)
+                .unwrap()
+                .is_pointer_type(),
             "Generic Result field 1 should be ptr type"
         );
 
@@ -437,7 +451,11 @@ mod tests {
         let struct_layout = create_sum_type_layout(&context, &struct_result, &structs, &sums, &td);
         // Struct + String: all_single_ptr is true (Struct treated as pointer-sized)
         // Layout: {i8, ptr}
-        assert_eq!(struct_layout.count_fields(), 2, "Sum type with Struct field should have 2 fields (tag + ptr)");
+        assert_eq!(
+            struct_layout.count_fields(),
+            2,
+            "Sum type with Struct field should have 2 fields (tag + ptr)"
+        );
         assert!(
             struct_layout.get_field_type_at_index(1).unwrap().is_pointer_type(),
             "Sum type with Struct field should use ptr layout (struct payloads are heap-allocated pointers)"
@@ -464,9 +482,16 @@ mod tests {
 
         let int_layout = create_sum_type_layout(&context, &int_result, &structs, &sums, &td);
         // Int is not pointer-sized, so all_single_ptr is false -> byte-array layout
-        assert_eq!(int_layout.count_fields(), 2, "Int-payload sum type should have 2 fields (tag + payload)");
+        assert_eq!(
+            int_layout.count_fields(),
+            2,
+            "Int-payload sum type should have 2 fields (tag + payload)"
+        );
         assert!(
-            int_layout.get_field_type_at_index(1).unwrap().is_array_type(),
+            int_layout
+                .get_field_type_at_index(1)
+                .unwrap()
+                .is_array_type(),
             "Int-payload sum type field 1 should be byte array"
         );
 
@@ -474,7 +499,10 @@ mod tests {
         let ptr_overlay = variant_struct_type(&context, &[MirType::Ptr], &structs, &sums);
         assert_eq!(ptr_overlay.count_fields(), 2);
         assert!(
-            ptr_overlay.get_field_type_at_index(1).unwrap().is_pointer_type(),
+            ptr_overlay
+                .get_field_type_at_index(1)
+                .unwrap()
+                .is_pointer_type(),
             "Ptr variant overlay should have ptr field"
         );
 
@@ -489,7 +517,10 @@ mod tests {
         );
         assert_eq!(struct_overlay.count_fields(), 2);
         assert!(
-            struct_overlay.get_field_type_at_index(1).unwrap().is_struct_type(),
+            struct_overlay
+                .get_field_type_at_index(1)
+                .unwrap()
+                .is_struct_type(),
             "Struct variant overlay should have struct field type (used for construction GEP)"
         );
 

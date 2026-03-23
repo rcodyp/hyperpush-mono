@@ -38,23 +38,48 @@ pub fn run(query: &str, registry: &str, json_mode: bool) -> Result<(), String> {
 fn fetch_results(query: &str, registry: &str) -> Result<Vec<SearchResult>, String> {
     let url = format!("{}/api/v1/packages?search={}", registry, query);
     let agent = ureq::Agent::new_with_defaults();
-    let mut response = agent.get(&url).call()
+    let mut response = agent
+        .get(&url)
+        .call()
         .map_err(|e| format!("Failed to search registry: {}", e))?;
-    let body = response.body_mut().read_to_string()
+    let body = response
+        .body_mut()
+        .read_to_string()
         .map_err(|e| format!("Failed to read search response: {}", e))?;
     serde_json::from_str::<Vec<SearchResult>>(&body)
         .map_err(|e| format!("Failed to parse search results: {}", e))
 }
 
 fn print_search_table(results: &[SearchResult]) {
-    let max_name = results.iter().map(|r| r.name.len()).max().unwrap_or(4).max(4);
-    let max_ver = results.iter().map(|r| r.version.len()).max().unwrap_or(7).max(7);
+    let max_name = results
+        .iter()
+        .map(|r| r.name.len())
+        .max()
+        .unwrap_or(4)
+        .max(4);
+    let max_ver = results
+        .iter()
+        .map(|r| r.version.len())
+        .max()
+        .unwrap_or(7)
+        .max(7);
 
-    println!("{:<w_name$}  {:<w_ver$}  DESCRIPTION",
-        "NAME", "VERSION", w_name = max_name, w_ver = max_ver);
+    println!(
+        "{:<w_name$}  {:<w_ver$}  DESCRIPTION",
+        "NAME",
+        "VERSION",
+        w_name = max_name,
+        w_ver = max_ver
+    );
     println!("{}", "-".repeat(max_name + max_ver + 16));
     for r in results {
-        println!("{:<w_name$}  {:<w_ver$}  {}",
-            r.name, r.version, r.description, w_name = max_name, w_ver = max_ver);
+        println!(
+            "{:<w_name$}  {:<w_ver$}  {}",
+            r.name,
+            r.version,
+            r.description,
+            w_name = max_name,
+            w_ver = max_ver
+        );
     }
 }

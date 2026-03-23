@@ -114,8 +114,10 @@ fn test_missing_assoc_type_binding() {
     );
     assert_has_error(
         &result,
-        |e| matches!(e, TypeError::MissingAssocType { trait_name, assoc_name, .. }
-            if trait_name == "Iterator" && assoc_name == "Item"),
+        |e| {
+            matches!(e, TypeError::MissingAssocType { trait_name, assoc_name, .. }
+            if trait_name == "Iterator" && assoc_name == "Item")
+        },
         "MissingAssocType for Iterator.Item",
     );
 }
@@ -136,8 +138,10 @@ fn test_extra_assoc_type_binding() {
     );
     assert_has_error(
         &result,
-        |e| matches!(e, TypeError::ExtraAssocType { trait_name, assoc_name, .. }
-            if trait_name == "Printable" && assoc_name == "Output"),
+        |e| {
+            matches!(e, TypeError::ExtraAssocType { trait_name, assoc_name, .. }
+            if trait_name == "Printable" && assoc_name == "Output")
+        },
         "ExtraAssocType for Output in Printable",
     );
 }
@@ -243,9 +247,10 @@ fn test_resolve_associated_type_api() {
     assert_eq!(resolved, Some(Ty::string()));
 
     // Non-existent bindings should return None.
-    let not_found = result
-        .trait_registry
-        .resolve_associated_type("Container", "NonExistent", &Ty::int());
+    let not_found =
+        result
+            .trait_registry
+            .resolve_associated_type("Container", "NonExistent", &Ty::int());
     assert_eq!(not_found, None);
 }
 

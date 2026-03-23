@@ -54,7 +54,10 @@ pub fn run_tests(
     // --coverage stub: accepted, prints message, exits cleanly
     if coverage {
         println!("Coverage reporting coming soon");
-        return Ok(TestSummary { passed: 0, failed: 0 });
+        return Ok(TestSummary {
+            passed: 0,
+            failed: 0,
+        });
     }
 
     // Discover test files
@@ -68,7 +71,8 @@ pub fn run_tests(
         if !abs.exists() {
             return Err(format!("Test file '{}' does not exist", abs.display()));
         }
-        if !abs.file_name()
+        if !abs
+            .file_name()
             .and_then(|n| n.to_str())
             .map(|n| n.ends_with(".test.mpl"))
             .unwrap_or(false)
@@ -82,7 +86,10 @@ pub fn run_tests(
 
     if test_files.is_empty() {
         println!("No *.test.mpl files found.");
-        return Ok(TestSummary { passed: 0, failed: 0 });
+        return Ok(TestSummary {
+            passed: 0,
+            failed: 0,
+        });
     }
 
     let start = Instant::now();
@@ -90,7 +97,8 @@ pub fn run_tests(
     let mut failed = 0usize;
 
     for test_file in &test_files {
-        let rel = test_file.strip_prefix(project_dir)
+        let rel = test_file
+            .strip_prefix(project_dir)
             .unwrap_or(test_file.as_path());
         let label = rel.display().to_string();
 
@@ -101,8 +109,8 @@ pub fn run_tests(
         let preprocessed = preprocess_test_source(&source);
 
         // Compile the preprocessed source to a temp binary.
-        let tmp_dir = tempfile::tempdir()
-            .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+        let tmp_dir =
+            tempfile::tempdir().map_err(|e| format!("Failed to create temp dir: {}", e))?;
         let bin_path = tmp_dir.path().join("test_bin");
 
         // Copy project source modules into the temp dir so cross-module imports resolve.
@@ -115,13 +123,16 @@ pub fn run_tests(
         std::fs::write(&main_path, &preprocessed)
             .map_err(|e| format!("Failed to write preprocessed source: {}", e))?;
 
-        let diag_opts = DiagnosticOptions { color: true, json: false };
+        let diag_opts = DiagnosticOptions {
+            color: true,
+            json: false,
+        };
         let compile_result = crate::build(
             tmp_dir.path(),
-            0,        // opt_level: debug
-            false,    // emit_llvm
+            0,     // opt_level: debug
+            false, // emit_llvm
             Some(&bin_path),
-            None,     // target: native
+            None, // target: native
             &diag_opts,
         );
 
@@ -367,21 +378,21 @@ fn tokenize_test_source(source: &str) -> Vec<TToken> {
                 i += 1;
             }
             let tok = match ident.as_str() {
-                "test"     => TToken::TestKw,
+                "test" => TToken::TestKw,
                 "describe" => TToken::DescribeKw,
-                "setup"    => TToken::SetupKw,
+                "setup" => TToken::SetupKw,
                 "teardown" => TToken::TeardownKw,
-                "do"       => TToken::Do,
-                "end"      => TToken::End,
-                "fn"       => TToken::Fn,
-                "if"       => TToken::If,
-                "while"    => TToken::While,
-                "case"     => TToken::Case,
-                "for"      => TToken::For,
-                "actor"    => TToken::Actor,
-                "service"  => TToken::Service,
-                "receive"  => TToken::Receive,
-                _          => TToken::Other(ident),
+                "do" => TToken::Do,
+                "end" => TToken::End,
+                "fn" => TToken::Fn,
+                "if" => TToken::If,
+                "while" => TToken::While,
+                "case" => TToken::Case,
+                "for" => TToken::For,
+                "actor" => TToken::Actor,
+                "service" => TToken::Service,
+                "receive" => TToken::Receive,
+                _ => TToken::Other(ident),
             };
             tokens.push(tok);
             continue;
@@ -449,7 +460,9 @@ fn extract_blocks_at(
         // Inside a non-test block (e.g., a helper `fn` body) — skip tokens until `end`.
         if block_depth > 0 {
             match &tokens[*i] {
-                TToken::Do => { block_depth += 1; }
+                TToken::Do => {
+                    block_depth += 1;
+                }
                 TToken::End => {
                     block_depth -= 1;
                     // When depth returns to 0, we've exited the non-test block.
@@ -465,8 +478,7 @@ fn extract_blocks_at(
                 // test(STRING) do BODY end
                 *i += 1;
                 // Expect ( STRING )
-                let label = extract_string_arg(tokens, i)
-                    .unwrap_or_else(|| "unnamed".to_string());
+                let label = extract_string_arg(tokens, i).unwrap_or_else(|| "unnamed".to_string());
                 let full_label = match group_prefix {
                     Some(prefix) => format!("{} > {}", prefix, label),
                     None => label,
@@ -488,15 +500,14 @@ fn extract_blocks_at(
             TToken::DescribeKw => {
                 // describe(STRING) do [setup] [teardown] test... end
                 *i += 1;
-                let group_name = extract_string_arg(tokens, i)
-                    .unwrap_or_else(|| "describe".to_string());
+                let group_name =
+                    extract_string_arg(tokens, i).unwrap_or_else(|| "describe".to_string());
                 skip_to_do(tokens, i);
                 if *i < tokens.len() {
                     *i += 1; // consume 'do'
                 }
                 // Now parse the describe body: find setup, teardown, and test blocks.
-                let (inner_setup, inner_teardown, inner_end) =
-                    peek_describe_body(tokens, *i);
+                let (inner_setup, inner_teardown, inner_end) = peek_describe_body(tokens, *i);
                 // Walk only the test tokens between setup/teardown sub-blocks.
                 extract_tests_from_describe(
                     tokens,
@@ -601,8 +612,8 @@ fn extract_tests_from_describe(
             }
             TToken::TestKw => {
                 i += 1;
-                let label = extract_string_arg(tokens, &mut i)
-                    .unwrap_or_else(|| "unnamed".to_string());
+                let label =
+                    extract_string_arg(tokens, &mut i).unwrap_or_else(|| "unnamed".to_string());
                 let full_label = format!("{} > {}", group_name, label);
                 skip_to_do(tokens, &mut i);
                 if i < tokens.len() {
@@ -628,10 +639,7 @@ fn extract_tests_from_describe(
 ///
 /// Returns `(setup_body, teardown_body, end_index)`.
 /// `end_index` points to the token AFTER the matching `end` of the describe.
-fn peek_describe_body(
-    tokens: &[TToken],
-    start: usize,
-) -> (Option<String>, Option<String>, usize) {
+fn peek_describe_body(tokens: &[TToken], start: usize) -> (Option<String>, Option<String>, usize) {
     let mut setup = None;
     let mut teardown = None;
     let mut i = start;
@@ -643,14 +651,18 @@ fn peek_describe_body(
                 i += 1;
                 // Expect `() do BODY end`
                 skip_to_do(tokens, &mut i);
-                if i < tokens.len() { i += 1; } // consume 'do'
+                if i < tokens.len() {
+                    i += 1;
+                } // consume 'do'
                 let body = extract_block_body_raw(tokens, &mut i);
                 setup = Some(body);
             }
             TToken::TeardownKw if depth == 1 => {
                 i += 1;
                 skip_to_do(tokens, &mut i);
-                if i < tokens.len() { i += 1; } // consume 'do'
+                if i < tokens.len() {
+                    i += 1;
+                } // consume 'do'
                 let body = extract_block_body_raw(tokens, &mut i);
                 teardown = Some(body);
             }
@@ -983,14 +995,14 @@ fn split_assert_receive_args(rest: &str) -> (String, String) {
         Some(pos) => {
             // Reconstruct the string slices from char positions.
             // Since we collected chars, we need byte offsets.
-            let byte_pos = rest
-                .char_indices()
-                .nth(pos)
-                .map(|(b, _)| b)
-                .unwrap_or(0);
+            let byte_pos = rest.char_indices().nth(pos).map(|(b, _)| b).unwrap_or(0);
             let pattern = rest[..byte_pos].trim().to_string();
             let timeout = rest[byte_pos + 1..].trim().to_string();
-            let timeout_ms = if timeout.is_empty() { "100".to_string() } else { timeout };
+            let timeout_ms = if timeout.is_empty() {
+                "100".to_string()
+            } else {
+                timeout
+            };
             (pattern, timeout_ms)
         }
         None => {
@@ -1084,7 +1096,8 @@ fn discover_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<(
         }
         if path.is_dir() {
             discover_recursive(&path, files)?;
-        } else if path.file_name()
+        } else if path
+            .file_name()
             .and_then(|n| n.to_str())
             .map(|n| n.ends_with(".test.mpl"))
             .unwrap_or(false)

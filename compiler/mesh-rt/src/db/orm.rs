@@ -135,7 +135,11 @@ fn build_select_sql(
 
 /// Build an INSERT SQL string from pure Rust types.
 /// Public within crate for use by repo.rs write operations.
-pub(crate) fn build_insert_sql_pure(table: &str, columns: &[String], returning: &[String]) -> String {
+pub(crate) fn build_insert_sql_pure(
+    table: &str,
+    columns: &[String],
+    returning: &[String],
+) -> String {
     build_insert_sql(table, columns, returning)
 }
 
@@ -236,7 +240,11 @@ fn build_update_sql(
 
 /// Build a DELETE SQL string from pure Rust types.
 /// Public within crate for use by repo.rs write operations.
-pub(crate) fn build_delete_sql_pure(table: &str, wheres: &[String], returning: &[String]) -> String {
+pub(crate) fn build_delete_sql_pure(
+    table: &str,
+    wheres: &[String],
+    returning: &[String],
+) -> String {
     build_delete_sql(table, wheres, returning)
 }
 
@@ -476,14 +484,7 @@ mod tests {
 
     #[test]
     fn test_select_with_columns() {
-        let sql = build_select_sql(
-            "users",
-            &["id".into(), "name".into()],
-            &[],
-            &[],
-            -1,
-            -1,
-        );
+        let sql = build_select_sql("users", &["id".into(), "name".into()], &[], &[], -1, -1);
         assert_eq!(sql, "SELECT \"id\", \"name\" FROM \"users\"");
     }
 
@@ -580,11 +581,7 @@ mod tests {
 
     #[test]
     fn test_insert_returning_star() {
-        let sql = build_insert_sql(
-            "users",
-            &["name".into(), "email".into()],
-            &["*".into()],
-        );
+        let sql = build_insert_sql("users", &["name".into(), "email".into()], &["*".into()]);
         assert_eq!(
             sql,
             "INSERT INTO \"users\" (\"name\", \"email\") VALUES ($1, $2) RETURNING *"
@@ -594,10 +591,7 @@ mod tests {
     #[test]
     fn test_insert_no_returning() {
         let sql = build_insert_sql("users", &["name".into()], &[]);
-        assert_eq!(
-            sql,
-            "INSERT INTO \"users\" (\"name\") VALUES ($1)"
-        );
+        assert_eq!(sql, "INSERT INTO \"users\" (\"name\") VALUES ($1)");
     }
 
     // ── build_update_sql tests ───────────────────────────────────────
@@ -651,7 +645,13 @@ mod tests {
     fn test_build_upsert_sql() {
         let sql = build_upsert_sql_pure(
             "issues",
-            &["project_id".into(), "fingerprint".into(), "title".into(), "level".into(), "event_count".into()],
+            &[
+                "project_id".into(),
+                "fingerprint".into(),
+                "title".into(),
+                "level".into(),
+                "event_count".into(),
+            ],
             &["project_id".into(), "fingerprint".into()],
             &["title".into(), "level".into(), "event_count".into()],
             &["*".into()],

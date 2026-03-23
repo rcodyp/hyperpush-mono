@@ -16,9 +16,10 @@ pub fn read_token() -> Result<String, String> {
     let path = credentials_path();
     let content = std::fs::read_to_string(&path)
         .map_err(|_| "Not logged in. Run `meshpkg login` first.".to_string())?;
-    let table: toml::Table = toml::from_str(&content)
-        .map_err(|e| format!("Corrupted credentials file: {}", e))?;
-    table.get("registry")
+    let table: toml::Table =
+        toml::from_str(&content).map_err(|e| format!("Corrupted credentials file: {}", e))?;
+    table
+        .get("registry")
         .and_then(|r| r.get("token"))
         .and_then(|t| t.as_str())
         .map(|s| s.to_string())
@@ -30,10 +31,8 @@ pub fn read_token() -> Result<String, String> {
 pub fn write_token(token: &str) -> Result<(), String> {
     let path = credentials_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create ~/.mesh/: {}", e))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create ~/.mesh/: {}", e))?;
     }
     let content = format!("[registry]\ntoken = \"{}\"\n", token);
-    std::fs::write(&path, content)
-        .map_err(|e| format!("Failed to write credentials: {}", e))
+    std::fs::write(&path, content).map_err(|e| format!("Failed to write credentials: {}", e))
 }

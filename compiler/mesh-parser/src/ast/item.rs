@@ -60,23 +60,13 @@ impl Item {
             }
             SyntaxKind::STRUCT_DEF => Some(Item::StructDef(StructDef { syntax: node })),
             SyntaxKind::LET_BINDING => Some(Item::LetBinding(LetBinding { syntax: node })),
-            SyntaxKind::INTERFACE_DEF => {
-                Some(Item::InterfaceDef(InterfaceDef { syntax: node }))
-            }
+            SyntaxKind::INTERFACE_DEF => Some(Item::InterfaceDef(InterfaceDef { syntax: node })),
             SyntaxKind::IMPL_DEF => Some(Item::ImplDef(ImplDef { syntax: node })),
-            SyntaxKind::TYPE_ALIAS_DEF => {
-                Some(Item::TypeAliasDef(TypeAliasDef { syntax: node }))
-            }
-            SyntaxKind::SUM_TYPE_DEF => {
-                Some(Item::SumTypeDef(SumTypeDef { syntax: node }))
-            }
+            SyntaxKind::TYPE_ALIAS_DEF => Some(Item::TypeAliasDef(TypeAliasDef { syntax: node })),
+            SyntaxKind::SUM_TYPE_DEF => Some(Item::SumTypeDef(SumTypeDef { syntax: node })),
             SyntaxKind::ACTOR_DEF => Some(Item::ActorDef(ActorDef { syntax: node })),
-            SyntaxKind::SERVICE_DEF => {
-                Some(Item::ServiceDef(ServiceDef { syntax: node }))
-            }
-            SyntaxKind::SUPERVISOR_DEF => {
-                Some(Item::SupervisorDef(SupervisorDef { syntax: node }))
-            }
+            SyntaxKind::SERVICE_DEF => Some(Item::ServiceDef(ServiceDef { syntax: node })),
+            SyntaxKind::SUPERVISOR_DEF => Some(Item::SupervisorDef(SupervisorDef { syntax: node })),
             _ => None,
         }
     }
@@ -178,9 +168,7 @@ impl Param {
     /// (e.g., `fn fib(0)`, `fn foo(_)`, `fn bar(Some(x))`).
     /// Returns `None` for regular named parameters (e.g., `fn foo(x)`).
     pub fn pattern(&self) -> Option<super::pat::Pattern> {
-        self.syntax
-            .children()
-            .find_map(super::pat::Pattern::cast)
+        self.syntax.children().find_map(super::pat::Pattern::cast)
     }
 }
 
@@ -454,9 +442,7 @@ impl LetBinding {
 
     /// The pattern, if the binding uses destructuring.
     pub fn pattern(&self) -> Option<super::pat::Pattern> {
-        self.syntax
-            .children()
-            .find_map(super::pat::Pattern::cast)
+        self.syntax.children().find_map(super::pat::Pattern::cast)
     }
 
     /// The type annotation, if present.
@@ -468,9 +454,7 @@ impl LetBinding {
     pub fn initializer(&self) -> Option<super::expr::Expr> {
         // The initializer is the expression child after the = token.
         // We find the first expression-like child node.
-        self.syntax
-            .children()
-            .find_map(super::expr::Expr::cast)
+        self.syntax.children().find_map(super::expr::Expr::cast)
     }
 }
 
@@ -654,9 +638,9 @@ impl AssocTypeBinding {
         // not NAME, not a keyword token, and not EQ -- it will be the type ref.
         // In practice, parse_type emits IDENT tokens (and optional GENERIC_ARG_LIST).
         // The simplest approach: return any child node that isn't NAME.
-        self.syntax.children().find(|n| {
-            n.kind() != SyntaxKind::NAME
-        })
+        self.syntax
+            .children()
+            .find(|n| n.kind() != SyntaxKind::NAME)
     }
 }
 
@@ -847,9 +831,7 @@ impl GuardClause {
     ///
     /// For `fn abs(n) when n < 0 = -n`, this returns the expression `n < 0`.
     pub fn expr(&self) -> Option<super::expr::Expr> {
-        self.syntax
-            .children()
-            .find_map(super::expr::Expr::cast)
+        self.syntax.children().find_map(super::expr::Expr::cast)
     }
 }
 
@@ -862,9 +844,7 @@ impl FnExprBody {
     ///
     /// For `fn fib(0) = 0`, this returns the expression `0`.
     pub fn expr(&self) -> Option<super::expr::Expr> {
-        self.syntax
-            .children()
-            .find_map(super::expr::Expr::cast)
+        self.syntax.children().find_map(super::expr::Expr::cast)
     }
 }
 
@@ -999,7 +979,8 @@ impl CallHandler {
     /// The state parameter name from the |state| pattern.
     pub fn state_param_name(&self) -> Option<String> {
         // First NAME is the handler name, second NAME (before BLOCK) is state param.
-        let names: Vec<_> = self.syntax
+        let names: Vec<_> = self
+            .syntax
             .children()
             .filter(|n| n.kind() == SyntaxKind::NAME)
             .collect();
@@ -1033,7 +1014,8 @@ impl CastHandler {
     /// The state parameter name from the |state| pattern.
     pub fn state_param_name(&self) -> Option<String> {
         // First NAME is the handler name, second NAME (before BLOCK) is state param.
-        let names: Vec<_> = self.syntax
+        let names: Vec<_> = self
+            .syntax
             .children()
             .filter(|n| n.kind() == SyntaxKind::NAME)
             .collect();

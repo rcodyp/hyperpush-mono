@@ -303,8 +303,16 @@ fn main() do
 end
 "#;
     let output = compile_and_run_with_timeout(source, 30);
-    assert!(output.contains("fast"), "Expected 'fast' in output: {}", output);
-    assert!(output.contains("slow"), "Expected 'slow' in output: {}", output);
+    assert!(
+        output.contains("fast"),
+        "Expected 'fast' in output: {}",
+        output
+    );
+    assert!(
+        output.contains("slow"),
+        "Expected 'slow' in output: {}",
+        output
+    );
 }
 
 /// Test: Timer.send_after delivers a delayed message to the target actor.

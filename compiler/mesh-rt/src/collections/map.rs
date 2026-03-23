@@ -10,8 +10,8 @@
 //! - 0 = integer keys (compared by value)
 //! - 1 = string keys (compared by content via mesh_string_eq)
 
-use crate::gc::mesh_gc_alloc_actor;
 use super::list::alloc_pair;
+use crate::gc::mesh_gc_alloc_actor;
 use std::ptr;
 
 /// Map header: len (u64), cap (u64).

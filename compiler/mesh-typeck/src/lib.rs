@@ -29,18 +29,18 @@ pub mod traits;
 pub mod ty;
 pub mod unify;
 
-use rustc_hash::{FxHashMap, FxHashSet};
 use rowan::TextRange;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::diagnostics::DiagnosticOptions;
 use crate::error::TypeError;
-use crate::traits::{TraitDef, ImplDef as TraitImplDef};
+use crate::traits::{ImplDef as TraitImplDef, TraitDef};
 use crate::ty::{Scheme, Ty};
 
 // Re-export type registry types for downstream crate consumption (codegen).
 pub use crate::infer::{
-    StructDefInfo, SumTypeDefInfo, TypeAliasInfo, TypeRegistry, VariantFieldInfo, VariantInfo,
-    register_variant_constructors,
+    register_variant_constructors, StructDefInfo, SumTypeDefInfo, TypeAliasInfo, TypeRegistry,
+    VariantFieldInfo, VariantInfo,
 };
 // Re-export trait registry for downstream trait resolution (codegen dispatch).
 pub use crate::traits::TraitRegistry;
@@ -200,7 +200,12 @@ impl TypeckResult {
     /// Accepts `DiagnosticOptions` to control color and output format.
     /// Each error is rendered with labeled source spans, error codes, and
     /// fix suggestions when applicable.
-    pub fn render_errors(&self, source: &str, filename: &str, options: &DiagnosticOptions) -> Vec<String> {
+    pub fn render_errors(
+        &self,
+        source: &str,
+        filename: &str,
+        options: &DiagnosticOptions,
+    ) -> Vec<String> {
         self.errors
             .iter()
             .map(|err| diagnostics::render_diagnostic(err, source, filename, options, None))
@@ -231,10 +236,7 @@ pub fn check_with_imports(parse: &mesh_parser::Parse, import_ctx: &ImportContext
 /// Extracts function schemes from the typeck types map by scanning the parse
 /// tree for FnDef items, struct/sum type defs from TypeRegistry, and
 /// trait defs/impls from TraitRegistry.
-pub fn collect_exports(
-    parse: &mesh_parser::Parse,
-    typeck: &TypeckResult,
-) -> ExportedSymbols {
+pub fn collect_exports(parse: &mesh_parser::Parse, typeck: &TypeckResult) -> ExportedSymbols {
     use mesh_parser::ast::item::Item;
     use mesh_parser::ast::AstNode;
     use mesh_parser::syntax_kind::SyntaxKind;
@@ -263,7 +265,8 @@ pub fn collect_exports(
                     if let Some(ty) = typeck.types.get(&range) {
                         if fn_def.visibility().is_some() {
                             // Mangle name if multiple pub fns share the same name (arity overloading).
-                            let export_name = if pub_fn_counts.get(&name).copied().unwrap_or(0) > 1 {
+                            let export_name = if pub_fn_counts.get(&name).copied().unwrap_or(0) > 1
+                            {
                                 let arity = fn_def
                                     .param_list()
                                     .map(|pl| pl.params().count())
@@ -272,10 +275,9 @@ pub fn collect_exports(
                             } else {
                                 name
                             };
-                            exports.functions.insert(
-                                export_name,
-                                Scheme::normalize_from_ty(ty.clone()),
-                            );
+                            exports
+                                .functions
+                                .insert(export_name, Scheme::normalize_from_ty(ty.clone()));
                         } else {
                             exports.private_names.insert(name);
                         }
@@ -348,10 +350,9 @@ pub fn collect_exports(
             if let Some(name) = actor_def.name().and_then(|n| n.text()) {
                 let range = actor_def.syntax().text_range();
                 if let Some(ty) = typeck.types.get(&range) {
-                    exports.actor_defs.insert(
-                        name,
-                        Scheme::normalize_from_ty(ty.clone()),
-                    );
+                    exports
+                        .actor_defs
+                        .insert(name, Scheme::normalize_from_ty(ty.clone()));
                 }
             }
         }
@@ -386,24 +387,20 @@ pub fn collect_exports(
                 .filter(|n| n.kind() == SyntaxKind::PATH)
                 .collect();
 
-            let trait_name = paths
-                .first()
-                .and_then(|path| {
-                    path.children_with_tokens()
-                        .filter_map(|t| t.into_token())
-                        .find(|t| t.kind() == SyntaxKind::IDENT)
-                        .map(|t| t.text().to_string())
-                });
+            let trait_name = paths.first().and_then(|path| {
+                path.children_with_tokens()
+                    .filter_map(|t| t.into_token())
+                    .find(|t| t.kind() == SyntaxKind::IDENT)
+                    .map(|t| t.text().to_string())
+            });
 
             // Extract type name from the second PATH child (after `for`).
-            let type_name = paths
-                .get(1)
-                .and_then(|path| {
-                    path.children_with_tokens()
-                        .filter_map(|t| t.into_token())
-                        .find(|t| t.kind() == SyntaxKind::IDENT)
-                        .map(|t| t.text().to_string())
-                });
+            let type_name = paths.get(1).and_then(|path| {
+                path.children_with_tokens()
+                    .filter_map(|t| t.into_token())
+                    .find(|t| t.kind() == SyntaxKind::IDENT)
+                    .map(|t| t.text().to_string())
+            });
 
             if let (Some(tn), Some(ty)) = (trait_name, type_name) {
                 local_impl_traits.push((tn, ty));
@@ -438,7 +435,7 @@ pub fn collect_exports(
                     _ => {
                         // For Eq, Ord, Display, Debug, Hash, Schema etc.
                         // store the name directly -- we'll match below.
-                        &[]  // handled by pushing single name
+                        &[] // handled by pushing single name
                     }
                 };
                 if internal_traits.is_empty() {
@@ -456,7 +453,10 @@ pub fn collect_exports(
         for (tn, ty) in &local_impl_traits {
             if impl_def.trait_name == *tn && impl_def.impl_type_name == *ty {
                 // Avoid duplicates (explicit impl + deriving could overlap)
-                if !exports.trait_impls.iter().any(|i| i.trait_name == impl_def.trait_name && i.impl_type_name == impl_def.impl_type_name) {
+                if !exports.trait_impls.iter().any(|i| {
+                    i.trait_name == impl_def.trait_name
+                        && i.impl_type_name == impl_def.impl_type_name
+                }) {
                     exports.trait_impls.push(impl_def.clone());
                 }
             }

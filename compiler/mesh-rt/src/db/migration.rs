@@ -133,11 +133,7 @@ pub(crate) fn build_rename_column_sql(table: &str, old_name: &str, new_name: &st
 /// - `where:condition` -- adds a WHERE clause for partial index
 ///
 /// The index name is auto-generated as `idx_{table}_{col1}_{col2}`.
-pub(crate) fn build_create_index_sql(
-    table: &str,
-    columns: &[String],
-    options: &str,
-) -> String {
+pub(crate) fn build_create_index_sql(table: &str, columns: &[String], options: &str) -> String {
     let is_unique = options.contains("unique:true") || options.contains("unique: true");
     let index_name = format!("idx_{}_{}", table, columns.join("_"));
     let mut sql = String::new();
@@ -207,10 +203,7 @@ pub extern "C" fn mesh_migration_create_table(
 ///
 /// `mesh_migration_drop_table(pool: u64, table: ptr) -> ptr`
 #[no_mangle]
-pub extern "C" fn mesh_migration_drop_table(
-    pool: u64,
-    table: *const MeshString,
-) -> *mut u8 {
+pub extern "C" fn mesh_migration_drop_table(pool: u64, table: *const MeshString) -> *mut u8 {
     unsafe {
         let table_name = (*table).as_str();
         let sql = build_drop_table_sql(table_name);
@@ -337,10 +330,7 @@ pub extern "C" fn mesh_migration_drop_index(
 ///
 /// `mesh_migration_execute(pool: u64, sql: ptr) -> ptr`
 #[no_mangle]
-pub extern "C" fn mesh_migration_execute(
-    pool: u64,
-    sql: *const MeshString,
-) -> *mut u8 {
+pub extern "C" fn mesh_migration_execute(pool: u64, sql: *const MeshString) -> *mut u8 {
     let empty_params = mesh_list_new();
     mesh_pool_execute(pool, sql, empty_params)
 }
@@ -371,10 +361,7 @@ mod tests {
     fn test_build_create_table_sql_two_part_columns() {
         let sql = build_create_table_sql(
             "posts",
-            &[
-                "id:SERIAL".to_string(),
-                "title:TEXT".to_string(),
-            ],
+            &["id:SERIAL".to_string(), "title:TEXT".to_string()],
         );
         assert_eq!(
             sql,
@@ -409,10 +396,7 @@ mod tests {
     #[test]
     fn test_build_drop_column_sql() {
         let sql = build_drop_column_sql("users", "age");
-        assert_eq!(
-            sql,
-            "ALTER TABLE \"users\" DROP COLUMN IF EXISTS \"age\""
-        );
+        assert_eq!(sql, "ALTER TABLE \"users\" DROP COLUMN IF EXISTS \"age\"");
     }
 
     #[test]
@@ -426,11 +410,7 @@ mod tests {
 
     #[test]
     fn test_build_create_index_sql() {
-        let sql = build_create_index_sql(
-            "users",
-            &["email".to_string()],
-            "",
-        );
+        let sql = build_create_index_sql("users", &["email".to_string()], "");
         assert_eq!(
             sql,
             "CREATE INDEX IF NOT EXISTS \"idx_users_email\" ON \"users\" (\"email\")"
@@ -439,11 +419,7 @@ mod tests {
 
     #[test]
     fn test_build_create_index_sql_unique() {
-        let sql = build_create_index_sql(
-            "users",
-            &["email".to_string()],
-            "unique:true",
-        );
+        let sql = build_create_index_sql("users", &["email".to_string()], "unique:true");
         assert_eq!(
             sql,
             "CREATE UNIQUE INDEX IF NOT EXISTS \"idx_users_email\" ON \"users\" (\"email\")"
@@ -452,11 +428,8 @@ mod tests {
 
     #[test]
     fn test_build_create_index_sql_multi_column() {
-        let sql = build_create_index_sql(
-            "orders",
-            &["user_id".to_string(), "status".to_string()],
-            "",
-        );
+        let sql =
+            build_create_index_sql("orders", &["user_id".to_string(), "status".to_string()], "");
         assert_eq!(
             sql,
             "CREATE INDEX IF NOT EXISTS \"idx_orders_user_id_status\" ON \"orders\" (\"user_id\", \"status\")"
@@ -478,26 +451,14 @@ mod tests {
 
     #[test]
     fn test_build_drop_index_sql() {
-        let sql = build_drop_index_sql(
-            "users",
-            &["email".to_string()],
-        );
-        assert_eq!(
-            sql,
-            "DROP INDEX IF EXISTS \"idx_users_email\""
-        );
+        let sql = build_drop_index_sql("users", &["email".to_string()]);
+        assert_eq!(sql, "DROP INDEX IF EXISTS \"idx_users_email\"");
     }
 
     #[test]
     fn test_build_drop_index_sql_multi_column() {
-        let sql = build_drop_index_sql(
-            "orders",
-            &["user_id".to_string(), "status".to_string()],
-        );
-        assert_eq!(
-            sql,
-            "DROP INDEX IF EXISTS \"idx_orders_user_id_status\""
-        );
+        let sql = build_drop_index_sql("orders", &["user_id".to_string(), "status".to_string()]);
+        assert_eq!(sql, "DROP INDEX IF EXISTS \"idx_orders_user_id_status\"");
     }
 
     #[test]

@@ -256,7 +256,10 @@ mod tests {
         // Group that fits => flat mode => if_break selects flat variant.
         let ir = group(concat(vec![
             text("("),
-            if_break(text("x, y"), concat(vec![text("x,"), hardline(), text("y")])),
+            if_break(
+                text("x, y"),
+                concat(vec![text("x,"), hardline(), text("y")]),
+            ),
             text(")"),
         ]));
         let result = print(&ir, &default_config());
@@ -274,7 +277,14 @@ mod tests {
             text("("),
             if_break(
                 text("x, y, z"),
-                concat(vec![hardline(), text("x,"), hardline(), text("y,"), hardline(), text("z")]),
+                concat(vec![
+                    hardline(),
+                    text("x,"),
+                    hardline(),
+                    text("y,"),
+                    hardline(),
+                    text("z"),
+                ]),
             ),
             text(")"),
         ]));
@@ -299,7 +309,13 @@ mod tests {
         let ir = group(concat(vec![
             text("let x ="),
             space(),
-            group(concat(vec![text("a"), space(), text("+"), space(), text("b")])),
+            group(concat(vec![
+                text("a"),
+                space(),
+                text("+"),
+                space(),
+                text("b"),
+            ])),
         ]));
         let result = print(&ir, &config);
         assert_eq!(result, "let x = a + b\n");

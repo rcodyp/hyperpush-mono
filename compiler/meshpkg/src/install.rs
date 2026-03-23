@@ -6,7 +6,7 @@ use flate2::read::GzDecoder;
 use sha2::{Digest, Sha256};
 use tar::Archive;
 
-use mesh_pkg::{Lockfile, LockedPackage, Manifest};
+use mesh_pkg::{LockedPackage, Lockfile, Manifest};
 
 pub fn run(
     project_dir: &Path,
@@ -81,7 +81,10 @@ fn install_all(project_dir: &Path, registry: &str, json_mode: bool) -> Result<()
 
         extract_tarball(&tarball_bytes, &install_dir)?;
 
-        let source_url = format!("{}/api/v1/packages/{}/{}/download", registry, name, resolved_version);
+        let source_url = format!(
+            "{}/api/v1/packages/{}/{}/download",
+            registry, name, resolved_version
+        );
         locked_packages.push(LockedPackage {
             name: name.clone(),
             version: resolved_version.clone(),
@@ -91,7 +94,12 @@ fn install_all(project_dir: &Path, registry: &str, json_mode: bool) -> Result<()
         });
 
         if !json_mode {
-            println!("{} Installed {}@{}", "✓".green().bold(), name, resolved_version);
+            println!(
+                "{} Installed {}@{}",
+                "✓".green().bold(),
+                name,
+                resolved_version
+            );
         }
     }
 
@@ -121,7 +129,12 @@ fn install_all(project_dir: &Path, registry: &str, json_mode: bool) -> Result<()
 }
 
 /// Install a single named package and add it to mesh.toml.
-fn install_named(project_dir: &Path, name: &str, registry: &str, json_mode: bool) -> Result<(), String> {
+fn install_named(
+    project_dir: &Path,
+    name: &str,
+    registry: &str,
+    json_mode: bool,
+) -> Result<(), String> {
     // Resolve latest version from registry
     let (version, sha256) = resolve_latest(name, registry)?;
 
@@ -167,7 +180,10 @@ fn install_named(project_dir: &Path, name: &str, registry: &str, json_mode: bool
     Lockfile::new(packages).write(&lock_path)?;
 
     if json_mode {
-        println!("{{\"status\": \"ok\", \"name\": \"{}\", \"version\": \"{}\"}}", name, version);
+        println!(
+            "{{\"status\": \"ok\", \"name\": \"{}\", \"version\": \"{}\"}}",
+            name, version
+        );
     } else {
         println!("{} Installed {}@{}", "✓".green().bold(), name, version);
         println!("  Add to mesh.toml: {} = \"{}\"", name, version);
@@ -177,35 +193,63 @@ fn install_named(project_dir: &Path, name: &str, registry: &str, json_mode: bool
 }
 
 /// Download a package tarball from the registry. Returns (bytes, sha256_hex).
-fn download_tarball(name: &str, version: &str, registry: &str) -> Result<(Vec<u8>, String), String> {
+fn download_tarball(
+    name: &str,
+    version: &str,
+    registry: &str,
+) -> Result<(Vec<u8>, String), String> {
     let url = format!("{}/api/v1/packages/{}/{}/download", registry, name, version);
     let agent = ureq::Agent::new_with_defaults();
-    let mut response = agent.get(&url).call()
+    let mut response = agent
+        .get(&url)
+        .call()
         .map_err(|e| format!("Failed to download {}@{}: {}", name, version, e))?;
 
     let mut buf = Vec::new();
-    response.body_mut().as_reader().read_to_end(&mut buf)
+    response
+        .body_mut()
+        .as_reader()
+        .read_to_end(&mut buf)
         .map_err(|e| format!("Failed to read response body: {}", e))?;
 
-    let sha256: String = Sha256::digest(&buf).iter().map(|b| format!("{:02x}", b)).collect();
+    let sha256: String = Sha256::digest(&buf)
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
     Ok((buf, sha256))
 }
 
 /// Resolve a version constraint against the registry (returns exact version + sha256).
 /// For now, if the constraint is an exact version ("1.0.0"), use it directly.
-fn resolve_version(name: &str, constraint: &str, registry: &str) -> Result<(String, String), String> {
+fn resolve_version(
+    name: &str,
+    constraint: &str,
+    registry: &str,
+) -> Result<(String, String), String> {
     // In v14.0, only exact versions are supported (no semver range solving per REQUIREMENTS.md)
     // Query registry for metadata to get the sha256
     let url = format!("{}/api/v1/packages/{}/{}", registry, name, constraint);
     let agent = ureq::Agent::new_with_defaults();
-    let mut response = agent.get(&url).call()
-        .map_err(|e| format!("Failed to query registry for {}@{}: {}", name, constraint, e))?;
-    let body = response.body_mut().read_to_string()
+    let mut response = agent.get(&url).call().map_err(|e| {
+        format!(
+            "Failed to query registry for {}@{}: {}",
+            name, constraint, e
+        )
+    })?;
+    let body = response
+        .body_mut()
+        .read_to_string()
         .map_err(|e| format!("Failed to read registry response: {}", e))?;
     let json: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| format!("Failed to parse registry response: {}", e))?;
-    let sha256 = json["sha256"].as_str()
-        .ok_or_else(|| format!("Registry response missing sha256 for {}@{}", name, constraint))?
+    let sha256 = json["sha256"]
+        .as_str()
+        .ok_or_else(|| {
+            format!(
+                "Registry response missing sha256 for {}@{}",
+                name, constraint
+            )
+        })?
         .to_string();
     Ok((constraint.to_string(), sha256))
 }
@@ -214,16 +258,22 @@ fn resolve_version(name: &str, constraint: &str, registry: &str) -> Result<(Stri
 fn resolve_latest(name: &str, registry: &str) -> Result<(String, String), String> {
     let url = format!("{}/api/v1/packages/{}", registry, name);
     let agent = ureq::Agent::new_with_defaults();
-    let mut response = agent.get(&url).call()
+    let mut response = agent
+        .get(&url)
+        .call()
         .map_err(|e| format!("Failed to query registry for {}: {}", name, e))?;
-    let body = response.body_mut().read_to_string()
+    let body = response
+        .body_mut()
+        .read_to_string()
         .map_err(|e| format!("Failed to read registry response: {}", e))?;
     let json: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| format!("Failed to parse registry response: {}", e))?;
-    let version = json["latest"]["version"].as_str()
+    let version = json["latest"]["version"]
+        .as_str()
         .ok_or_else(|| format!("Registry response missing version for {}", name))?
         .to_string();
-    let sha256 = json["latest"]["sha256"].as_str()
+    let sha256 = json["latest"]["sha256"]
+        .as_str()
         .ok_or_else(|| format!("Registry response missing sha256 for {}", name))?
         .to_string();
     Ok((version, sha256))
@@ -233,6 +283,7 @@ fn resolve_latest(name: &str, registry: &str) -> Result<(String, String), String
 fn extract_tarball(bytes: &[u8], dest: &Path) -> Result<(), String> {
     let dec = GzDecoder::new(bytes);
     let mut archive = Archive::new(dec);
-    archive.unpack(dest)
+    archive
+        .unpack(dest)
         .map_err(|e| format!("Failed to extract package to {}: {}", dest.display(), e))
 }

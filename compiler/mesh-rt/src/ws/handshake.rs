@@ -122,7 +122,9 @@ pub fn write_bad_request<W: Write>(stream: &mut W, reason: &str) -> std::io::Res
 /// the borrow ends and the caller resumes raw stream access for frame I/O.
 /// This is safe because RFC 6455 clients do not send frames before receiving
 /// the 101 response. We verify the buffer is empty as a sanity check.
-pub fn perform_upgrade<S: Read + Write>(stream: &mut S) -> Result<(String, Vec<(String, String)>), String> {
+pub fn perform_upgrade<S: Read + Write>(
+    stream: &mut S,
+) -> Result<(String, Vec<(String, String)>), String> {
     let mut reader = BufReader::new(&mut *stream);
 
     // 1. Read request line: "GET /path HTTP/1.1\r\n"
@@ -378,7 +380,10 @@ mod tests {
         };
 
         let result = perform_upgrade(&mut stream);
-        assert!(result.is_err(), "upgrade should fail for non-upgrade request");
+        assert!(
+            result.is_err(),
+            "upgrade should fail for non-upgrade request"
+        );
 
         let response = String::from_utf8_lossy(&stream.write_buf);
         assert!(

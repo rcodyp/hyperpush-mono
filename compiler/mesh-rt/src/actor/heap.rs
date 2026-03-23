@@ -187,7 +187,9 @@ impl ActorHeap {
                 // Found a suitable block. Unlink from free list.
                 let next = header.next;
                 if !prev.is_null() {
-                    unsafe { (*prev).next = next; }
+                    unsafe {
+                        (*prev).next = next;
+                    }
                 } else {
                     self.free_list = next;
                 }
@@ -523,7 +525,9 @@ impl ActorHeap {
 
                 // Unlink from all_objects list.
                 if !prev.is_null() {
-                    unsafe { (*prev).next = next; }
+                    unsafe {
+                        (*prev).next = next;
+                    }
                 } else {
                     // We're removing the head.
                     new_head = next;
@@ -633,7 +637,10 @@ mod tests {
         assert!(!header_ptr.is_null());
 
         let recovered_data = unsafe { (*header_ptr).data_ptr() };
-        assert_eq!(data_ptr, recovered_data, "data_ptr/from_data_ptr round-trip");
+        assert_eq!(
+            data_ptr, recovered_data,
+            "data_ptr/from_data_ptr round-trip"
+        );
 
         // Verify header fields.
         let header = unsafe { &*header_ptr };
@@ -786,7 +793,9 @@ mod tests {
         // (In normal GC, sweep does this; here we simulate.)
         let next_in_all = unsafe { (*header1).next };
         heap.set_all_objects_head(next_in_all);
-        unsafe { (*header1).set_free(); }
+        unsafe {
+            (*header1).set_free();
+        }
         heap.add_to_free_list(header1);
 
         // Allocate the same size -- should reuse from free list.
@@ -816,12 +825,17 @@ mod tests {
         // Unlink from all_objects, add to free list.
         let next = unsafe { (*header_big).next };
         heap.set_all_objects_head(next);
-        unsafe { (*header_big).set_free(); }
+        unsafe {
+            (*header_big).set_free();
+        }
         heap.add_to_free_list(header_big);
 
         // Allocate a smaller block -- should reuse the larger freed block.
         let ptr_small = heap.alloc(64, 8);
-        assert_eq!(ptr_big, ptr_small, "should reuse larger free block for smaller request");
+        assert_eq!(
+            ptr_big, ptr_small,
+            "should reuse larger free block for smaller request"
+        );
 
         let header = unsafe { &*GcHeader::from_data_ptr(ptr_small) };
         // Size in the header remains the original (256), not the requested (64).
@@ -917,9 +931,19 @@ mod tests {
         heap.collect(stack_ptr, stack_ptr);
 
         // All objects should have been swept to the free list.
-        assert!(heap.all_objects_head().is_null(), "all_objects should be empty after collecting unreachable objects");
-        assert!(!heap.free_list_head().is_null(), "free_list should be non-empty after sweep");
-        assert_eq!(heap.total_bytes(), 0, "total_allocated should be 0 after collecting all unreachable objects");
+        assert!(
+            heap.all_objects_head().is_null(),
+            "all_objects should be empty after collecting unreachable objects"
+        );
+        assert!(
+            !heap.free_list_head().is_null(),
+            "free_list should be non-empty after sweep"
+        );
+        assert_eq!(
+            heap.total_bytes(),
+            0,
+            "total_allocated should be 0 after collecting all unreachable objects"
+        );
     }
 
     #[test]
@@ -941,12 +965,22 @@ mod tests {
         heap.collect(stack_bottom, stack_top);
 
         // The object should be retained (reachable from the fake stack).
-        assert!(!heap.all_objects_head().is_null(), "reachable object should survive GC");
-        assert_eq!(heap.total_bytes(), original_total, "total_allocated should be unchanged for reachable objects");
+        assert!(
+            !heap.all_objects_head().is_null(),
+            "reachable object should survive GC"
+        );
+        assert_eq!(
+            heap.total_bytes(),
+            original_total,
+            "total_allocated should be unchanged for reachable objects"
+        );
 
         // The mark bit should be cleared after sweep.
         let header = unsafe { &*GcHeader::from_data_ptr(ptr) };
-        assert!(!header.is_marked(), "mark bit should be cleared after sweep");
+        assert!(
+            !header.is_marked(),
+            "mark bit should be cleared after sweep"
+        );
     }
 
     #[test]
@@ -965,7 +999,10 @@ mod tests {
         heap.collect(stack_ptr, stack_ptr);
 
         assert_eq!(heap.total_bytes(), 0);
-        assert!(heap.total_bytes() < before, "total_bytes should decrease after collection");
+        assert!(
+            heap.total_bytes() < before,
+            "total_bytes should decrease after collection"
+        );
     }
 
     #[test]
@@ -984,8 +1021,15 @@ mod tests {
         heap.collect(stack_ptr, stack_ptr);
 
         // Nothing should have changed.
-        assert_eq!(heap.total_bytes(), before, "collect should be no-op when gc_in_progress is true");
-        assert!(!heap.all_objects_head().is_null(), "all_objects should be unchanged when gc_in_progress");
+        assert_eq!(
+            heap.total_bytes(),
+            before,
+            "collect should be no-op when gc_in_progress is true"
+        );
+        assert!(
+            !heap.all_objects_head().is_null(),
+            "all_objects should be unchanged when gc_in_progress"
+        );
 
         // gc_in_progress should still be true (collect was a no-op).
         assert!(heap.gc_in_progress());
@@ -1023,7 +1067,10 @@ mod tests {
             count += 1;
             current = unsafe { (*current).next };
         }
-        assert_eq!(count, 2, "A and B should survive (transitive reachability), C should be freed");
+        assert_eq!(
+            count, 2,
+            "A and B should survive (transitive reachability), C should be freed"
+        );
 
         // total_allocated should reflect only A and B.
         assert_eq!(
@@ -1042,11 +1089,17 @@ mod tests {
         // Interior pointer: 64 bytes into the object.
         let interior = unsafe { ptr.add(64) };
         let found = heap.find_object_containing(interior);
-        assert!(found.is_some(), "interior pointer should find the containing object");
+        assert!(
+            found.is_some(),
+            "interior pointer should find the containing object"
+        );
 
         let header = found.unwrap();
         let data_start = unsafe { (*header).data_ptr() };
-        assert_eq!(data_start, ptr, "found object should be the one containing the interior pointer");
+        assert_eq!(
+            data_start, ptr,
+            "found object should be the one containing the interior pointer"
+        );
     }
 
     #[test]

@@ -43,7 +43,13 @@ pub extern "C" fn mesh_alloc_result(tag: i64, value: *mut u8) -> *mut u8 {
 #[no_mangle]
 pub extern "C" fn mesh_result_is_ok(result: *mut u8) -> i64 {
     let r = result as *const MeshResult;
-    unsafe { if (*r).tag == 0 { 1 } else { 0 } }
+    unsafe {
+        if (*r).tag == 0 {
+            1
+        } else {
+            0
+        }
+    }
 }
 
 /// Extract the value from a MeshResult (Ok or Err payload).

@@ -35,9 +35,9 @@ use crate::string::MeshString;
 // ── ANSI color codes ─────────────────────────────────────────────────────────
 
 const GREEN: &str = "\x1b[32m";
-const RED: &str   = "\x1b[31m";
-const BOLD: &str  = "\x1b[1m";
-const DIM: &str   = "\x1b[2m";
+const RED: &str = "\x1b[31m";
+const BOLD: &str = "\x1b[1m";
+const DIM: &str = "\x1b[2m";
 const RESET: &str = "\x1b[0m";
 
 // ── Per-process test state ────────────────────────────────────────────────────
@@ -139,9 +139,7 @@ pub unsafe extern "C" fn mesh_test_fail_msg(msg: *const MeshString) {
         println!("    {RED}{msg_str}{RESET}");
     }
 
-    let entry = format!(
-        "  {RED}{BOLD}✗{RESET} {name}\n    {RED}{msg_str}{RESET}"
-    );
+    let entry = format!("  {RED}{BOLD}✗{RESET} {name}\n    {RED}{msg_str}{RESET}");
     FAIL_MESSAGES.with(|fm| fm.borrow_mut().push(entry));
 }
 
@@ -302,9 +300,7 @@ pub extern "C" fn mesh_test_summary(passed: i64, failed: i64, elapsed_ms: i64) {
 
     let elapsed = elapsed_ms as f64 / 1000.0;
     if failed > 0 {
-        println!(
-            "\n{RED}{BOLD}{failed} failed{RESET}, {passed} passed in {elapsed:.2}s"
-        );
+        println!("\n{RED}{BOLD}{failed} failed{RESET}, {passed} passed in {elapsed:.2}s");
         std::process::exit(1);
     } else {
         println!("\n{GREEN}{BOLD}{passed} passed{RESET} in {elapsed:.2}s");

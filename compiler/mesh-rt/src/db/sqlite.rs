@@ -110,13 +110,7 @@ unsafe fn bind_params(
             std::mem::transmute::<isize, Option<unsafe extern "C" fn(*mut std::ffi::c_void)>>(
                 SQLITE_TRANSIENT_VALUE,
             );
-        let rc = sqlite3_bind_text(
-            stmt,
-            (i + 1) as c_int,
-            cstr.as_ptr(),
-            -1,
-            destructor,
-        );
+        let rc = sqlite3_bind_text(stmt, (i + 1) as c_int, cstr.as_ptr(), -1, destructor);
         if rc != SQLITE_OK {
             return Err(sqlite_err_result(db));
         }

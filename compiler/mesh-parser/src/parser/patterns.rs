@@ -148,7 +148,10 @@ fn parse_primary_pattern(p: &mut Parser) -> Option<MarkClosed> {
 
         // Negative number literal: -42
         SyntaxKind::MINUS
-            if matches!(p.nth(1), SyntaxKind::INT_LITERAL | SyntaxKind::FLOAT_LITERAL) =>
+            if matches!(
+                p.nth(1),
+                SyntaxKind::INT_LITERAL | SyntaxKind::FLOAT_LITERAL
+            ) =>
         {
             let m = p.open();
             p.advance(); // -

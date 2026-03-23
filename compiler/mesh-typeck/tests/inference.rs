@@ -89,10 +89,7 @@ fn test_let_binding_inference() {
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
     // x should be inferred as Int in the type table.
     // We check the result_type which should be the type of the let-binding's initializer.
-    let ty = result
-        .result_type
-        .as_ref()
-        .expect("expected a result type");
+    let ty = result.result_type.as_ref().expect("expected a result type");
     assert_eq!(format!("{}", ty), "Int");
 }
 
@@ -114,9 +111,7 @@ fn test_function_identity() {
 /// The identity function can be used at multiple types.
 #[test]
 fn test_let_polymorphism() {
-    let result = check_source(
-        "let id = fn (x) -> x end\nlet a = id(1)\nlet b = id(\"hello\")\nb",
-    );
+    let result = check_source("let id = fn (x) -> x end\nlet a = id(1)\nlet b = id(\"hello\")\nb");
     assert!(
         result.errors.is_empty(),
         "let-polymorphism should not produce errors, got: {:?}",
@@ -197,8 +192,6 @@ fn test_comparison_returns_bool() {
 
 #[test]
 fn test_nested_function_inference() {
-    let result = check_source(
-        "let apply = fn (f, x) -> f(x) end\napply(fn (n) -> n + 1 end, 42)",
-    );
+    let result = check_source("let apply = fn (f, x) -> f(x) end\napply(fn (n) -> n + 1 end, 42)");
     assert_result_type(&result, Ty::int());
 }

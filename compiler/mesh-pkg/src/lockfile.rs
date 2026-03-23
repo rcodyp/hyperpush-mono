@@ -53,14 +53,12 @@ impl Lockfile {
     pub fn read(path: &Path) -> Result<Lockfile, String> {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-        toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse lockfile: {}", e))
+        toml::from_str(&content).map_err(|e| format!("Failed to parse lockfile: {}", e))
     }
 
     /// Serialize the lockfile to a TOML string.
     pub fn to_string(&self) -> Result<String, String> {
-        toml::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize lockfile: {}", e))
+        toml::to_string_pretty(self).map_err(|e| format!("Failed to serialize lockfile: {}", e))
     }
 }
 
@@ -143,7 +141,10 @@ mod tests {
 
         let s1 = lf1.to_string().unwrap();
         let s2 = lf2.to_string().unwrap();
-        assert_eq!(s1, s2, "Same packages in different order must produce identical output");
+        assert_eq!(
+            s1, s2,
+            "Same packages in different order must produce identical output"
+        );
     }
 
     #[test]
@@ -162,15 +163,13 @@ mod tests {
 
     #[test]
     fn lockfile_with_path_dep() {
-        let lockfile = Lockfile::new(vec![
-            LockedPackage {
-                name: "local-dep".to_string(),
-                version: String::new(),
-                source: "../local-dep".to_string(),
-                revision: "local".to_string(),
-                sha256: None,
-            },
-        ]);
+        let lockfile = Lockfile::new(vec![LockedPackage {
+            name: "local-dep".to_string(),
+            version: String::new(),
+            source: "../local-dep".to_string(),
+            revision: "local".to_string(),
+            sha256: None,
+        }]);
 
         let s = lockfile.to_string().unwrap();
         assert!(s.contains("local-dep"));
@@ -180,15 +179,13 @@ mod tests {
     #[test]
     fn lockfile_registry_package_with_sha256() {
         // Registry packages have version and sha256 populated
-        let lockfile = Lockfile::new(vec![
-            LockedPackage {
-                name: "foo".to_string(),
-                version: "1.0.0".to_string(),
-                source: "https://registry.example.com/packages/foo-1.0.0.tar.gz".to_string(),
-                revision: "1.0.0".to_string(),
-                sha256: Some("abc123def456".to_string()),
-            },
-        ]);
+        let lockfile = Lockfile::new(vec![LockedPackage {
+            name: "foo".to_string(),
+            version: "1.0.0".to_string(),
+            source: "https://registry.example.com/packages/foo-1.0.0.tar.gz".to_string(),
+            revision: "1.0.0".to_string(),
+            sha256: Some("abc123def456".to_string()),
+        }]);
 
         let s = lockfile.to_string().unwrap();
         assert!(s.contains("sha256"));

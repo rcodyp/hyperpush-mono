@@ -68,9 +68,7 @@ impl SupervisorState {
 
     /// Find the index of a child by its current PID.
     pub fn find_child_index(&self, pid: ProcessId) -> Option<usize> {
-        self.children
-            .iter()
-            .position(|c| c.pid == Some(pid))
+        self.children.iter().position(|c| c.pid == Some(pid))
     }
 
     /// Count the number of currently running children.
@@ -121,15 +119,19 @@ pub struct SupervisorConfig {
 /// Since coroutine entry functions only receive a `*const u8`, we store
 /// supervisor state in a global registry that the entry function can
 /// look up by PID.
-static SUPERVISOR_STATES: std::sync::OnceLock<Mutex<FxHashMap<ProcessId, Arc<Mutex<SupervisorState>>>>> =
-    std::sync::OnceLock::new();
+static SUPERVISOR_STATES: std::sync::OnceLock<
+    Mutex<FxHashMap<ProcessId, Arc<Mutex<SupervisorState>>>>,
+> = std::sync::OnceLock::new();
 
 fn supervisor_states() -> &'static Mutex<FxHashMap<ProcessId, Arc<Mutex<SupervisorState>>>> {
     SUPERVISOR_STATES.get_or_init(|| Mutex::new(FxHashMap::default()))
 }
 
 /// Register a supervisor state for the given PID.
-pub fn register_supervisor_state(pid: ProcessId, state: SupervisorState) -> Arc<Mutex<SupervisorState>> {
+pub fn register_supervisor_state(
+    pid: ProcessId,
+    state: SupervisorState,
+) -> Arc<Mutex<SupervisorState>> {
     let arc = Arc::new(Mutex::new(state));
     supervisor_states().lock().insert(pid, Arc::clone(&arc));
     arc
@@ -189,7 +191,10 @@ pub fn start_single_child(
     // Route to remote spawn if target_node is set.
     if child.spec.target_node.is_some() {
         let node = child.spec.target_node.clone().unwrap();
-        let fn_name = child.spec.start_fn_name.clone()
+        let fn_name = child
+            .spec
+            .start_fn_name
+            .clone()
             .ok_or("remote child requires start_fn_name")?;
         return start_single_child_remote(child, sup_pid, &node, &fn_name);
     }
@@ -333,11 +338,7 @@ pub fn terminate_children_from(
 /// Based on the child's shutdown type:
 /// - BrutalKill: immediately mark the process as Exited(Killed).
 /// - Timeout(ms): send a Shutdown exit signal, poll/wait for exit, force-kill on timeout.
-pub fn terminate_single_child(
-    child: &mut ChildState,
-    scheduler: &Scheduler,
-    sup_pid: ProcessId,
-) {
+pub fn terminate_single_child(child: &mut ChildState, scheduler: &Scheduler, sup_pid: ProcessId) {
     let child_pid = match child.pid {
         Some(pid) => pid,
         None => {
@@ -414,11 +415,7 @@ pub fn terminate_single_child(
 /// If the target has trap_exit enabled, the signal is delivered as a message.
 /// If not, the process is terminated with the given reason.
 /// If the reason is Killed, the process is immediately terminated (untrappable).
-fn send_exit_signal(
-    scheduler: &Scheduler,
-    target_pid: ProcessId,
-    reason: &ExitReason,
-) {
+fn send_exit_signal(scheduler: &Scheduler, target_pid: ProcessId, reason: &ExitReason) {
     if let Some(proc_arc) = scheduler.get_process(target_pid) {
         let mut proc = proc_arc.lock();
 
@@ -659,11 +656,7 @@ mod tests {
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
 
         // Record initial PIDs.
-        let initial_pids: Vec<ProcessId> = state
-            .children
-            .iter()
-            .map(|c| c.pid.unwrap())
-            .collect();
+        let initial_pids: Vec<ProcessId> = state.children.iter().map(|c| c.pid.unwrap()).collect();
 
         // Simulate child2 exit.
         let crashed_pid = initial_pids[1];
@@ -701,11 +694,7 @@ mod tests {
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForAll, specs);
 
-        let initial_pids: Vec<ProcessId> = state
-            .children
-            .iter()
-            .map(|c| c.pid.unwrap())
-            .collect();
+        let initial_pids: Vec<ProcessId> = state.children.iter().map(|c| c.pid.unwrap()).collect();
 
         // Simulate child2 exit.
         let crashed_pid = initial_pids[1];
@@ -745,11 +734,7 @@ mod tests {
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::RestForOne, specs);
 
-        let initial_pids: Vec<ProcessId> = state
-            .children
-            .iter()
-            .map(|c| c.pid.unwrap())
-            .collect();
+        let initial_pids: Vec<ProcessId> = state.children.iter().map(|c| c.pid.unwrap()).collect();
 
         // Simulate child2 (middle child) exit.
         let crashed_pid = initial_pids[1];
@@ -804,11 +789,7 @@ mod tests {
             state.children.push(child);
         }
 
-        let initial_pids: Vec<ProcessId> = state
-            .children
-            .iter()
-            .map(|c| c.pid.unwrap())
-            .collect();
+        let initial_pids: Vec<ProcessId> = state.children.iter().map(|c| c.pid.unwrap()).collect();
 
         // Crash the middle dynamic child.
         let crashed_pid = initial_pids[1];
@@ -838,9 +819,11 @@ mod tests {
     #[test]
     fn test_restart_limit_exceeded() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Permanent, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Permanent,
+            ShutdownType::BrutalKill,
+        )];
 
         // Set max_restarts=2, max_seconds=5.
         let sup_pid = sched.spawn(noop_entry as *const u8, std::ptr::null(), 0, 1);
@@ -881,9 +864,7 @@ mod tests {
             sup_pid,
         );
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("restart limit exceeded"));
+        assert!(result.unwrap_err().contains("restart limit exceeded"));
     }
 
     #[test]
@@ -911,9 +892,11 @@ mod tests {
     #[test]
     fn test_permanent_restarts_on_normal() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Permanent, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Permanent,
+            ShutdownType::BrutalKill,
+        )];
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
         let initial_pid = state.children[0].pid.unwrap();
@@ -939,9 +922,11 @@ mod tests {
     #[test]
     fn test_transient_no_restart_on_normal() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Transient, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Transient,
+            ShutdownType::BrutalKill,
+        )];
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
         let initial_pid = state.children[0].pid.unwrap();
@@ -967,9 +952,11 @@ mod tests {
     #[test]
     fn test_transient_restarts_on_error() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Transient, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Transient,
+            ShutdownType::BrutalKill,
+        )];
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
         let initial_pid = state.children[0].pid.unwrap();
@@ -995,9 +982,11 @@ mod tests {
     #[test]
     fn test_transient_no_restart_on_shutdown() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Transient, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Transient,
+            ShutdownType::BrutalKill,
+        )];
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
         let initial_pid = state.children[0].pid.unwrap();
@@ -1023,9 +1012,11 @@ mod tests {
     #[test]
     fn test_temporary_never_restarts() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Temporary, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Temporary,
+            ShutdownType::BrutalKill,
+        )];
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
         let initial_pid = state.children[0].pid.unwrap();
@@ -1065,11 +1056,7 @@ mod tests {
         // Verify all children are running.
         assert!(state.children.iter().all(|c| c.running));
 
-        let pids: Vec<ProcessId> = state
-            .children
-            .iter()
-            .map(|c| c.pid.unwrap())
-            .collect();
+        let pids: Vec<ProcessId> = state.children.iter().map(|c| c.pid.unwrap()).collect();
 
         // Terminate all children.
         terminate_all_children(&mut state, &sched, sup_pid);
@@ -1165,9 +1152,11 @@ mod tests {
     #[test]
     fn test_unknown_child_exit_ignored() {
         let sched = test_scheduler();
-        let specs = vec![
-            test_child_spec("child1", RestartType::Permanent, ShutdownType::BrutalKill),
-        ];
+        let specs = vec![test_child_spec(
+            "child1",
+            RestartType::Permanent,
+            ShutdownType::BrutalKill,
+        )];
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::OneForOne, specs);
         let initial_pid = state.children[0].pid.unwrap();
@@ -1237,11 +1226,7 @@ mod tests {
 
         let (mut state, sup_pid) = setup_supervisor(&sched, Strategy::RestForOne, specs);
 
-        let initial_pids: Vec<ProcessId> = state
-            .children
-            .iter()
-            .map(|c| c.pid.unwrap())
-            .collect();
+        let initial_pids: Vec<ProcessId> = state.children.iter().map(|c| c.pid.unwrap()).collect();
 
         // Crash the FIRST child -- rest_for_one should restart ALL (0..end).
         let crashed_pid = initial_pids[0];
@@ -1297,7 +1282,10 @@ mod tests {
             running: false,
         };
 
-        assert_eq!(child_state.spec.target_node.as_deref(), Some("worker@host:9000"));
+        assert_eq!(
+            child_state.spec.target_node.as_deref(),
+            Some("worker@host:9000")
+        );
         assert_eq!(child_state.spec.start_fn_name.as_deref(), Some("my_worker"));
     }
 
@@ -1309,7 +1297,11 @@ mod tests {
         let remote_pid = ProcessId::from_remote(5, 1, 42);
 
         let child = ChildState {
-            spec: test_child_spec("remote_child", RestartType::Permanent, ShutdownType::BrutalKill),
+            spec: test_child_spec(
+                "remote_child",
+                RestartType::Permanent,
+                ShutdownType::BrutalKill,
+            ),
             pid: Some(remote_pid),
             running: true,
         };
@@ -1318,7 +1310,11 @@ mod tests {
         // Also add a local child.
         let local_pid = ProcessId::next();
         let local_child = ChildState {
-            spec: test_child_spec("local_child", RestartType::Permanent, ShutdownType::BrutalKill),
+            spec: test_child_spec(
+                "local_child",
+                RestartType::Permanent,
+                ShutdownType::BrutalKill,
+            ),
             pid: Some(local_pid),
             running: true,
         };
@@ -1341,7 +1337,11 @@ mod tests {
         // Create a ChildState with a remote PID (node_id != 0).
         let remote_pid = ProcessId::from_remote(5, 1, 42);
         let mut child = ChildState {
-            spec: test_child_spec("remote_child", RestartType::Permanent, ShutdownType::BrutalKill),
+            spec: test_child_spec(
+                "remote_child",
+                RestartType::Permanent,
+                ShutdownType::BrutalKill,
+            ),
             pid: Some(remote_pid),
             running: true,
         };

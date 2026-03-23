@@ -11,13 +11,13 @@
 //! Base64 uses the base64 0.22 crate (already in Cargo.toml).
 //! Hex encoding uses inline format loop (no new dependency).
 
-use crate::io::{MeshResult, alloc_result};
-use crate::string::{MeshString, mesh_string_new};
+use crate::io::{alloc_result, MeshResult};
+use crate::string::{mesh_string_new, MeshString};
 use base64::{engine::general_purpose, Engine as _};
-use sha2::{Digest, Sha256, Sha512};
 use hmac::{Hmac, Mac};
-use std::hint::black_box;
 use rand::RngCore;
+use sha2::{Digest, Sha256, Sha512};
+use std::hint::black_box;
 
 type HmacSha256 = Hmac<Sha256>;
 type HmacSha512 = Hmac<Sha512>;
@@ -64,12 +64,14 @@ pub extern "C" fn mesh_crypto_hmac_sha256(
     unsafe {
         let k = (*key).as_str().as_bytes();
         let m = (*msg).as_str().as_bytes();
-        let mut mac = HmacSha256::new_from_slice(k)
-            .expect("HMAC accepts any key length");
+        let mut mac = HmacSha256::new_from_slice(k).expect("HMAC accepts any key length");
         mac.update(m);
         let result = mac.finalize();
-        let hex: String = result.into_bytes().iter()
-            .map(|b| format!("{:02x}", b)).collect();
+        let hex: String = result
+            .into_bytes()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
         mesh_string_new(hex.as_ptr(), hex.len() as u64)
     }
 }
@@ -87,12 +89,14 @@ pub extern "C" fn mesh_crypto_hmac_sha512(
     unsafe {
         let k = (*key).as_str().as_bytes();
         let m = (*msg).as_str().as_bytes();
-        let mut mac = HmacSha512::new_from_slice(k)
-            .expect("HMAC accepts any key length");
+        let mut mac = HmacSha512::new_from_slice(k).expect("HMAC accepts any key length");
         mac.update(m);
         let result = mac.finalize();
-        let hex: String = result.into_bytes().iter()
-            .map(|b| format!("{:02x}", b)).collect();
+        let hex: String = result
+            .into_bytes()
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
         mesh_string_new(hex.as_ptr(), hex.len() as u64)
     }
 }
@@ -105,10 +109,7 @@ pub extern "C" fn mesh_crypto_hmac_sha512(
 ///
 /// Uses std::hint::black_box to prevent LLVM from eliminating the accumulation loop.
 #[no_mangle]
-pub extern "C" fn mesh_crypto_secure_compare(
-    a: *const MeshString,
-    b: *const MeshString,
-) -> i8 {
+pub extern "C" fn mesh_crypto_secure_compare(a: *const MeshString, b: *const MeshString) -> i8 {
     unsafe {
         let a_bytes = (*a).as_str().as_bytes();
         let b_bytes = (*b).as_str().as_bytes();
@@ -123,7 +124,11 @@ pub extern "C" fn mesh_crypto_secure_compare(
         // XOR length difference into diff — length itself is not leaked
         diff |= (a_bytes.len() ^ b_bytes.len()) as u8;
         // black_box prevents LLVM from eliminating the accumulation loop
-        if black_box(diff) == 0 { 1 } else { 0 }
+        if black_box(diff) == 0 {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -176,7 +181,8 @@ pub extern "C" fn mesh_base64_encode(s: *const MeshString) -> *mut MeshString {
 pub extern "C" fn mesh_base64_decode(s: *const MeshString) -> *mut MeshResult {
     unsafe {
         let text = (*s).as_str();
-        let bytes = general_purpose::STANDARD.decode(text)
+        let bytes = general_purpose::STANDARD
+            .decode(text)
             .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(text));
         match bytes {
             Err(_) => {
@@ -188,9 +194,10 @@ pub extern "C" fn mesh_base64_decode(s: *const MeshString) -> *mut MeshResult {
                     let e = "invalid utf-8";
                     alloc_result(1, mesh_string_new(e.as_ptr(), e.len() as u64) as *mut u8)
                 }
-                Ok(valid) => {
-                    alloc_result(0, mesh_string_new(valid.as_ptr(), valid.len() as u64) as *mut u8)
-                }
+                Ok(valid) => alloc_result(
+                    0,
+                    mesh_string_new(valid.as_ptr(), valid.len() as u64) as *mut u8,
+                ),
             },
         }
     }
@@ -228,9 +235,10 @@ pub extern "C" fn mesh_base64_decode_url(s: *const MeshString) -> *mut MeshResul
                     let e = "invalid utf-8";
                     alloc_result(1, mesh_string_new(e.as_ptr(), e.len() as u64) as *mut u8)
                 }
-                Ok(valid) => {
-                    alloc_result(0, mesh_string_new(valid.as_ptr(), valid.len() as u64) as *mut u8)
-                }
+                Ok(valid) => alloc_result(
+                    0,
+                    mesh_string_new(valid.as_ptr(), valid.len() as u64) as *mut u8,
+                ),
             },
         }
     }
@@ -281,9 +289,10 @@ pub extern "C" fn mesh_hex_decode(s: *const MeshString) -> *mut MeshResult {
                 let e = "invalid utf-8";
                 alloc_result(1, mesh_string_new(e.as_ptr(), e.len() as u64) as *mut u8)
             }
-            Ok(valid) => {
-                alloc_result(0, mesh_string_new(valid.as_ptr(), valid.len() as u64) as *mut u8)
-            }
+            Ok(valid) => alloc_result(
+                0,
+                mesh_string_new(valid.as_ptr(), valid.len() as u64) as *mut u8,
+            ),
         }
     }
 }

@@ -45,7 +45,13 @@ fn value_to_string(val: Option<&serde_json::Value>) -> String {
         None => String::new(),
         Some(serde_json::Value::String(s)) => s.clone(),
         Some(serde_json::Value::Number(n)) => n.to_string(),
-        Some(serde_json::Value::Bool(b)) => if *b { "true".to_string() } else { "false".to_string() },
+        Some(serde_json::Value::Bool(b)) => {
+            if *b {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
         Some(serde_json::Value::Null) => String::new(),
         // Arrays/objects: return JSON string representation (matches PG ->> on complex types)
         Some(other) => other.to_string(),
@@ -77,7 +83,11 @@ pub extern "C" fn mesh_json_get(json_ptr: *mut u8, key_ptr: *mut u8) -> *mut u8 
 ///
 /// Returns empty string on invalid JSON or missing path (matches COALESCE behavior).
 #[no_mangle]
-pub extern "C" fn mesh_json_get_nested(json_ptr: *mut u8, path1_ptr: *mut u8, path2_ptr: *mut u8) -> *mut u8 {
+pub extern "C" fn mesh_json_get_nested(
+    json_ptr: *mut u8,
+    path1_ptr: *mut u8,
+    path2_ptr: *mut u8,
+) -> *mut u8 {
     unsafe {
         let json_str = (*(json_ptr as *const MeshString)).as_str();
         let path1 = (*(path1_ptr as *const MeshString)).as_str();
@@ -161,11 +171,8 @@ mod tests {
 
     #[test]
     fn test_json_get_nested_missing_inner() {
-        let result = json_get_nested_field(
-            r#"{"filters":{"level":"error"}}"#,
-            "filters",
-            "missing",
-        );
+        let result =
+            json_get_nested_field(r#"{"filters":{"level":"error"}}"#, "filters", "missing");
         assert_eq!(result, "");
     }
 
@@ -177,7 +184,8 @@ mod tests {
 
     #[test]
     fn test_json_get_nested_outer_not_object() {
-        let result = json_get_nested_field(r#"{"filters":"string_not_object"}"#, "filters", "level");
+        let result =
+            json_get_nested_field(r#"{"filters":"string_not_object"}"#, "filters", "level");
         assert_eq!(result, "");
     }
 

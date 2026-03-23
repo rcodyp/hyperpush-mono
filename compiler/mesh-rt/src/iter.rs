@@ -12,17 +12,17 @@
 //! iterator via `mesh_iter_generic_next` and applies the transformation
 //! on-the-fly.
 
-use crate::gc::mesh_gc_alloc_actor;
-use crate::option::{MeshOption, alloc_option};
 use crate::collections::list::alloc_pair;
-use crate::collections::list::mesh_list_iter_next;
 use crate::collections::list::mesh_list_from_array;
+use crate::collections::list::mesh_list_iter_next;
 use crate::collections::map::mesh_map_iter_next;
 use crate::collections::map::{mesh_map_new, mesh_map_put};
-use crate::collections::set::mesh_set_iter_next;
-use crate::collections::set::{mesh_set_new, mesh_set_add};
 use crate::collections::range::mesh_range_iter_next;
-use crate::string::{MeshString, mesh_string_new, mesh_string_concat};
+use crate::collections::set::mesh_set_iter_next;
+use crate::collections::set::{mesh_set_add, mesh_set_new};
+use crate::gc::mesh_gc_alloc_actor;
+use crate::option::{alloc_option, MeshOption};
+use crate::string::{mesh_string_concat, mesh_string_new, MeshString};
 
 // ── Type tag constants ──────────────────────────────────────────────────
 
@@ -82,11 +82,7 @@ struct MapAdapter {
 
 /// Create a lazy map adapter: Iter.map(source, fn_ptr, env_ptr).
 #[no_mangle]
-pub extern "C" fn mesh_iter_map(
-    source: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_iter_map(source: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     unsafe {
         let adapter = mesh_gc_alloc_actor(
             std::mem::size_of::<MapAdapter>() as u64,
@@ -135,11 +131,7 @@ struct FilterAdapter {
 
 /// Create a lazy filter adapter: Iter.filter(source, fn_ptr, env_ptr).
 #[no_mangle]
-pub extern "C" fn mesh_iter_filter(
-    source: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_iter_filter(source: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     unsafe {
         let adapter = mesh_gc_alloc_actor(
             std::mem::size_of::<FilterAdapter>() as u64,
@@ -400,11 +392,7 @@ pub extern "C" fn mesh_iter_sum(iter: *mut u8) -> i64 {
 /// Iter.any(iter, fn) -- return 1 if any element passes predicate, 0 otherwise.
 /// Short-circuits on first match.
 #[no_mangle]
-pub extern "C" fn mesh_iter_any(
-    iter: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> i8 {
+pub extern "C" fn mesh_iter_any(iter: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> i8 {
     unsafe {
         loop {
             let option = mesh_iter_generic_next(iter);
@@ -430,11 +418,7 @@ pub extern "C" fn mesh_iter_any(
 /// Iter.all(iter, fn) -- return 1 if all elements pass predicate, 0 otherwise.
 /// Short-circuits on first non-match.
 #[no_mangle]
-pub extern "C" fn mesh_iter_all(
-    iter: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> i8 {
+pub extern "C" fn mesh_iter_all(iter: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> i8 {
     unsafe {
         loop {
             let option = mesh_iter_generic_next(iter);
@@ -459,11 +443,7 @@ pub extern "C" fn mesh_iter_all(
 
 /// Iter.find(iter, fn) -- return Option: Some(elem) on first match, None if exhausted.
 #[no_mangle]
-pub extern "C" fn mesh_iter_find(
-    iter: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_iter_find(iter: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     unsafe {
         loop {
             let option = mesh_iter_generic_next(iter);
@@ -615,10 +595,7 @@ pub extern "C" fn mesh_string_collect(iter: *mut u8) -> *mut u8 {
                 break; // None
             }
             let str_ptr = (*opt_ref).value as *const MeshString;
-            result = mesh_string_concat(
-                result as *const MeshString,
-                str_ptr,
-            ) as *mut u8;
+            result = mesh_string_concat(result as *const MeshString, str_ptr) as *mut u8;
         }
         result
     }
@@ -629,10 +606,12 @@ pub extern "C" fn mesh_string_collect(iter: *mut u8) -> *mut u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gc::mesh_rt_init;
-    use crate::collections::list::{mesh_list_iter_new, mesh_list_length, mesh_list_get, mesh_list_from_array};
+    use crate::collections::list::{
+        mesh_list_from_array, mesh_list_get, mesh_list_iter_new, mesh_list_length,
+    };
     use crate::collections::map::mesh_map_size;
     use crate::collections::set::mesh_set_size;
+    use crate::gc::mesh_rt_init;
 
     fn init_runtime() {
         unsafe { mesh_rt_init() };

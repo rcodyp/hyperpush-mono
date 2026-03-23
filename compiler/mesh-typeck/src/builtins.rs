@@ -8,7 +8,9 @@
 use rustc_hash::FxHashMap;
 
 use crate::env::TypeEnv;
-use crate::traits::{AssocTypeDef, ImplDef, ImplMethodSig, TraitDef, TraitMethodSig, TraitRegistry};
+use crate::traits::{
+    AssocTypeDef, ImplDef, ImplMethodSig, TraitDef, TraitMethodSig, TraitRegistry,
+};
 use crate::ty::{Scheme, Ty, TyCon, TyVar};
 use crate::unify::InferCtx;
 
@@ -78,7 +80,10 @@ pub fn register_builtins(
         let t = Ty::Var(t_var);
         env.insert(
             "default".into(),
-            Scheme { vars: vec![t_var], ty: Ty::fun(vec![], t) },
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![], t),
+            },
         );
     }
 
@@ -114,10 +119,7 @@ pub fn register_builtins(
 
     // ── Float arithmetic ────────────────────────────────────────────
 
-    let float_binop = Scheme::mono(Ty::fun(
-        vec![Ty::float(), Ty::float()],
-        Ty::float(),
-    ));
+    let float_binop = Scheme::mono(Ty::fun(vec![Ty::float(), Ty::float()], Ty::float()));
     env.insert("+.".into(), float_binop.clone());
     env.insert("-.".into(), float_binop.clone());
     env.insert("*.".into(), float_binop.clone());
@@ -158,7 +160,10 @@ pub fn register_builtins(
     );
     env.insert(
         "string_slice".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::int(), Ty::int()], Ty::string())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::int(), Ty::int()],
+            Ty::string(),
+        )),
     );
     env.insert(
         "string_contains".into(),
@@ -193,11 +198,17 @@ pub fn register_builtins(
     );
     env.insert(
         "string_split".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::list(Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string(), Ty::string()],
+            Ty::list(Ty::string()),
+        )),
     );
     env.insert(
         "string_join".into(),
-        Scheme::mono(Ty::fun(vec![Ty::list(Ty::string()), Ty::string()], Ty::string())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::list(Ty::string()), Ty::string()],
+            Ty::string(),
+        )),
     );
     env.insert(
         "string_to_int".into(),
@@ -212,7 +223,10 @@ pub fn register_builtins(
 
     env.insert(
         "file_read".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
     );
     env.insert(
         "file_write".into(),
@@ -276,61 +290,109 @@ pub fn register_builtins(
     // Module-qualified: Regex.compile -> prefixed "regex_compile" -> map_builtin_name -> mesh_regex_compile
     env.insert(
         "regex_compile".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::Con(TyCon::new("Regex")), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::Con(TyCon::new("Regex")), Ty::string()),
+        )),
     );
     // Regex.is_match(rx, str) -> Bool
     env.insert(
         "regex_is_match".into(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::bool())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string()],
+            Ty::bool(),
+        )),
     );
     // Regex.captures(rx, str) -> Option<List<String>>
     env.insert(
         "regex_captures".into(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::option(Ty::list(Ty::string())))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string()],
+            Ty::option(Ty::list(Ty::string())),
+        )),
     );
     // Regex.replace(rx, str, replacement) -> String
     env.insert(
         "regex_replace".into(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string(), Ty::string()], Ty::string())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string(), Ty::string()],
+            Ty::string(),
+        )),
     );
     // Regex.split(rx, str) -> List<String>
     env.insert(
         "regex_split".into(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Regex")), Ty::string()], Ty::list(Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Regex")), Ty::string()],
+            Ty::list(Ty::string()),
+        )),
     );
 
     // ── Standard library: Crypto functions (Phase 135) ─────────────────────
 
-    env.insert("crypto_sha256".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
-    env.insert("crypto_sha512".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
-    env.insert("crypto_hmac_sha256".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())));
-    env.insert("crypto_hmac_sha512".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())));
-    env.insert("crypto_secure_compare".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::bool())));
-    env.insert("crypto_uuid4".into(),
-        Scheme::mono(Ty::fun(vec![], Ty::string())));
+    env.insert(
+        "crypto_sha256".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "crypto_sha512".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "crypto_hmac_sha256".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "crypto_hmac_sha512".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "crypto_secure_compare".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string(), Ty::string()], Ty::bool())),
+    );
+    env.insert(
+        "crypto_uuid4".into(),
+        Scheme::mono(Ty::fun(vec![], Ty::string())),
+    );
 
     // ── Standard library: Base64 functions (Phase 135) ─────────────────────
 
-    env.insert("base64_encode".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
-    env.insert("base64_decode".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
-    env.insert("base64_encode_url".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
-    env.insert("base64_decode_url".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
+    env.insert(
+        "base64_encode".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "base64_decode".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
+    );
+    env.insert(
+        "base64_encode_url".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "base64_decode_url".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
+    );
 
     // ── Standard library: Hex functions (Phase 135) ─────────────────────────
 
-    env.insert("hex_encode".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())));
-    env.insert("hex_decode".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))));
+    env.insert(
+        "hex_encode".into(),
+        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::string())),
+    );
+    env.insert(
+        "hex_decode".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
+    );
 
     // ── Standard library: DateTime functions (Phase 136) ─────────────────────
 
@@ -340,117 +402,181 @@ pub fn register_builtins(
     env.insert("DateTime".into(), Scheme::mono(dt_t.clone()));
 
     // DateTime.utc_now() -> DateTime
-    env.insert("datetime_utc_now".into(),
-        Scheme::mono(Ty::fun(vec![], dt_t.clone())));
+    env.insert(
+        "datetime_utc_now".into(),
+        Scheme::mono(Ty::fun(vec![], dt_t.clone())),
+    );
     // DateTime.from_iso8601(s) -> Result<DateTime, String>
-    env.insert("datetime_from_iso8601".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(dt_t.clone(), Ty::string()))));
+    env.insert(
+        "datetime_from_iso8601".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(dt_t.clone(), Ty::string()),
+        )),
+    );
     // DateTime.to_iso8601(dt) -> String
-    env.insert("datetime_to_iso8601".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::string())));
+    env.insert(
+        "datetime_to_iso8601".into(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::string())),
+    );
     // DateTime.from_unix_ms(ms) -> Result<DateTime, String>
-    env.insert("datetime_from_unix_ms".into(),
-        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::result(dt_t.clone(), Ty::string()))));
+    env.insert(
+        "datetime_from_unix_ms".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::int()],
+            Ty::result(dt_t.clone(), Ty::string()),
+        )),
+    );
     // DateTime.to_unix_ms(dt) -> Int
-    env.insert("datetime_to_unix_ms".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())));
+    env.insert(
+        "datetime_to_unix_ms".into(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())),
+    );
     // DateTime.from_unix_secs(s) -> Result<DateTime, String>
-    env.insert("datetime_from_unix_secs".into(),
-        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::result(dt_t.clone(), Ty::string()))));
+    env.insert(
+        "datetime_from_unix_secs".into(),
+        Scheme::mono(Ty::fun(
+            vec![Ty::int()],
+            Ty::result(dt_t.clone(), Ty::string()),
+        )),
+    );
     // DateTime.to_unix_secs(dt) -> Int
-    env.insert("datetime_to_unix_secs".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())));
+    env.insert(
+        "datetime_to_unix_secs".into(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone()], Ty::int())),
+    );
     // DateTime.add(dt, n, unit) -> DateTime
     // The unit parameter uses Atom type (e.g. :day, :hour) — Atom resolves to String at MIR level.
     let atom_t = Ty::Con(TyCon::new("Atom"));
-    env.insert("datetime_add".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), Ty::int(), atom_t.clone()], dt_t.clone())));
+    env.insert(
+        "datetime_add".into(),
+        Scheme::mono(Ty::fun(
+            vec![dt_t.clone(), Ty::int(), atom_t.clone()],
+            dt_t.clone(),
+        )),
+    );
     // DateTime.diff(dt1, dt2, unit) -> Float  (NOT Int — fractional precision)
-    env.insert("datetime_diff".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone(), atom_t], Ty::float())));
+    env.insert(
+        "datetime_diff".into(),
+        Scheme::mono(Ty::fun(
+            vec![dt_t.clone(), dt_t.clone(), atom_t],
+            Ty::float(),
+        )),
+    );
     // DateTime.is_before(dt1, dt2) -> Bool
-    env.insert("datetime_is_before".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())));
+    env.insert(
+        "datetime_is_before".into(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())),
+    );
     // DateTime.is_after(dt1, dt2) -> Bool
-    env.insert("datetime_is_after".into(),
-        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())));
+    env.insert(
+        "datetime_is_after".into(),
+        Scheme::mono(Ty::fun(vec![dt_t.clone(), dt_t.clone()], Ty::bool())),
+    );
 
     // ── Standard library: Http client builder API (Phase 137) ─────────────────
-    let http_req_t = Ty::int();   // MeshRequest opaque handle is u64 -> Int ABI
+    let http_req_t = Ty::int(); // MeshRequest opaque handle is u64 -> Int ABI
     let http_resp_t = Ty::Con(TyCon::new("HttpResponse"));
     // Atom type for HTTP method (e.g. :get, :post) — lowered to String ABI at MIR level.
     let http_atom_t = Ty::Con(TyCon::new("Atom"));
 
     // Http.build(:method_atom, url) -> Request (Int handle)
     // First arg is Atom (e.g. :get, :post) — Atom resolves to String at MIR level.
-    env.insert("http_build".into(), Scheme::mono(Ty::fun(
-        vec![http_atom_t, Ty::string()],
-        http_req_t.clone()
-    )));
+    env.insert(
+        "http_build".into(),
+        Scheme::mono(Ty::fun(vec![http_atom_t, Ty::string()], http_req_t.clone())),
+    );
     // Http.header(req, key, val) -> Request
-    env.insert("http_header".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), Ty::string(), Ty::string()],
-        http_req_t.clone()
-    )));
+    env.insert(
+        "http_header".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
     // Http.body(req, s) -> Request
-    env.insert("http_body".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), Ty::string()],
-        http_req_t.clone()
-    )));
+    env.insert(
+        "http_body".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
     // Http.timeout(req, ms) -> Request
-    env.insert("http_timeout".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), Ty::int()],
-        http_req_t.clone()
-    )));
+    env.insert(
+        "http_timeout".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::int()],
+            http_req_t.clone(),
+        )),
+    );
     // Http.query(req, key, val) -> Request
-    env.insert("http_query".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), Ty::string(), Ty::string()],
-        http_req_t.clone()
-    )));
+    env.insert(
+        "http_query".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
     // Http.json(req, body) -> Request
-    env.insert("http_json".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), Ty::string()],
-        http_req_t.clone()
-    )));
+    env.insert(
+        "http_json".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), Ty::string()],
+            http_req_t.clone(),
+        )),
+    );
     // Http.send(req) -> Result<HttpResponse, String>
-    env.insert("http_send".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone()],
-        Ty::result(http_resp_t.clone(), Ty::string())
-    )));
+    env.insert(
+        "http_send".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone()],
+            Ty::result(http_resp_t.clone(), Ty::string()),
+        )),
+    );
     // HttpResponse type name available as a type annotation
     env.insert("HttpResponse".into(), Scheme::mono(http_resp_t.clone()));
     // Http.stream(req, fn(String) -> String) -> Int  (Int = cancel handle u64)
     // Callback receives chunk as String, returns atom :continue or :stop (lowered to String)
     let stream_cb_t = Ty::fun(vec![Ty::string()], Ty::string());
-    env.insert("http_stream".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), stream_cb_t.clone()],
-        Ty::int()  // cancel handle
-    )));
-    env.insert("http_stream_bytes".into(), Scheme::mono(Ty::fun(
-        vec![http_req_t.clone(), stream_cb_t],
-        Ty::int()  // cancel handle
-    )));
+    env.insert(
+        "http_stream".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), stream_cb_t.clone()],
+            Ty::int(), // cancel handle
+        )),
+    );
+    env.insert(
+        "http_stream_bytes".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_req_t.clone(), stream_cb_t],
+            Ty::int(), // cancel handle
+        )),
+    );
     // Http.cancel(cancel_handle) -> ()
-    env.insert("http_cancel".into(), Scheme::mono(Ty::fun(
-        vec![Ty::int()],
-        Ty::Tuple(vec![])
-    )));
+    env.insert(
+        "http_cancel".into(),
+        Scheme::mono(Ty::fun(vec![Ty::int()], Ty::Tuple(vec![]))),
+    );
     // Http.client() -> Int (keep-alive Agent handle)
     let http_client_handle_t = Ty::int();
-    env.insert("http_client".into(), Scheme::mono(Ty::fun(
-        vec![],
-        http_client_handle_t.clone()
-    )));
+    env.insert(
+        "http_client".into(),
+        Scheme::mono(Ty::fun(vec![], http_client_handle_t.clone())),
+    );
     // Http.send_with(client, req) -> Result<HttpResponse, String>
-    env.insert("http_send_with".into(), Scheme::mono(Ty::fun(
-        vec![http_client_handle_t.clone(), http_req_t.clone()],
-        Ty::result(http_resp_t.clone(), Ty::string())
-    )));
+    env.insert(
+        "http_send_with".into(),
+        Scheme::mono(Ty::fun(
+            vec![http_client_handle_t.clone(), http_req_t.clone()],
+            Ty::result(http_resp_t.clone(), Ty::string()),
+        )),
+    );
     // Http.client_close(client) -> ()
-    env.insert("http_client_close".into(), Scheme::mono(Ty::fun(
-        vec![http_client_handle_t],
-        Ty::Tuple(vec![])
-    )));
+    env.insert(
+        "http_client_close".into(),
+        Scheme::mono(Ty::fun(vec![http_client_handle_t], Ty::Tuple(vec![]))),
+    );
 
     // ── Standard library: Collection types (Phase 8) ─────────────────
 
@@ -486,56 +612,239 @@ pub fn register_builtins(
         // These are auto-imported without module qualification.
 
         // map(list, fn) -> list  (bare prelude name)
-        env.insert("map".into(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), t_to_u.clone()], list_u.clone()) });
+        env.insert(
+            "map".into(),
+            Scheme {
+                vars: vec![t_var, u_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_u.clone()], list_u.clone()),
+            },
+        );
         // filter(list, fn) -> list
-        env.insert("filter".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], list_t.clone()) });
+        env.insert(
+            "filter".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], list_t.clone()),
+            },
+        );
         // reduce(list, init, fn) -> U
-        env.insert("reduce".into(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), u.clone(), u_t_to_u.clone()], u.clone()) });
+        env.insert(
+            "reduce".into(),
+            Scheme {
+                vars: vec![t_var, u_var],
+                ty: Ty::fun(vec![list_t.clone(), u.clone(), u_t_to_u.clone()], u.clone()),
+            },
+        );
         // head(list) -> T
-        env.insert("head".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], t.clone()) });
+        env.insert(
+            "head".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], t.clone()),
+            },
+        );
         // tail(list) -> List<T>
-        env.insert("tail".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], list_t.clone()) });
+        env.insert(
+            "tail".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], list_t.clone()),
+            },
+        );
 
         // Also register with list_ prefix for module-qualified lowering.
-        env.insert("list_map".into(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), t_to_u.clone()], list_u.clone()) });
-        env.insert("list_filter".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], list_t.clone()) });
-        env.insert("list_reduce".into(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), u.clone(), u_t_to_u.clone()], u.clone()) });
-        env.insert("list_head".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], t.clone()) });
-        env.insert("list_tail".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], list_t.clone()) });
+        env.insert(
+            "list_map".into(),
+            Scheme {
+                vars: vec![t_var, u_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_u.clone()], list_u.clone()),
+            },
+        );
+        env.insert(
+            "list_filter".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], list_t.clone()),
+            },
+        );
+        env.insert(
+            "list_reduce".into(),
+            Scheme {
+                vars: vec![t_var, u_var],
+                ty: Ty::fun(vec![list_t.clone(), u.clone(), u_t_to_u.clone()], u.clone()),
+            },
+        );
+        env.insert(
+            "list_head".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], t.clone()),
+            },
+        );
+        env.insert(
+            "list_tail".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], list_t.clone()),
+            },
+        );
 
         // ── List module functions ─────────────────────────────────────────
 
         // List.new() -> List<T>
-        env.insert("list_new".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![], list_t.clone()) });
+        env.insert(
+            "list_new".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![], list_t.clone()),
+            },
+        );
         // List.length(List<T>) -> Int
-        env.insert("list_length".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], Ty::int()) });
+        env.insert(
+            "list_length".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], Ty::int()),
+            },
+        );
         // List.append(List<T>, T) -> List<T>
-        env.insert("list_append".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t.clone()], list_t.clone()) });
+        env.insert(
+            "list_append".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t.clone()], list_t.clone()),
+            },
+        );
         // List.get(List<T>, Int) -> T
-        env.insert("list_get".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()) });
+        env.insert(
+            "list_get".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()),
+            },
+        );
         // List.concat(List<T>, List<T>) -> List<T>
-        env.insert("list_concat".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), list_t.clone()], list_t.clone()) });
+        env.insert(
+            "list_concat".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), list_t.clone()], list_t.clone()),
+            },
+        );
         // List.reverse(List<T>) -> List<T>
-        env.insert("list_reverse".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], list_t.clone()) });
+        env.insert(
+            "list_reverse".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], list_t.clone()),
+            },
+        );
 
         // Phase 46: sort, find, any, all, contains
         let t_t_to_int = Ty::fun(vec![t.clone(), t.clone()], Ty::int());
-        env.insert("list_sort".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_t_to_int], list_t.clone()) });
-        env.insert("list_find".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::option(t.clone())) });
-        env.insert("list_any".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()) });
-        env.insert("list_all".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()) });
-        env.insert("list_contains".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), t.clone()], Ty::bool()) });
+        env.insert(
+            "list_sort".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t_t_to_int], list_t.clone()),
+            },
+        );
+        env.insert(
+            "list_find".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(
+                    vec![list_t.clone(), t_to_bool.clone()],
+                    Ty::option(t.clone()),
+                ),
+            },
+        );
+        env.insert(
+            "list_any".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()),
+            },
+        );
+        env.insert(
+            "list_all".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_bool.clone()], Ty::bool()),
+            },
+        );
+        env.insert(
+            "list_contains".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), t.clone()], Ty::bool()),
+            },
+        );
 
         // Phase 47: zip, flat_map, flatten, enumerate, take, drop, last, nth
-        env.insert("list_zip".into(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), list_u.clone()], Ty::list(Ty::Tuple(vec![t.clone(), u.clone()]))) });
+        env.insert(
+            "list_zip".into(),
+            Scheme {
+                vars: vec![t_var, u_var],
+                ty: Ty::fun(
+                    vec![list_t.clone(), list_u.clone()],
+                    Ty::list(Ty::Tuple(vec![t.clone(), u.clone()])),
+                ),
+            },
+        );
         let t_to_list_u = Ty::fun(vec![t.clone()], list_u.clone());
-        env.insert("list_flat_map".into(), Scheme { vars: vec![t_var, u_var], ty: Ty::fun(vec![list_t.clone(), t_to_list_u], list_u.clone()) });
-        env.insert("list_flatten".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![Ty::list(list_t.clone())], list_t.clone()) });
-        env.insert("list_enumerate".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], Ty::list(Ty::Tuple(vec![Ty::int(), t.clone()]))) });
-        env.insert("list_take".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()) });
-        env.insert("list_drop".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()) });
-        env.insert("list_last".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone()], t.clone()) });
-        env.insert("list_nth".into(), Scheme { vars: vec![t_var], ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()) });
+        env.insert(
+            "list_flat_map".into(),
+            Scheme {
+                vars: vec![t_var, u_var],
+                ty: Ty::fun(vec![list_t.clone(), t_to_list_u], list_u.clone()),
+            },
+        );
+        env.insert(
+            "list_flatten".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![Ty::list(list_t.clone())], list_t.clone()),
+            },
+        );
+        env.insert(
+            "list_enumerate".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(
+                    vec![list_t.clone()],
+                    Ty::list(Ty::Tuple(vec![Ty::int(), t.clone()])),
+                ),
+            },
+        );
+        env.insert(
+            "list_take".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()),
+            },
+        );
+        env.insert(
+            "list_drop".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), Ty::int()], list_t.clone()),
+            },
+        );
+        env.insert(
+            "list_last".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone()], t.clone()),
+            },
+        );
+        env.insert(
+            "list_nth".into(),
+            Scheme {
+                vars: vec![t_var],
+                ty: Ty::fun(vec![list_t.clone(), Ty::int()], t.clone()),
+            },
+        );
     }
 
     // ── Map module functions (polymorphic) ──────────────────────────────
@@ -546,18 +855,90 @@ pub fn register_builtins(
         let v = Ty::Var(v_var);
         let map_kv = Ty::map(k.clone(), v.clone());
 
-        env.insert("map_new".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![], map_kv.clone()) });
-        env.insert("map_put".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone(), v.clone()], map_kv.clone()) });
-        env.insert("map_get".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone()], v.clone()) });
-        env.insert("map_has_key".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone()], Ty::bool()) });
-        env.insert("map_delete".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), k.clone()], map_kv.clone()) });
-        env.insert("map_size".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::int()) });
-        env.insert("map_keys".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::list(k.clone())) });
-        env.insert("map_values".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::list(v.clone())) });
+        env.insert(
+            "map_new".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![], map_kv.clone()),
+            },
+        );
+        env.insert(
+            "map_put".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone(), k.clone(), v.clone()], map_kv.clone()),
+            },
+        );
+        env.insert(
+            "map_get".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone(), k.clone()], v.clone()),
+            },
+        );
+        env.insert(
+            "map_has_key".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone(), k.clone()], Ty::bool()),
+            },
+        );
+        env.insert(
+            "map_delete".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone(), k.clone()], map_kv.clone()),
+            },
+        );
+        env.insert(
+            "map_size".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone()], Ty::int()),
+            },
+        );
+        env.insert(
+            "map_keys".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone()], Ty::list(k.clone())),
+            },
+        );
+        env.insert(
+            "map_values".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone()], Ty::list(v.clone())),
+            },
+        );
         // Phase 47: merge, to_list, from_list
-        env.insert("map_merge".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone(), map_kv.clone()], map_kv.clone()) });
-        env.insert("map_to_list".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![map_kv.clone()], Ty::list(Ty::Tuple(vec![k.clone(), v.clone()]))) });
-        env.insert("map_from_list".into(), Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![Ty::list(Ty::Tuple(vec![k.clone(), v.clone()]))], map_kv.clone()) });
+        env.insert(
+            "map_merge".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![map_kv.clone(), map_kv.clone()], map_kv.clone()),
+            },
+        );
+        env.insert(
+            "map_to_list".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(
+                    vec![map_kv.clone()],
+                    Ty::list(Ty::Tuple(vec![k.clone(), v.clone()])),
+                ),
+            },
+        );
+        env.insert(
+            "map_from_list".into(),
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(
+                    vec![Ty::list(Ty::Tuple(vec![k.clone(), v.clone()]))],
+                    map_kv.clone(),
+                ),
+            },
+        );
     }
 
     // ── Set module functions ──────────────────────────────────────────
@@ -608,7 +989,10 @@ pub fn register_builtins(
 
     env.insert(
         "tuple_nth".into(),
-        Scheme::mono(Ty::fun(vec![Ty::Con(TyCon::new("Tuple")), Ty::int()], Ty::int())),
+        Scheme::mono(Ty::fun(
+            vec![Ty::Con(TyCon::new("Tuple")), Ty::int()],
+            Ty::int(),
+        )),
     );
     env.insert(
         "tuple_first".into(),
@@ -639,7 +1023,10 @@ pub fn register_builtins(
     );
     env.insert(
         "range_map".into(),
-        Scheme::mono(Ty::fun(vec![range_t.clone(), int_to_int.clone()], list_t.clone())),
+        Scheme::mono(Ty::fun(
+            vec![range_t.clone(), int_to_int.clone()],
+            list_t.clone(),
+        )),
     );
     env.insert(
         "range_filter".into(),
@@ -686,7 +1073,10 @@ pub fn register_builtins(
     // JSON.parse(string) -> Result<Json, String>
     env.insert(
         "json_parse".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(json_t.clone(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(json_t.clone(), Ty::string()),
+        )),
     );
     // JSON.encode(json) -> String
     env.insert(
@@ -738,19 +1128,29 @@ pub fn register_builtins(
     env.insert(
         "http_route".into(),
         Scheme::mono(Ty::fun(
-            vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
             router_t.clone(),
         )),
     );
     // HTTP.serve(Router, Int) -> ()
     env.insert(
         "http_serve".into(),
-        Scheme::mono(Ty::fun(vec![router_t.clone(), Ty::int()], Ty::Tuple(vec![]))),
+        Scheme::mono(Ty::fun(
+            vec![router_t.clone(), Ty::int()],
+            Ty::Tuple(vec![]),
+        )),
     );
     // HTTP.serve_tls(Router, Int, String, String) -> () (Phase 56)
     env.insert(
         "http_serve_tls".into(),
-        Scheme::mono(Ty::fun(vec![router_t.clone(), Ty::int(), Ty::string(), Ty::string()], Ty::Tuple(vec![]))),
+        Scheme::mono(Ty::fun(
+            vec![router_t.clone(), Ty::int(), Ty::string(), Ty::string()],
+            Ty::Tuple(vec![]),
+        )),
     );
     // HTTP.response(Int, String) -> Response
     env.insert(
@@ -766,13 +1166,19 @@ pub fn register_builtins(
         let map_kv = Ty::map(k, v);
         env.insert(
             "http_response_with_headers".into(),
-            Scheme { vars: vec![k_var, v_var], ty: Ty::fun(vec![Ty::int(), Ty::string(), map_kv], response_t.clone()) },
+            Scheme {
+                vars: vec![k_var, v_var],
+                ty: Ty::fun(vec![Ty::int(), Ty::string(), map_kv], response_t.clone()),
+            },
         );
     }
     // HTTP.get(String) -> Result<String, String>
     env.insert(
         "http_get".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(Ty::string(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(Ty::string(), Ty::string()),
+        )),
     );
     // HTTP.post(String, String) -> Result<String, String>
     env.insert(
@@ -788,7 +1194,11 @@ pub fn register_builtins(
     env.insert(
         "http_on_get".into(),
         Scheme::mono(Ty::fun(
-            vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
             router_t.clone(),
         )),
     );
@@ -796,7 +1206,11 @@ pub fn register_builtins(
     env.insert(
         "http_on_post".into(),
         Scheme::mono(Ty::fun(
-            vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
             router_t.clone(),
         )),
     );
@@ -804,7 +1218,11 @@ pub fn register_builtins(
     env.insert(
         "http_on_put".into(),
         Scheme::mono(Ty::fun(
-            vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
             router_t.clone(),
         )),
     );
@@ -812,7 +1230,11 @@ pub fn register_builtins(
     env.insert(
         "http_on_delete".into(),
         Scheme::mono(Ty::fun(
-            vec![router_t.clone(), Ty::string(), Ty::fun(vec![request_t.clone()], response_t.clone())],
+            vec![
+                router_t.clone(),
+                Ty::string(),
+                Ty::fun(vec![request_t.clone()], response_t.clone()),
+            ],
             router_t.clone(),
         )),
     );
@@ -824,7 +1246,10 @@ pub fn register_builtins(
             vec![
                 router_t.clone(),
                 Ty::fun(
-                    vec![request_t.clone(), Ty::fun(vec![request_t.clone()], response_t.clone())],
+                    vec![
+                        request_t.clone(),
+                        Ty::fun(vec![request_t.clone()], response_t.clone()),
+                    ],
                     response_t.clone(),
                 ),
             ],
@@ -840,7 +1265,10 @@ pub fn register_builtins(
     // Sqlite.open(String) -> Result<SqliteConn, String>
     env.insert(
         "sqlite_open".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(sqlite_conn_t.clone(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(sqlite_conn_t.clone(), Ty::string()),
+        )),
     );
     // Sqlite.close(SqliteConn) -> Unit
     env.insert(
@@ -872,7 +1300,10 @@ pub fn register_builtins(
     // Pg.connect(String) -> Result<PgConn, String>
     env.insert(
         "pg_connect".into(),
-        Scheme::mono(Ty::fun(vec![Ty::string()], Ty::result(pg_conn_t.clone(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![Ty::string()],
+            Ty::result(pg_conn_t.clone(), Ty::string()),
+        )),
     );
     // Pg.close(PgConn) -> Unit
     env.insert(
@@ -900,23 +1331,38 @@ pub fn register_builtins(
     // Pg.begin(PgConn) -> Result<Unit, String>
     env.insert(
         "pg_begin".into(),
-        Scheme::mono(Ty::fun(vec![pg_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
     );
     // Pg.commit(PgConn) -> Result<Unit, String>
     env.insert(
         "pg_commit".into(),
-        Scheme::mono(Ty::fun(vec![pg_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
     );
     // Pg.rollback(PgConn) -> Result<Unit, String>
     env.insert(
         "pg_rollback".into(),
-        Scheme::mono(Ty::fun(vec![pg_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![pg_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
     );
     // Pg.transaction(PgConn, fn(PgConn) -> Result<Unit, String>) -> Result<Unit, String>
     env.insert(
         "pg_transaction".into(),
         Scheme::mono(Ty::fun(
-            vec![pg_conn_t.clone(), Ty::fun(vec![pg_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))],
+            vec![
+                pg_conn_t.clone(),
+                Ty::fun(
+                    vec![pg_conn_t.clone()],
+                    Ty::result(Ty::Tuple(vec![]), Ty::string()),
+                ),
+            ],
             Ty::result(Ty::Tuple(vec![]), Ty::string()),
         )),
     );
@@ -925,17 +1371,26 @@ pub fn register_builtins(
     // Sqlite.begin(SqliteConn) -> Result<Unit, String>
     env.insert(
         "sqlite_begin".into(),
-        Scheme::mono(Ty::fun(vec![sqlite_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
     );
     // Sqlite.commit(SqliteConn) -> Result<Unit, String>
     env.insert(
         "sqlite_commit".into(),
-        Scheme::mono(Ty::fun(vec![sqlite_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
     );
     // Sqlite.rollback(SqliteConn) -> Result<Unit, String>
     env.insert(
         "sqlite_rollback".into(),
-        Scheme::mono(Ty::fun(vec![sqlite_conn_t.clone()], Ty::result(Ty::Tuple(vec![]), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![sqlite_conn_t.clone()],
+            Ty::result(Ty::Tuple(vec![]), Ty::string()),
+        )),
     );
 
     // ── Phase 57: Connection Pool ───────────────────────────────────
@@ -959,12 +1414,18 @@ pub fn register_builtins(
     // Pool.checkout(PoolHandle) -> Result<PgConn, String>
     env.insert(
         "pool_checkout".into(),
-        Scheme::mono(Ty::fun(vec![pool_handle_t.clone()], Ty::result(pg_conn_t.clone(), Ty::string()))),
+        Scheme::mono(Ty::fun(
+            vec![pool_handle_t.clone()],
+            Ty::result(pg_conn_t.clone(), Ty::string()),
+        )),
     );
     // Pool.checkin(PoolHandle, PgConn) -> Unit
     env.insert(
         "pool_checkin".into(),
-        Scheme::mono(Ty::fun(vec![pool_handle_t.clone(), pg_conn_t.clone()], Ty::Tuple(vec![]))),
+        Scheme::mono(Ty::fun(
+            vec![pool_handle_t.clone(), pg_conn_t.clone()],
+            Ty::Tuple(vec![]),
+        )),
     );
     // Pool.query(PoolHandle, String, List<String>) -> Result<List<Map<String, String>>, String>
     env.insert(
@@ -1167,7 +1628,9 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
                 return_type: None, // return type is Self (the implementing type)
                 has_default_body: false,
             }],
-            associated_types: vec![AssocTypeDef { name: "Output".to_string() }],
+            associated_types: vec![AssocTypeDef {
+                name: "Output".to_string(),
+            }],
         });
 
         // Register impls for Int and Float.
@@ -1205,7 +1668,9 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
             return_type: None,
             has_default_body: false,
         }],
-        associated_types: vec![AssocTypeDef { name: "Output".to_string() }],
+        associated_types: vec![AssocTypeDef {
+            name: "Output".to_string(),
+        }],
     });
 
     // Neg impls for Int and Float.
@@ -1242,7 +1707,9 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
             return_type: None, // Option<Self.Item> -- resolved per impl
             has_default_body: false,
         }],
-        associated_types: vec![AssocTypeDef { name: "Item".to_string() }],
+        associated_types: vec![AssocTypeDef {
+            name: "Item".to_string(),
+        }],
     });
 
     // ── Iterable trait ─────────────────────────────────────────────
@@ -1257,8 +1724,12 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
             has_default_body: false,
         }],
         associated_types: vec![
-            AssocTypeDef { name: "Item".to_string() },
-            AssocTypeDef { name: "Iter".to_string() },
+            AssocTypeDef {
+                name: "Item".to_string(),
+            },
+            AssocTypeDef {
+                name: "Iter".to_string(),
+            },
         ],
     });
 
@@ -1266,13 +1737,19 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
 
     // impl Iterable for List<T>
     {
-        let list_t = Ty::App(Box::new(Ty::Con(TyCon::new("List"))), vec![Ty::Con(TyCon::new("T"))]);
+        let list_t = Ty::App(
+            Box::new(Ty::Con(TyCon::new("List"))),
+            vec![Ty::Con(TyCon::new("T"))],
+        );
         let mut methods = FxHashMap::default();
-        methods.insert("iter".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "iter".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
         assoc_types.insert("Item".to_string(), Ty::Con(TyCon::new("T")));
         assoc_types.insert("Iter".to_string(), Ty::Con(TyCon::new("ListIterator")));
@@ -1289,11 +1766,14 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     // impl Iterator for ListIterator
     {
         let mut methods = FxHashMap::default();
-        methods.insert("next".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "next".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
         assoc_types.insert("Item".to_string(), Ty::Con(TyCon::new("T")));
         let _ = registry.register_impl(ImplDef {
@@ -1313,13 +1793,19 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
             vec![Ty::Con(TyCon::new("K")), Ty::Con(TyCon::new("V"))],
         );
         let mut methods = FxHashMap::default();
-        methods.insert("iter".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "iter".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
-        assoc_types.insert("Item".to_string(), Ty::Tuple(vec![Ty::Con(TyCon::new("K")), Ty::Con(TyCon::new("V"))]));
+        assoc_types.insert(
+            "Item".to_string(),
+            Ty::Tuple(vec![Ty::Con(TyCon::new("K")), Ty::Con(TyCon::new("V"))]),
+        );
         assoc_types.insert("Iter".to_string(), Ty::Con(TyCon::new("MapIterator")));
         let _ = registry.register_impl(ImplDef {
             trait_name: "Iterable".to_string(),
@@ -1334,13 +1820,19 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     // impl Iterator for MapIterator
     {
         let mut methods = FxHashMap::default();
-        methods.insert("next".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "next".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
-        assoc_types.insert("Item".to_string(), Ty::Tuple(vec![Ty::Con(TyCon::new("K")), Ty::Con(TyCon::new("V"))]));
+        assoc_types.insert(
+            "Item".to_string(),
+            Ty::Tuple(vec![Ty::Con(TyCon::new("K")), Ty::Con(TyCon::new("V"))]),
+        );
         let _ = registry.register_impl(ImplDef {
             trait_name: "Iterator".to_string(),
             trait_type_args: vec![],
@@ -1355,11 +1847,14 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     {
         let set_t = Ty::Con(TyCon::new("Set"));
         let mut methods = FxHashMap::default();
-        methods.insert("iter".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "iter".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
         assoc_types.insert("Item".to_string(), Ty::int());
         assoc_types.insert("Iter".to_string(), Ty::Con(TyCon::new("SetIterator")));
@@ -1376,11 +1871,14 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     // impl Iterator for SetIterator
     {
         let mut methods = FxHashMap::default();
-        methods.insert("next".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "next".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
         assoc_types.insert("Item".to_string(), Ty::int());
         let _ = registry.register_impl(ImplDef {
@@ -1397,11 +1895,14 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     {
         let range_t = Ty::Con(TyCon::new("Range"));
         let mut methods = FxHashMap::default();
-        methods.insert("iter".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "iter".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
         assoc_types.insert("Item".to_string(), Ty::int());
         assoc_types.insert("Iter".to_string(), Ty::Con(TyCon::new("RangeIterator")));
@@ -1418,11 +1919,14 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     // impl Iterator for RangeIterator
     {
         let mut methods = FxHashMap::default();
-        methods.insert("next".to_string(), ImplMethodSig {
-            has_self: true,
-            param_count: 0,
-            return_type: None,
-        });
+        methods.insert(
+            "next".to_string(),
+            ImplMethodSig {
+                has_self: true,
+                param_count: 0,
+                return_type: None,
+            },
+        );
         let mut assoc_types = FxHashMap::default();
         assoc_types.insert("Item".to_string(), Ty::int());
         let _ = registry.register_impl(ImplDef {
@@ -1534,7 +2038,10 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     // ── List Eq/Ord impls (Phase 27 Plan 01) ──────────────────────
     // Register Eq for List<T> -- parametric impl via single-letter type param "T".
     {
-        let list_t = Ty::App(Box::new(Ty::Con(TyCon::new("List"))), vec![Ty::Con(TyCon::new("T"))]);
+        let list_t = Ty::App(
+            Box::new(Ty::Con(TyCon::new("List"))),
+            vec![Ty::Con(TyCon::new("T"))],
+        );
         let mut eq_methods = FxHashMap::default();
         eq_methods.insert(
             "eq".to_string(),
@@ -1655,7 +2162,10 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
     // works for to_string() on collections. The actual runtime Display
     // is handled by wrap_collection_to_string in MIR lowering.
     {
-        let list_t = Ty::App(Box::new(Ty::Con(TyCon::new("List"))), vec![Ty::Con(TyCon::new("T"))]);
+        let list_t = Ty::App(
+            Box::new(Ty::Con(TyCon::new("List"))),
+            vec![Ty::Con(TyCon::new("T"))],
+        );
         let mut methods = FxHashMap::default();
         methods.insert(
             "to_string".to_string(),
@@ -1871,9 +2381,9 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
         name: "TryFrom".to_string(),
         methods: vec![TraitMethodSig {
             name: "try_from".to_string(),
-            has_self: false,        // static method like From.from()
+            has_self: false, // static method like From.from()
             param_count: 1,
-            return_type: None,      // Result<Self, E> -- resolved per impl
+            return_type: None, // Result<Self, E> -- resolved per impl
             has_default_body: false,
         }],
         associated_types: vec![],
@@ -1884,9 +2394,9 @@ fn register_compiler_known_traits(registry: &mut TraitRegistry) {
         name: "TryInto".to_string(),
         methods: vec![TraitMethodSig {
             name: "try_into".to_string(),
-            has_self: true,         // instance method like Into.into()
+            has_self: true, // instance method like Into.into()
             param_count: 0,
-            return_type: None,      // Result<T, E> -- the target type wrapped in Result
+            return_type: None, // Result<T, E> -- the target type wrapped in Result
             has_default_body: false,
         }],
         associated_types: vec![],

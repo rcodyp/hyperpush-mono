@@ -78,9 +78,7 @@ fn err_result(msg: &str) -> *mut MeshResult {
 fn serde_value_to_mesh_json(val: &serde_json::Value) -> *mut MeshJson {
     match val {
         serde_json::Value::Null => alloc_json(JSON_NULL, 0),
-        serde_json::Value::Bool(b) => {
-            alloc_json(JSON_BOOL, if *b { 1 } else { 0 })
-        }
+        serde_json::Value::Bool(b) => alloc_json(JSON_BOOL, if *b { 1 } else { 0 }),
         serde_json::Value::Number(n) => {
             // Int and Float are separate tags for round-trip fidelity.
             if let Some(i) = n.as_i64() {
@@ -125,9 +123,7 @@ fn serde_value_to_mesh_json(val: &serde_json::Value) -> *mut MeshJson {
 unsafe fn mesh_json_to_serde_value(json: *const MeshJson) -> serde_json::Value {
     match (*json).tag {
         JSON_NULL => serde_json::Value::Null,
-        JSON_BOOL => {
-            serde_json::Value::Bool((*json).value != 0)
-        }
+        JSON_BOOL => serde_json::Value::Bool((*json).value != 0),
         JSON_INT => {
             let ival = (*json).value as i64;
             serde_json::Value::Number(serde_json::Number::from(ival))
@@ -393,9 +389,7 @@ pub extern "C" fn mesh_json_as_int(json: *mut u8) -> *mut u8 {
     unsafe {
         let j = json as *mut MeshJson;
         match (*j).tag {
-            JSON_INT => {
-                alloc_result(0, (*j).value as i64 as *mut u8) as *mut u8
-            }
+            JSON_INT => alloc_result(0, (*j).value as i64 as *mut u8) as *mut u8,
             JSON_FLOAT => {
                 let f = f64::from_bits((*j).value);
                 alloc_result(0, f as i64 as *mut u8) as *mut u8
@@ -412,9 +406,7 @@ pub extern "C" fn mesh_json_as_float(json: *mut u8) -> *mut u8 {
     unsafe {
         let j = json as *mut MeshJson;
         match (*j).tag {
-            JSON_FLOAT => {
-                alloc_result(0, (*j).value as *mut u8) as *mut u8
-            }
+            JSON_FLOAT => alloc_result(0, (*j).value as *mut u8) as *mut u8,
             JSON_INT => {
                 let i = (*j).value as i64;
                 let f = (i as f64).to_bits();

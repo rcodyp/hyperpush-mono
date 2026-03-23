@@ -75,21 +75,13 @@ impl Expr {
             SyntaxKind::STRING_EXPR => Some(Expr::StringExpr(StringExpr { syntax: node })),
             SyntaxKind::RETURN_EXPR => Some(Expr::ReturnExpr(ReturnExpr { syntax: node })),
             SyntaxKind::TUPLE_EXPR => Some(Expr::TupleExpr(TupleExpr { syntax: node })),
-            SyntaxKind::STRUCT_LITERAL => {
-                Some(Expr::StructLiteral(StructLiteral { syntax: node }))
-            }
-            SyntaxKind::MAP_LITERAL => {
-                Some(Expr::MapLiteral(MapLiteral { syntax: node }))
-            }
-            SyntaxKind::LIST_LITERAL => {
-                Some(Expr::ListLiteral(ListLiteral { syntax: node }))
-            }
+            SyntaxKind::STRUCT_LITERAL => Some(Expr::StructLiteral(StructLiteral { syntax: node })),
+            SyntaxKind::MAP_LITERAL => Some(Expr::MapLiteral(MapLiteral { syntax: node })),
+            SyntaxKind::LIST_LITERAL => Some(Expr::ListLiteral(ListLiteral { syntax: node })),
             // Loop expressions
             SyntaxKind::WHILE_EXPR => Some(Expr::WhileExpr(WhileExpr { syntax: node })),
             SyntaxKind::BREAK_EXPR => Some(Expr::BreakExpr(BreakExpr { syntax: node })),
-            SyntaxKind::CONTINUE_EXPR => {
-                Some(Expr::ContinueExpr(ContinueExpr { syntax: node }))
-            }
+            SyntaxKind::CONTINUE_EXPR => Some(Expr::ContinueExpr(ContinueExpr { syntax: node })),
             SyntaxKind::FOR_IN_EXPR => Some(Expr::ForInExpr(ForInExpr { syntax: node })),
             // Actor expressions
             SyntaxKind::SPAWN_EXPR => Some(Expr::SpawnExpr(SpawnExpr { syntax: node })),
@@ -102,9 +94,7 @@ impl Expr {
             SyntaxKind::STRUCT_UPDATE_EXPR => {
                 Some(Expr::StructUpdate(StructUpdate { syntax: node }))
             }
-            SyntaxKind::SLOT_PIPE_EXPR => {
-                Some(Expr::SlotPipeExpr(SlotPipeExpr { syntax: node }))
-            }
+            SyntaxKind::SLOT_PIPE_EXPR => Some(Expr::SlotPipeExpr(SlotPipeExpr { syntax: node })),
             SyntaxKind::REGEX_EXPR => Some(Expr::RegexExpr(RegexExpr { syntax: node })),
             SyntaxKind::JSON_EXPR => Some(Expr::JsonExpr(JsonExpr { syntax: node })),
             _ => None,
@@ -339,7 +329,19 @@ impl FieldAccess {
         self.syntax
             .children_with_tokens()
             .filter_map(|it| it.into_token())
-            .filter(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::SELF_KW | SyntaxKind::MONITOR_KW | SyntaxKind::SPAWN_KW | SyntaxKind::LINK_KW | SyntaxKind::SEND_KW | SyntaxKind::WHERE_KW | SyntaxKind::CAST_KW))
+            .filter(|t| {
+                matches!(
+                    t.kind(),
+                    SyntaxKind::IDENT
+                        | SyntaxKind::SELF_KW
+                        | SyntaxKind::MONITOR_KW
+                        | SyntaxKind::SPAWN_KW
+                        | SyntaxKind::LINK_KW
+                        | SyntaxKind::SEND_KW
+                        | SyntaxKind::WHERE_KW
+                        | SyntaxKind::CAST_KW
+                )
+            })
             .last()
     }
 }
@@ -416,9 +418,7 @@ ast_node!(MatchArm, MATCH_ARM);
 impl MatchArm {
     /// The pattern being matched.
     pub fn pattern(&self) -> Option<super::pat::Pattern> {
-        self.syntax
-            .children()
-            .find_map(super::pat::Pattern::cast)
+        self.syntax.children().find_map(super::pat::Pattern::cast)
     }
 
     /// The guard expression (after `when`), if present.
@@ -768,9 +768,7 @@ ast_node!(ReceiveArm, RECEIVE_ARM);
 impl ReceiveArm {
     /// The pattern being matched.
     pub fn pattern(&self) -> Option<super::pat::Pattern> {
-        self.syntax
-            .children()
-            .find_map(super::pat::Pattern::cast)
+        self.syntax.children().find_map(super::pat::Pattern::cast)
     }
 
     /// The body expression (after `->`).

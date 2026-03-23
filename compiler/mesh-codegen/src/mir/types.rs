@@ -119,7 +119,10 @@ fn resolve_app(con_ty: &Ty, args: &[Ty], registry: &TypeRegistry) -> MirType {
     };
 
     // Collection types are opaque pointers regardless of type parameters.
-    if matches!(base_name.as_str(), "List" | "Map" | "Set" | "Range" | "Queue") {
+    if matches!(
+        base_name.as_str(),
+        "List" | "Map" | "Set" | "Range" | "Queue"
+    ) {
         return MirType::Ptr;
     }
 
@@ -136,10 +139,7 @@ fn resolve_app(con_ty: &Ty, args: &[Ty], registry: &TypeRegistry) -> MirType {
     // For monomorphization: generate a mangled name from base + args
     if args.is_empty() {
         // No-arg application, e.g., Ty::App(Con("Point"), [])
-        return resolve_con(
-            &TyCon::new(base_name),
-            registry,
-        );
+        return resolve_con(&TyCon::new(base_name), registry);
     }
 
     let mangled_name = mangle_type_name(base_name, args, registry);

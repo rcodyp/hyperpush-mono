@@ -22,14 +22,13 @@
 //! - `mesh_repo_delete`: DELETE with RETURNING *, accepts id
 //! - `mesh_repo_transaction`: Wraps callback in checkout/begin/commit-or-rollback/checkin
 
-use crate::collections::list::{mesh_list_get, mesh_list_length, mesh_list_new, mesh_list_append};
+use crate::collections::list::{mesh_list_append, mesh_list_get, mesh_list_length, mesh_list_new};
 use crate::collections::map::{mesh_map_get, mesh_map_put};
-use crate::db::pool::{mesh_pool_query, mesh_pool_execute, mesh_pool_checkout, mesh_pool_checkin};
-use crate::db::pg::{mesh_pg_begin, mesh_pg_commit, mesh_pg_rollback};
 use crate::db::changeset::{
-    SLOT_CHANGES, SLOT_VALID,
-    map_constraint_error, add_constraint_error_to_changeset,
+    add_constraint_error_to_changeset, map_constraint_error, SLOT_CHANGES, SLOT_VALID,
 };
+use crate::db::pg::{mesh_pg_begin, mesh_pg_commit, mesh_pg_rollback};
+use crate::db::pool::{mesh_pool_checkin, mesh_pool_checkout, mesh_pool_execute, mesh_pool_query};
 use crate::io::{alloc_result, MeshResult};
 use crate::string::{mesh_string_new, MeshString};
 
@@ -154,7 +153,11 @@ fn renumber_placeholders(sql: &str, start_idx: usize) -> (String, usize) {
             i += 1;
         }
     }
-    let params_consumed = if question_count > 0 { question_count } else { max_placeholder };
+    let params_consumed = if question_count > 0 {
+        question_count
+    } else {
+        max_placeholder
+    };
     (result, params_consumed)
 }
 
@@ -223,13 +226,16 @@ fn build_select_sql_from_parts(
     if select_fields.is_empty() {
         sql.push('*');
     } else {
-        let cols: Vec<String> = select_fields.iter().map(|f| {
-            if let Some(raw) = f.strip_prefix("RAW:") {
-                raw.to_string() // emit verbatim, no quoting
-            } else {
-                quote_ident(f)
-            }
-        }).collect();
+        let cols: Vec<String> = select_fields
+            .iter()
+            .map(|f| {
+                if let Some(raw) = f.strip_prefix("RAW:") {
+                    raw.to_string() // emit verbatim, no quoting
+                } else {
+                    quote_ident(f)
+                }
+            })
+            .collect();
         sql.push_str(&cols.join(", "));
     }
 
@@ -243,10 +249,10 @@ fn build_select_sql_from_parts(
             if parts.len() == 4 {
                 sql.push_str(&format!(
                     " {} JOIN {} {} ON {}",
-                    parts[0],          // join type (INNER, LEFT)
-                    quote_ident(parts[1]),  // table name
-                    parts[2],          // alias (unquoted)
-                    parts[3]           // on clause
+                    parts[0],              // join type (INNER, LEFT)
+                    quote_ident(parts[1]), // table name
+                    parts[2],              // alias (unquoted)
+                    parts[3]               // on clause
                 ));
             }
         } else {
@@ -307,9 +313,8 @@ fn build_select_sql_from_parts(
                 } else if op.starts_with("IN:") {
                     // IN clause: "field IN:N"
                     let count: usize = op[3..].parse().unwrap_or(0);
-                    let placeholders: Vec<String> = (0..count)
-                        .map(|i| format!("${}", param_idx + i))
-                        .collect();
+                    let placeholders: Vec<String> =
+                        (0..count).map(|i| format!("${}", param_idx + i)).collect();
                     conditions.push(format!(
                         "{} IN ({})",
                         quote_ident(col),
@@ -326,9 +331,8 @@ fn build_select_sql_from_parts(
                 } else if op.starts_with("NOT_IN:") {
                     // NOT IN clause: "field NOT_IN:N"
                     let count: usize = op[7..].parse().unwrap_or(0);
-                    let placeholders: Vec<String> = (0..count)
-                        .map(|i| format!("${}", param_idx + i))
-                        .collect();
+                    let placeholders: Vec<String> =
+                        (0..count).map(|i| format!("${}", param_idx + i)).collect();
                     conditions.push(format!(
                         "{} NOT IN ({})",
                         quote_ident(col),
@@ -360,12 +364,7 @@ fn build_select_sql_from_parts(
                     continue;
                 } else {
                     // Regular operator: "field op" -> "field" op $N
-                    conditions.push(format!(
-                        "{} {} ${}",
-                        quote_ident(col),
-                        op,
-                        param_idx
-                    ));
+                    conditions.push(format!("{} {} ${}", quote_ident(col), op, param_idx));
                     if wp_idx < where_params.len() {
                         params.push(where_params[wp_idx].clone());
                         wp_idx += 1;
@@ -387,13 +386,16 @@ fn build_select_sql_from_parts(
 
     // GROUP BY clause
     if !group_fields.is_empty() {
-        let cols: Vec<String> = group_fields.iter().map(|f| {
-            if let Some(raw) = f.strip_prefix("RAW:") {
-                raw.to_string() // emit verbatim
-            } else {
-                quote_ident(f)
-            }
-        }).collect();
+        let cols: Vec<String> = group_fields
+            .iter()
+            .map(|f| {
+                if let Some(raw) = f.strip_prefix("RAW:") {
+                    raw.to_string() // emit verbatim
+                } else {
+                    quote_ident(f)
+                }
+            })
+            .collect();
         sql.push_str(&format!(" GROUP BY {}", cols.join(", ")));
     }
 
@@ -567,9 +569,8 @@ fn build_count_sql_from_parts(
                     conditions.push(format!("{} {}", quote_ident(col), op));
                 } else if op.starts_with("IN:") {
                     let count: usize = op[3..].parse().unwrap_or(0);
-                    let placeholders: Vec<String> = (0..count)
-                        .map(|i| format!("${}", param_idx + i))
-                        .collect();
+                    let placeholders: Vec<String> =
+                        (0..count).map(|i| format!("${}", param_idx + i)).collect();
                     conditions.push(format!(
                         "{} IN ({})",
                         quote_ident(col),
@@ -585,9 +586,8 @@ fn build_count_sql_from_parts(
                     continue;
                 } else if op.starts_with("NOT_IN:") {
                     let count: usize = op[7..].parse().unwrap_or(0);
-                    let placeholders: Vec<String> = (0..count)
-                        .map(|i| format!("${}", param_idx + i))
-                        .collect();
+                    let placeholders: Vec<String> =
+                        (0..count).map(|i| format!("${}", param_idx + i)).collect();
                     conditions.push(format!(
                         "{} NOT IN ({})",
                         quote_ident(col),
@@ -638,13 +638,16 @@ fn build_count_sql_from_parts(
 
     // GROUP BY clause
     if !group_fields.is_empty() {
-        let cols: Vec<String> = group_fields.iter().map(|f| {
-            if let Some(raw) = f.strip_prefix("RAW:") {
-                raw.to_string()
-            } else {
-                quote_ident(f)
-            }
-        }).collect();
+        let cols: Vec<String> = group_fields
+            .iter()
+            .map(|f| {
+                if let Some(raw) = f.strip_prefix("RAW:") {
+                    raw.to_string()
+                } else {
+                    quote_ident(f)
+                }
+            })
+            .collect();
         sql.push_str(&format!(" GROUP BY {}", cols.join(", ")));
     }
 
@@ -767,9 +770,8 @@ fn build_exists_sql_from_parts(
                     conditions.push(format!("{} {}", quote_ident(col), op));
                 } else if op.starts_with("IN:") {
                     let count: usize = op[3..].parse().unwrap_or(0);
-                    let placeholders: Vec<String> = (0..count)
-                        .map(|i| format!("${}", param_idx + i))
-                        .collect();
+                    let placeholders: Vec<String> =
+                        (0..count).map(|i| format!("${}", param_idx + i)).collect();
                     conditions.push(format!(
                         "{} IN ({})",
                         quote_ident(col),
@@ -785,9 +787,8 @@ fn build_exists_sql_from_parts(
                     continue;
                 } else if op.starts_with("NOT_IN:") {
                     let count: usize = op[7..].parse().unwrap_or(0);
-                    let placeholders: Vec<String> = (0..count)
-                        .map(|i| format!("${}", param_idx + i))
-                        .collect();
+                    let placeholders: Vec<String> =
+                        (0..count).map(|i| format!("${}", param_idx + i)).collect();
                     conditions.push(format!(
                         "{} NOT IN ({})",
                         quote_ident(col),
@@ -1410,12 +1411,14 @@ pub extern "C" fn mesh_repo_insert_changeset(
             let err_str = mesh_str_ref(r.value);
             let (sqlstate, constraint, pg_table, column, _message) = parse_pg_error_string(err_str);
 
-            if let Some((field, msg)) = map_constraint_error(sqlstate, constraint, pg_table, column) {
+            if let Some((field, msg)) = map_constraint_error(sqlstate, constraint, pg_table, column)
+            {
                 let cs_with_err = add_constraint_error_to_changeset(changeset, &field, &msg);
                 alloc_result(1, cs_with_err) as *mut u8
             } else {
                 // Unknown error: add as generic _base error
-                let cs_with_err = add_constraint_error_to_changeset(changeset, "_base", "database error");
+                let cs_with_err =
+                    add_constraint_error_to_changeset(changeset, "_base", "database error");
                 alloc_result(1, cs_with_err) as *mut u8
             }
         }
@@ -1478,12 +1481,14 @@ pub extern "C" fn mesh_repo_update_changeset(
             let err_str = mesh_str_ref(r.value);
             let (sqlstate, constraint, pg_table, column, _message) = parse_pg_error_string(err_str);
 
-            if let Some((field, msg)) = map_constraint_error(sqlstate, constraint, pg_table, column) {
+            if let Some((field, msg)) = map_constraint_error(sqlstate, constraint, pg_table, column)
+            {
                 let cs_with_err = add_constraint_error_to_changeset(changeset, &field, &msg);
                 alloc_result(1, cs_with_err) as *mut u8
             } else {
                 // Unknown error: add as generic _base error
-                let cs_with_err = add_constraint_error_to_changeset(changeset, "_base", "database error");
+                let cs_with_err =
+                    add_constraint_error_to_changeset(changeset, "_base", "database error");
                 alloc_result(1, cs_with_err) as *mut u8
             }
         }
@@ -1496,10 +1501,10 @@ use std::collections::{HashMap, HashSet};
 
 /// Parsed relationship metadata from "kind:name:target:fk:target_table" strings.
 struct RelMeta {
-    kind: String,       // "belongs_to", "has_many", "has_one"
-    _name: String,      // association name (e.g., "posts")
-    _target: String,    // target struct name (e.g., "Post")
-    fk: String,         // foreign key column (e.g., "user_id")
+    kind: String,         // "belongs_to", "has_many", "has_one"
+    _name: String,        // association name (e.g., "posts")
+    _target: String,      // target struct name (e.g., "Post")
+    fk: String,           // foreign key column (e.g., "user_id")
     target_table: String, // target table (e.g., "posts")
 }
 
@@ -1509,13 +1514,16 @@ fn parse_relationship_meta(meta_strings: &[String]) -> HashMap<String, RelMeta> 
     for entry in meta_strings {
         let parts: Vec<&str> = entry.splitn(5, ':').collect();
         if parts.len() == 5 {
-            map.insert(parts[1].to_string(), RelMeta {
-                kind: parts[0].to_string(),
-                _name: parts[1].to_string(),
-                _target: parts[2].to_string(),
-                fk: parts[3].to_string(),
-                target_table: parts[4].to_string(),
-            });
+            map.insert(
+                parts[1].to_string(),
+                RelMeta {
+                    kind: parts[0].to_string(),
+                    _name: parts[1].to_string(),
+                    _target: parts[2].to_string(),
+                    fk: parts[3].to_string(),
+                    target_table: parts[4].to_string(),
+                },
+            );
         }
     }
     map
@@ -1569,7 +1577,12 @@ unsafe fn preload_direct(
             // query target WHERE id IN (...), group by id
             (meta.fk.clone(), "id".to_string())
         }
-        _ => return Err(err_result(&format!("Repo.preload: unknown relationship kind '{}'", meta.kind))),
+        _ => {
+            return Err(err_result(&format!(
+                "Repo.preload: unknown relationship kind '{}'",
+                meta.kind
+            )))
+        }
     };
 
     // 1. Collect unique parent values for the IN clause
@@ -1589,7 +1602,9 @@ unsafe fn preload_direct(
 
     if id_set.is_empty() {
         // No IDs to query -- attach empty associations and return
-        return Ok(attach_empty_association(rows, row_count, assoc_name, &meta.kind));
+        return Ok(attach_empty_association(
+            rows, row_count, assoc_name, &meta.kind,
+        ));
     }
 
     // 2. Build and execute the IN query
@@ -1643,7 +1658,8 @@ unsafe fn preload_direct(
             }
             "has_one" | "belongs_to" => {
                 // Single associated row or null pointer (0)
-                grouped.get(&parent_str)
+                grouped
+                    .get(&parent_str)
                     .and_then(|v| v.first())
                     .map(|&m| m as u64)
                     .unwrap_or(0)
@@ -1697,7 +1713,10 @@ unsafe fn preload_nested(
 ) -> Result<*mut u8, *mut u8> {
     let parts: Vec<&str> = assoc_path.splitn(2, '.').collect();
     if parts.len() != 2 {
-        return Err(err_result(&format!("Repo.preload: invalid nested association path '{}'", assoc_path)));
+        return Err(err_result(&format!(
+            "Repo.preload: invalid nested association path '{}'",
+            assoc_path
+        )));
     }
     let parent_assoc = parts[0];
     let child_assoc = parts[1];
@@ -1706,8 +1725,12 @@ unsafe fn preload_nested(
     let parent_key_mesh = rust_str_to_mesh(parent_assoc);
 
     // Check parent association's kind to decide how to extract intermediate rows
-    let parent_meta = rel_map.get(parent_assoc)
-        .ok_or_else(|| err_result(&format!("Repo.preload: unknown parent association '{}' in nested path", parent_assoc)))?;
+    let parent_meta = rel_map.get(parent_assoc).ok_or_else(|| {
+        err_result(&format!(
+            "Repo.preload: unknown parent association '{}' in nested path",
+            parent_assoc
+        ))
+    })?;
 
     // Collect intermediate rows and track which parent row each came from
     // and its position within the parent's association list.
@@ -1752,7 +1775,10 @@ unsafe fn preload_nested(
     let mut parent_groups: HashMap<i64, Vec<*mut u8>> = HashMap::new();
     for (idx, &(parent_idx, _pos)) in position_map.iter().enumerate() {
         let enriched_row = mesh_list_get(enriched_intermediate, idx as i64) as *mut u8;
-        parent_groups.entry(parent_idx).or_default().push(enriched_row);
+        parent_groups
+            .entry(parent_idx)
+            .or_default()
+            .push(enriched_row);
     }
 
     // Rebuild parent rows
@@ -1771,7 +1797,11 @@ unsafe fn preload_nested(
                 result = mesh_list_append(result, new_row as u64);
             } else {
                 // has_one/belongs_to: single enriched row
-                let new_row = mesh_map_put(row, assoc_key_mesh_parent as u64, enriched_children[0] as u64);
+                let new_row = mesh_map_put(
+                    row,
+                    assoc_key_mesh_parent as u64,
+                    enriched_children[0] as u64,
+                );
                 result = mesh_list_append(result, new_row as u64);
             }
         } else {
@@ -1906,9 +1936,8 @@ fn build_where_from_query_parts(
                 conditions.push(format!("{} {}", quote_ident(col), op));
             } else if op.starts_with("IN:") {
                 let count: usize = op[3..].parse().unwrap_or(0);
-                let placeholders: Vec<String> = (0..count)
-                    .map(|i| format!("${}", param_idx + i))
-                    .collect();
+                let placeholders: Vec<String> =
+                    (0..count).map(|i| format!("${}", param_idx + i)).collect();
                 conditions.push(format!(
                     "{} IN ({})",
                     quote_ident(col),
@@ -1923,9 +1952,8 @@ fn build_where_from_query_parts(
                 }
             } else if op.starts_with("NOT_IN:") {
                 let count: usize = op[7..].parse().unwrap_or(0);
-                let placeholders: Vec<String> = (0..count)
-                    .map(|i| format!("${}", param_idx + i))
-                    .collect();
+                let placeholders: Vec<String> =
+                    (0..count).map(|i| format!("${}", param_idx + i)).collect();
                 conditions.push(format!(
                     "{} NOT IN ({})",
                     quote_ident(col),
@@ -2037,11 +2065,7 @@ pub extern "C" fn mesh_repo_update_where(
 /// Delete rows matching a Query's WHERE conditions.
 /// `Repo.delete_where(pool, table, query)` -> `Result<Int, String>`
 #[no_mangle]
-pub extern "C" fn mesh_repo_delete_where(
-    pool: u64,
-    table: *mut u8,
-    query: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_repo_delete_where(pool: u64, table: *mut u8, query: *mut u8) -> *mut u8 {
     unsafe {
         let table_str = mesh_str_ref(table);
 
@@ -2100,7 +2124,9 @@ pub extern "C" fn mesh_repo_insert_or_update(
         }
 
         let returning = vec!["*".to_string()];
-        let sql = crate::db::orm::build_upsert_sql_pure(table_str, &columns, &targets, &updates, &returning);
+        let sql = crate::db::orm::build_upsert_sql_pure(
+            table_str, &columns, &targets, &updates, &returning,
+        );
 
         let sql_ptr = rust_str_to_mesh(&sql) as *const MeshString;
         let params_ptr = strings_to_mesh_list(&values);
@@ -2153,11 +2179,7 @@ pub extern "C" fn mesh_repo_delete_where_returning(
 /// Execute raw SQL and return rows.
 /// `Repo.query_raw(pool, sql, params)` -> `Result<List<Map<String,String>>, String>`
 #[no_mangle]
-pub extern "C" fn mesh_repo_query_raw(
-    pool: u64,
-    sql: *mut u8,
-    params: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_repo_query_raw(pool: u64, sql: *mut u8, params: *mut u8) -> *mut u8 {
     let sql_ptr = sql as *const MeshString;
     mesh_pool_query(pool, sql_ptr, params)
 }
@@ -2165,11 +2187,7 @@ pub extern "C" fn mesh_repo_query_raw(
 /// Execute raw SQL and return affected row count.
 /// `Repo.execute_raw(pool, sql, params)` -> `Result<Int, String>`
 #[no_mangle]
-pub extern "C" fn mesh_repo_execute_raw(
-    pool: u64,
-    sql: *mut u8,
-    params: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_repo_execute_raw(pool: u64, sql: *mut u8, params: *mut u8) -> *mut u8 {
     let sql_ptr = sql as *const MeshString;
     mesh_pool_execute(pool, sql_ptr, params)
 }
@@ -2183,7 +2201,19 @@ mod tests {
     #[test]
     fn test_select_all_from_table() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[], &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            "users",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT * FROM \"users\"");
         assert!(params.is_empty());
@@ -2194,7 +2224,17 @@ mod tests {
         let (sql, _) = build_select_sql_from_parts(
             "users",
             &["id".into(), "name".into()],
-            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT \"id\", \"name\" FROM \"users\"");
     }
@@ -2202,10 +2242,19 @@ mod tests {
     #[test]
     fn test_select_with_where() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["name =".into(), "age >".into()],
             &["Alice".into(), "21".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2217,10 +2266,19 @@ mod tests {
     #[test]
     fn test_select_with_is_null() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["deleted_at IS NULL".into(), "name =".into()],
             &["Alice".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2232,10 +2290,19 @@ mod tests {
     #[test]
     fn test_select_with_in_clause() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["status IN:3".into()],
             &["active".into(), "pending".into(), "trial".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2249,10 +2316,19 @@ mod tests {
     #[test]
     fn test_select_with_not_in() {
         let (sql, params) = build_select_sql_from_parts(
-            "issues", &[],
+            "issues",
+            &[],
             &["status NOT_IN:2".into()],
             &["archived".into(), "deleted".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2264,10 +2340,19 @@ mod tests {
     #[test]
     fn test_select_with_between() {
         let (sql, params) = build_select_sql_from_parts(
-            "events", &[],
+            "events",
+            &[],
             &["age BETWEEN".into()],
             &["18".into(), "65".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2279,10 +2364,19 @@ mod tests {
     #[test]
     fn test_select_with_or() {
         let (sql, params) = build_select_sql_from_parts(
-            "issues", &[],
+            "issues",
+            &[],
             &["OR:status,level:2".into()],
             &["active".into(), "error".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2294,15 +2388,21 @@ mod tests {
     #[test]
     fn test_select_with_ilike() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["name ILIKE".into()],
             &["%alice%".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
-        assert_eq!(
-            sql,
-            "SELECT * FROM \"users\" WHERE \"name\" ILIKE $1"
-        );
+        assert_eq!(sql, "SELECT * FROM \"users\" WHERE \"name\" ILIKE $1");
         assert_eq!(params, vec!["%alice%"]);
     }
 
@@ -2310,7 +2410,8 @@ mod tests {
     fn test_mixed_where_clauses() {
         // Combines: WHERE + NOT IN + BETWEEN + OR to verify $N sequencing
         let (sql, params) = build_select_sql_from_parts(
-            "events", &[],
+            "events",
+            &[],
             &[
                 "project_id =".into(),
                 "status NOT_IN:2".into(),
@@ -2319,25 +2420,49 @@ mod tests {
             ],
             &[
                 "abc".into(),
-                "archived".into(), "deleted".into(),
-                "18".into(), "65".into(),
-                "active".into(), "high".into(),
+                "archived".into(),
+                "deleted".into(),
+                "18".into(),
+                "65".into(),
+                "active".into(),
+                "high".into(),
             ],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
             "SELECT * FROM \"events\" WHERE \"project_id\" = $1 AND \"status\" NOT IN ($2, $3) AND \"age\" BETWEEN $4 AND $5 AND (\"status\" = $6 OR \"priority\" = $7)"
         );
-        assert_eq!(params, vec!["abc", "archived", "deleted", "18", "65", "active", "high"]);
+        assert_eq!(
+            params,
+            vec!["abc", "archived", "deleted", "18", "65", "active", "high"]
+        );
     }
 
     #[test]
     fn test_select_with_join() {
         let (sql, _) = build_select_sql_from_parts(
-            "users", &[], &[], &[], &[], -1, -1,
+            "users",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
             &["INNER:posts:posts.user_id = users.id".into()],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2348,11 +2473,19 @@ mod tests {
     #[test]
     fn test_select_with_group_by_having() {
         let (sql, params) = build_select_sql_from_parts(
-            "orders", &[], &[], &[], &[], -1, -1, &[],
+            "orders",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
             &["category".into()],
             &["count(*) >".into()],
             &["5".into()],
-            &[], &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2364,9 +2497,19 @@ mod tests {
     #[test]
     fn test_select_with_order_limit_offset() {
         let (sql, _) = build_select_sql_from_parts(
-            "users", &[], &[], &[],
+            "users",
+            &[],
+            &[],
+            &[],
             &["name ASC".into(), "age DESC".into()],
-            10, 20, &[], &[], &[], &[], &[], &[],
+            10,
+            20,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2382,9 +2525,14 @@ mod tests {
             &["active =".into()],
             &["true".into()],
             &["name ASC".into()],
-            10, 0,
+            10,
+            0,
             &["INNER:posts:posts.user_id = users.id".into()],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2396,14 +2544,21 @@ mod tests {
     #[test]
     fn test_select_with_fragment() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[], &[], &[], &[], -1, -1, &[], &[], &[], &[],
+            "users",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
             &["AND custom_fn(?)".into()],
             &["test_val".into()],
         );
-        assert_eq!(
-            sql,
-            "SELECT * FROM \"users\" AND custom_fn($1)"
-        );
+        assert_eq!(sql, "SELECT * FROM \"users\" AND custom_fn($1)");
         assert_eq!(params, vec!["test_val"]);
     }
 
@@ -2413,10 +2568,17 @@ mod tests {
     fn test_fragment_dollar_renumbering() {
         // Fragment with $1 after 2 WHERE params should renumber $1 -> $3
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["email =".into(), "active =".into()],
             &["alice@example.com".into(), "true".into()],
-            &[], -1, -1, &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
             &["AND password_hash = crypt($1, password_hash)".into()],
             &["secret".into()],
         );
@@ -2431,10 +2593,19 @@ mod tests {
     fn test_where_raw_dollar_renumbering() {
         // where_raw with $1 after 1 WHERE param should renumber $1 -> $2
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["active =".into(), "RAW:email ILIKE $1".into()],
             &["true".into(), "%@example.com".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2446,9 +2617,19 @@ mod tests {
     #[test]
     fn test_order_by_raw() {
         let (sql, params) = build_select_sql_from_parts(
-            "events", &[], &[], &[],
+            "events",
+            &[],
+            &[],
+            &[],
             &["RAW:random()".into()],
-            -1, -1, &[], &[], &[], &[], &[], &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT * FROM \"events\" ORDER BY random()");
         assert!(params.is_empty());
@@ -2457,9 +2638,19 @@ mod tests {
     #[test]
     fn test_group_by_raw() {
         let (sql, params) = build_select_sql_from_parts(
-            "events", &[], &[], &[], &[], -1, -1, &[],
+            "events",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
             &["RAW:date_trunc('hour', received_at)".into()],
-            &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2472,7 +2663,17 @@ mod tests {
     fn test_fragment_with_pg_crypt() {
         // crypt($1, gen_salt('bf')) with offset=1 -> crypt($1, gen_salt('bf'))
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[], &[], &[], &[], -1, -1, &[], &[], &[], &[],
+            "users",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
             &["AND password_hash = crypt($1, gen_salt('bf'))".into()],
             &["secret123".into()],
         );
@@ -2487,10 +2688,17 @@ mod tests {
     fn test_fragment_with_jsonb() {
         // metadata @> $1::jsonb after 1 WHERE param
         let (sql, params) = build_select_sql_from_parts(
-            "events", &[],
+            "events",
+            &[],
             &["project_id =".into()],
             &["abc".into()],
-            &[], -1, -1, &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
             &["AND metadata @> $1::jsonb".into()],
             &[r#"{"env":"production"}"#.into()],
         );
@@ -2505,16 +2713,20 @@ mod tests {
     fn test_mixed_fragments_and_where() {
         // Full query: WHERE + where_raw + fragment with correct numbering
         let (sql, params) = build_select_sql_from_parts(
-            "events", &[],
+            "events",
+            &[],
             &[
                 "project_id =".into(),
                 "RAW:received_at > now() - interval '24 hours'".into(),
             ],
             &["abc".into()],
             &["RAW:date_trunc('hour', received_at)".into()],
-            -1, -1, &[],
+            -1,
+            -1,
+            &[],
             &["RAW:date_trunc('hour', received_at)".into()],
-            &[], &[],
+            &[],
+            &[],
             &["AND tags @> $1::jsonb".into()],
             &[r#"{"env":"prod"}"#.into()],
         );
@@ -2531,23 +2743,21 @@ mod tests {
             "users",
             &["active =".into()],
             &["true".into()],
-            &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
-        assert_eq!(
-            sql,
-            "SELECT COUNT(*) FROM \"users\" WHERE \"active\" = $1"
-        );
+        assert_eq!(sql, "SELECT COUNT(*) FROM \"users\" WHERE \"active\" = $1");
         assert_eq!(params, vec!["true"]);
     }
 
     #[test]
     fn test_exists_sql() {
-        let (sql, params) = build_exists_sql_from_parts(
-            "users",
-            &["name =".into()],
-            &["Alice".into()],
-            &[],
-        );
+        let (sql, params) =
+            build_exists_sql_from_parts("users", &["name =".into()], &["Alice".into()], &[]);
         assert_eq!(
             sql,
             "SELECT EXISTS(SELECT 1 FROM \"users\" WHERE \"name\" = $1 LIMIT 1)"
@@ -2584,19 +2794,28 @@ mod tests {
     #[test]
     fn test_map_constraint_unique_violation() {
         let result = map_constraint_error("23505", "users_email_key", "users", "");
-        assert_eq!(result, Some(("email".to_string(), "has already been taken".to_string())));
+        assert_eq!(
+            result,
+            Some(("email".to_string(), "has already been taken".to_string()))
+        );
     }
 
     #[test]
     fn test_map_constraint_foreign_key_violation() {
         let result = map_constraint_error("23503", "posts_user_id_fkey", "posts", "");
-        assert_eq!(result, Some(("user_id".to_string(), "does not exist".to_string())));
+        assert_eq!(
+            result,
+            Some(("user_id".to_string(), "does not exist".to_string()))
+        );
     }
 
     #[test]
     fn test_map_constraint_not_null_violation() {
         let result = map_constraint_error("23502", "", "", "name");
-        assert_eq!(result, Some(("name".to_string(), "can't be blank".to_string())));
+        assert_eq!(
+            result,
+            Some(("name".to_string(), "can't be blank".to_string()))
+        );
     }
 
     #[test]
@@ -2632,7 +2851,10 @@ mod tests {
     fn test_build_preload_sql_basic() {
         let ids = vec!["1".to_string(), "2".to_string(), "3".to_string()];
         let (sql, params) = build_preload_sql("posts", "user_id", &ids);
-        assert_eq!(sql, "SELECT * FROM \"posts\" WHERE \"user_id\" IN ($1, $2, $3)");
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"posts\" WHERE \"user_id\" IN ($1, $2, $3)"
+        );
         assert_eq!(params, vec!["1", "2", "3"]);
     }
 
@@ -2659,9 +2881,22 @@ mod tests {
         let (sql, params) = build_select_sql_from_parts(
             "users",
             &["RAW:count(*)::text AS count".into(), "level".into()],
-            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
-        assert_eq!(sql, "SELECT count(*)::text AS count, \"level\" FROM \"users\"");
+        assert_eq!(
+            sql,
+            "SELECT count(*)::text AS count, \"level\" FROM \"users\""
+        );
         assert!(params.is_empty());
     }
 
@@ -2670,7 +2905,17 @@ mod tests {
         let (sql, _) = build_select_sql_from_parts(
             "sessions",
             &["RAW:count(*)".into(), "RAW:max(created_at)".into()],
-            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT count(*), max(created_at) FROM \"sessions\"");
     }
@@ -2678,10 +2923,19 @@ mod tests {
     #[test]
     fn test_where_raw_no_params() {
         let (sql, params) = build_select_sql_from_parts(
-            "sessions", &[],
+            "sessions",
+            &[],
             &["RAW:expires_at > now()".into()],
             &[],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT * FROM \"sessions\" WHERE expires_at > now()");
         assert!(params.is_empty());
@@ -2690,10 +2944,19 @@ mod tests {
     #[test]
     fn test_where_raw_with_params() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
+            "users",
+            &[],
             &["RAW:status IN (?, ?)".into()],
             &["active".into(), "pending".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT * FROM \"users\" WHERE status IN ($1, $2)");
         assert_eq!(params, vec!["active", "pending"]);
@@ -2702,10 +2965,23 @@ mod tests {
     #[test]
     fn test_where_raw_mixed_with_normal() {
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
-            &["name =".into(), "RAW:expires_at > now()".into(), "age >".into()],
+            "users",
+            &[],
+            &[
+                "name =".into(),
+                "RAW:expires_at > now()".into(),
+                "age >".into(),
+            ],
             &["Alice".into(), "21".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2718,10 +2994,28 @@ mod tests {
     fn test_where_raw_with_params_mixed() {
         // Normal where (1 param) + RAW with 2 params + normal where (1 param)
         let (sql, params) = build_select_sql_from_parts(
-            "users", &[],
-            &["org_id =".into(), "RAW:role IN (?, ?)".into(), "active =".into()],
-            &["org1".into(), "admin".into(), "editor".into(), "true".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            "users",
+            &[],
+            &[
+                "org_id =".into(),
+                "RAW:role IN (?, ?)".into(),
+                "active =".into(),
+            ],
+            &[
+                "org1".into(),
+                "admin".into(),
+                "editor".into(),
+                "true".into(),
+            ],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2736,9 +3030,17 @@ mod tests {
             "sessions",
             &["RAW:expires_at > now()".into()],
             &[],
-            &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
-        assert_eq!(sql, "SELECT COUNT(*) FROM \"sessions\" WHERE expires_at > now()");
+        assert_eq!(
+            sql,
+            "SELECT COUNT(*) FROM \"sessions\" WHERE expires_at > now()"
+        );
         assert!(params.is_empty());
     }
 
@@ -2761,11 +3063,7 @@ mod tests {
 
     #[test]
     fn test_where_builder_basic_equality() {
-        let (sql, params, next) = build_where_from_query_parts(
-            &["id =".into()],
-            &["42".into()],
-            1,
-        );
+        let (sql, params, next) = build_where_from_query_parts(&["id =".into()], &["42".into()], 1);
         assert_eq!(sql, "\"id\" = $1");
         assert_eq!(params, vec!["42"]);
         assert_eq!(next, 2);
@@ -2821,11 +3119,8 @@ mod tests {
 
     #[test]
     fn test_where_builder_default_eq() {
-        let (sql, params, next) = build_where_from_query_parts(
-            &["name".into()],
-            &["Alice".into()],
-            1,
-        );
+        let (sql, params, next) =
+            build_where_from_query_parts(&["name".into()], &["Alice".into()], 1);
         assert_eq!(sql, "\"name\" = $1");
         assert_eq!(params, vec!["Alice"]);
         assert_eq!(next, 2);
@@ -2836,9 +3131,19 @@ mod tests {
     #[test]
     fn test_select_with_left_join() {
         let (sql, _) = build_select_sql_from_parts(
-            "users", &[], &[], &[], &[], -1, -1,
+            "users",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
             &["LEFT:profiles:profiles.user_id = users.id".into()],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2849,12 +3154,22 @@ mod tests {
     #[test]
     fn test_select_with_multi_join() {
         let (sql, _) = build_select_sql_from_parts(
-            "issues", &[], &[], &[], &[], -1, -1,
+            "issues",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
             &[
                 "INNER:projects:projects.id = issues.project_id".into(),
                 "INNER:organizations:organizations.id = projects.org_id".into(),
             ],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2865,9 +3180,19 @@ mod tests {
     #[test]
     fn test_select_with_alias_join() {
         let (sql, _) = build_select_sql_from_parts(
-            "issues", &[], &[], &[], &[], -1, -1,
+            "issues",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
             &["ALIAS:INNER:projects:p:p.id = issues.project_id".into()],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2878,12 +3203,22 @@ mod tests {
     #[test]
     fn test_select_with_multi_alias_join() {
         let (sql, _) = build_select_sql_from_parts(
-            "alerts", &[], &[], &[], &[], -1, -1,
+            "alerts",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
             &[
                 "ALIAS:INNER:alert_rules:r:r.id = alerts.rule_id".into(),
                 "ALIAS:INNER:projects:p:p.id = alerts.project_id".into(),
             ],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2894,9 +3229,19 @@ mod tests {
     #[test]
     fn test_select_with_left_alias_join() {
         let (sql, _) = build_select_sql_from_parts(
-            "users", &[], &[], &[], &[], -1, -1,
+            "users",
+            &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
             &["ALIAS:LEFT:profiles:p:p.user_id = users.id".into()],
-            &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -2911,7 +3256,17 @@ mod tests {
         let (sql, params) = build_select_sql_from_parts(
             "issues",
             &["RAW:count(*)".into()],
-            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT count(*) FROM \"issues\"");
         assert!(params.is_empty());
@@ -2922,7 +3277,17 @@ mod tests {
         let (sql, params) = build_select_sql_from_parts(
             "orders",
             &["RAW:sum(\"amount\")".into()],
-            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(sql, "SELECT sum(\"amount\") FROM \"orders\"");
         assert!(params.is_empty());
@@ -2933,11 +3298,22 @@ mod tests {
         let (sql, params) = build_select_sql_from_parts(
             "products",
             &["RAW:avg(\"price\")".into()],
-            &[], &[], &[], -1, -1, &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
             &["category".into()],
-            &[], &[], &[], &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
-        assert_eq!(sql, "SELECT avg(\"price\") FROM \"products\" GROUP BY \"category\"");
+        assert_eq!(
+            sql,
+            "SELECT avg(\"price\") FROM \"products\" GROUP BY \"category\""
+        );
         assert!(params.is_empty());
     }
 
@@ -2945,10 +3321,26 @@ mod tests {
     fn test_aggregate_select_min_max() {
         let (sql, params) = build_select_sql_from_parts(
             "events",
-            &["RAW:min(\"created_at\")".into(), "RAW:max(\"created_at\")".into()],
-            &[], &[], &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[
+                "RAW:min(\"created_at\")".into(),
+                "RAW:max(\"created_at\")".into(),
+            ],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
-        assert_eq!(sql, "SELECT min(\"created_at\"), max(\"created_at\") FROM \"events\"");
+        assert_eq!(
+            sql,
+            "SELECT min(\"created_at\"), max(\"created_at\") FROM \"events\""
+        );
         assert!(params.is_empty());
     }
 
@@ -2957,11 +3349,17 @@ mod tests {
         let (sql, params) = build_select_sql_from_parts(
             "issues",
             &["RAW:count(*)".into()],
-            &[], &[], &[], -1, -1, &[],
+            &[],
+            &[],
+            &[],
+            -1,
+            -1,
+            &[],
             &["project_id".into()],
             &["count(*) >".into()],
             &["5".into()],
-            &[], &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,
@@ -3005,13 +3403,23 @@ mod tests {
     #[test]
     fn test_subquery_where_clause() {
         let (sql, params) = build_select_sql_from_parts(
-            "issues", &[],
+            "issues",
+            &[],
             &[
                 "status =".into(),
-                "RAW:\"project_id\" IN (SELECT \"id\" FROM \"projects\" WHERE \"org_id\" = ?)".into(),
+                "RAW:\"project_id\" IN (SELECT \"id\" FROM \"projects\" WHERE \"org_id\" = ?)"
+                    .into(),
             ],
             &["open".into(), "org-123".into()],
-            &[], -1, -1, &[], &[], &[], &[], &[], &[],
+            &[],
+            -1,
+            -1,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
         );
         assert_eq!(
             sql,

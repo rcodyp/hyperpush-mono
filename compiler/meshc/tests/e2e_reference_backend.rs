@@ -1,9 +1,37 @@
+use std::any::Any;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read as _, Write as _};
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use mesh_rt::db::pg::{native_pg_close, native_pg_connect, native_pg_execute, native_pg_query};
+use serde_json::Value;
+
+const REFERENCE_BACKEND_MIGRATION_VERSION: i64 = 20260323010000;
+const REFERENCE_BACKEND_MIGRATION_NAME: &str = "create_jobs";
+
+type DbRow = HashMap<String, String>;
+
+#[derive(Clone, Copy, Debug)]
+struct ReferenceBackendConfig {
+    port: u16,
+    job_poll_ms: u64,
+}
+
+struct SpawnedReferenceBackend {
+    child: Child,
+    stdout_path: PathBuf,
+    stderr_path: PathBuf,
+}
+
+struct HttpResponse {
+    status_code: u16,
+    body: String,
+    raw: String,
+}
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -60,6 +88,21 @@ fn reference_backend_binary() -> PathBuf {
         .join("reference-backend")
 }
 
+fn pick_unused_port() -> u16 {
+    TcpListener::bind("127.0.0.1:0")
+        .expect("failed to bind ephemeral port")
+        .local_addr()
+        .expect("failed to read ephemeral port")
+        .port()
+}
+
+fn reference_backend_test_config(job_poll_ms: u64) -> ReferenceBackendConfig {
+    ReferenceBackendConfig {
+        port: pick_unused_port(),
+        job_poll_ms,
+    }
+}
+
 fn run_reference_backend_migration(database_url: &str, command: &str) -> Output {
     let root = repo_root();
     let meshc = find_meshc();
@@ -78,19 +121,27 @@ fn run_reference_backend_migration(database_url: &str, command: &str) -> Output 
 
 fn assert_reference_backend_migration_succeeds(database_url: &str, command: &str) {
     let output = run_reference_backend_migration(database_url, command);
-    assert!(
-        output.status.success(),
-        "meshc migrate reference-backend {} failed:\nstdout: {}\nstderr: {}",
-        command,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    assert_command_success(
+        &output,
+        &format!("meshc migrate reference-backend {command}"),
     );
 }
 
-struct SpawnedReferenceBackend {
-    child: Child,
-    stdout_path: PathBuf,
-    stderr_path: PathBuf,
+fn command_output_text(output: &Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}
+
+fn assert_command_success(output: &Output, description: &str) {
+    assert!(
+        output.status.success(),
+        "{description} failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn reference_backend_log_paths() -> (PathBuf, PathBuf) {
@@ -104,7 +155,10 @@ fn reference_backend_log_paths() -> (PathBuf, PathBuf) {
     (stdout_path, stderr_path)
 }
 
-fn spawn_reference_backend(database_url: &str) -> SpawnedReferenceBackend {
+fn spawn_reference_backend(
+    database_url: &str,
+    config: ReferenceBackendConfig,
+) -> SpawnedReferenceBackend {
     let binary = reference_backend_binary();
     let (stdout_path, stderr_path) = reference_backend_log_paths();
     let stdout_file = File::create(&stdout_path)
@@ -115,8 +169,8 @@ fn spawn_reference_backend(database_url: &str) -> SpawnedReferenceBackend {
     let child = Command::new(&binary)
         .current_dir(repo_root())
         .env("DATABASE_URL", database_url)
-        .env("PORT", "18080")
-        .env("JOB_POLL_MS", "1000")
+        .env("PORT", config.port.to_string())
+        .env("JOB_POLL_MS", config.job_poll_ms.to_string())
         .stdout(Stdio::from(stdout_file))
         .stderr(Stdio::from(stderr_file))
         .spawn()
@@ -129,14 +183,19 @@ fn spawn_reference_backend(database_url: &str) -> SpawnedReferenceBackend {
     }
 }
 
-fn send_http_request(method: &str, path: &str, body: Option<&str>) -> std::io::Result<String> {
-    let mut stream = TcpStream::connect("127.0.0.1:18080")?;
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+fn send_http_request(
+    config: &ReferenceBackendConfig,
+    method: &str,
+    path: &str,
+    body: Option<&str>,
+) -> std::io::Result<HttpResponse> {
+    let mut stream = TcpStream::connect(("127.0.0.1", config.port))?;
+    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
 
     let request = match body {
         Some(body) => format!(
             "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            body.len(),
+            body.as_bytes().len(),
             body
         ),
         None => format!(
@@ -145,57 +204,115 @@ fn send_http_request(method: &str, path: &str, body: Option<&str>) -> std::io::R
     };
 
     stream.write_all(request.as_bytes())?;
-    let mut response = String::new();
-    stream.read_to_string(&mut response)?;
-    Ok(response)
+    let mut raw = String::new();
+    stream.read_to_string(&mut raw)?;
+
+    let mut parts = raw.splitn(2, "\r\n\r\n");
+    let headers = parts.next().unwrap_or("");
+    let body = parts.next().unwrap_or("").to_string();
+    let status_code = headers
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|code| code.parse::<u16>().ok())
+        .unwrap_or(0);
+
+    Ok(HttpResponse {
+        status_code,
+        body,
+        raw,
+    })
 }
 
-fn wait_for_reference_backend() -> String {
-    for attempt in 0..20 {
+fn assert_json_response(response: HttpResponse, expected_status: u16, description: &str) -> Value {
+    assert!(
+        response.status_code == expected_status,
+        "expected HTTP {expected_status} for {description}, got raw response:\n{}",
+        response.raw
+    );
+    serde_json::from_str(&response.body).unwrap_or_else(|e| {
+        panic!(
+            "expected JSON body for {description}, got parse error {e}: {}",
+            response.body
+        )
+    })
+}
+
+fn get_json(config: &ReferenceBackendConfig, path: &str, expected_status: u16) -> Value {
+    let response = send_http_request(config, "GET", path, None)
+        .unwrap_or_else(|e| panic!("GET {path} failed on {}: {}", config.port, e));
+    assert_json_response(response, expected_status, path)
+}
+
+fn post_json(
+    config: &ReferenceBackendConfig,
+    path: &str,
+    body: &str,
+    expected_status: u16,
+) -> Value {
+    let response = send_http_request(config, "POST", path, Some(body))
+        .unwrap_or_else(|e| panic!("POST {path} failed on {}: {}", config.port, e));
+    assert_json_response(response, expected_status, path)
+}
+
+fn wait_for_reference_backend(config: &ReferenceBackendConfig) -> Value {
+    for attempt in 0..40 {
         if attempt > 0 {
-            std::thread::sleep(std::time::Duration::from_millis(250));
+            std::thread::sleep(Duration::from_millis(250));
         }
 
-        match send_http_request("GET", "/health", None) {
-            Ok(response) => return response,
-            Err(_) => continue,
+        match send_http_request(config, "GET", "/health", None) {
+            Ok(response) if response.status_code == 200 => {
+                return assert_json_response(response, 200, "/health")
+            }
+            Ok(_) | Err(_) => continue,
         }
     }
 
-    panic!("reference-backend never became reachable on :18080");
+    panic!(
+        "reference-backend never became reachable on :{}",
+        config.port
+    );
 }
 
-fn stop_reference_backend(mut spawned: SpawnedReferenceBackend) -> (String, String, String) {
+fn stop_reference_backend(spawned: SpawnedReferenceBackend) -> (String, String, String) {
+    let SpawnedReferenceBackend {
+        mut child,
+        stdout_path,
+        stderr_path,
+    } = spawned;
+
     let _ = Command::new("kill")
-        .args(["-TERM", &spawned.child.id().to_string()])
+        .args(["-TERM", &child.id().to_string()])
         .status();
-    std::thread::sleep(std::time::Duration::from_millis(250));
-    if spawned
-        .child
+    std::thread::sleep(Duration::from_millis(250));
+    if child
         .try_wait()
         .expect("failed to probe reference-backend exit status")
         .is_none()
     {
-        let _ = spawned.child.kill();
+        let _ = child.kill();
     }
-    spawned
-        .child
+    child
         .wait()
         .expect("failed to collect reference-backend exit status");
 
-    let stdout = fs::read_to_string(&spawned.stdout_path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {}", spawned.stdout_path.display(), e));
-    let stderr = fs::read_to_string(&spawned.stderr_path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {}", spawned.stderr_path.display(), e));
-    let _ = fs::remove_file(&spawned.stdout_path);
-    let _ = fs::remove_file(&spawned.stderr_path);
+    let stdout = fs::read_to_string(&stdout_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {}", stdout_path.display(), e));
+    let stderr = fs::read_to_string(&stderr_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {}", stderr_path.display(), e));
+    let _ = fs::remove_file(&stdout_path);
+    let _ = fs::remove_file(&stderr_path);
     let combined = format!("{stdout}{stderr}");
     (stdout, stderr, combined)
 }
 
-fn assert_startup_logs(combined: &str, database_url: &str) {
+fn assert_startup_logs(combined: &str, config: &ReferenceBackendConfig, database_url: &str) {
     assert!(
-        combined.contains("[reference-backend] Config loaded port=18080 job_poll_ms=1000"),
+        combined.contains(&format!(
+            "[reference-backend] Config loaded port={} job_poll_ms={}",
+            config.port, config.job_poll_ms
+        )),
         "expected config-loaded log line, got:\n{}",
         combined
     );
@@ -210,7 +327,15 @@ fn assert_startup_logs(combined: &str, database_url: &str) {
         combined
     );
     assert!(
-        combined.contains("[reference-backend] HTTP server starting on :18080"),
+        combined.contains("[reference-backend] Job worker ready"),
+        "expected worker-ready log line, got:\n{}",
+        combined
+    );
+    assert!(
+        combined.contains(&format!(
+            "[reference-backend] HTTP server starting on :{}",
+            config.port
+        )),
         "expected HTTP-bind log line, got:\n{}",
         combined
     );
@@ -221,47 +346,60 @@ fn assert_startup_logs(combined: &str, database_url: &str) {
     );
 }
 
+fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "non-string panic payload".to_string()
+    }
+}
+
 fn assert_reference_backend_runtime_starts(database_url: &str) {
     assert_reference_backend_build_succeeds();
 
-    let child = spawn_reference_backend(database_url);
-    let response = wait_for_reference_backend();
-    let (stdout, stderr, combined) = stop_reference_backend(child);
+    let config = reference_backend_test_config(1000);
+    let spawned = spawn_reference_backend(database_url, config);
+    let run_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let health = wait_for_reference_backend(&config);
+        assert_eq!(health["status"].as_str(), Some("ok"));
+        assert_eq!(health["worker"]["poll_ms"].as_i64(), Some(1000));
+    }));
+    let (stdout, stderr, combined) = stop_reference_backend(spawned);
 
-    assert!(
-        response.contains("200"),
-        "expected HTTP 200 from /health, got: {}\nstdout: {}\nstderr: {}",
-        response,
-        stdout,
-        stderr
-    );
-    assert!(
-        response.contains(r#""status":"ok""#),
-        "expected JSON health payload, got: {}\nstdout: {}\nstderr: {}",
-        response,
-        stdout,
-        stderr
-    );
-    assert_startup_logs(&combined, database_url);
+    match run_result {
+        Ok(()) => assert_startup_logs(&combined, &config, database_url),
+        Err(payload) => panic!(
+            "reference-backend runtime-starts assertions failed: {}\nstdout: {}\nstderr: {}",
+            panic_payload_to_string(payload),
+            stdout,
+            stderr
+        ),
+    }
 }
 
-fn run_reference_backend_smoke_script(database_url: &str) -> Output {
+fn run_reference_backend_smoke_script(
+    database_url: &str,
+    config: &ReferenceBackendConfig,
+) -> Output {
     let root = repo_root();
     Command::new("bash")
         .current_dir(&root)
         .arg("reference-backend/scripts/smoke.sh")
         .env("DATABASE_URL", database_url)
-        .env("PORT", "18080")
-        .env("JOB_POLL_MS", "500")
+        .env("PORT", config.port.to_string())
+        .env("JOB_POLL_MS", config.job_poll_ms.to_string())
         .output()
         .expect("failed to invoke reference-backend/scripts/smoke.sh")
 }
 
 fn assert_reference_backend_postgres_smoke(database_url: &str) {
+    let config = reference_backend_test_config(500);
     assert_reference_backend_migration_succeeds(database_url, "status");
     assert_reference_backend_migration_succeeds(database_url, "up");
 
-    let output = run_reference_backend_smoke_script(database_url);
+    let output = run_reference_backend_smoke_script(database_url, &config);
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     let combined = format!("{stdout}{stderr}");
@@ -278,7 +416,10 @@ fn assert_reference_backend_postgres_smoke(database_url: &str) {
         combined
     );
     assert!(
-        combined.contains("[smoke] starting reference-backend on :18080"),
+        combined.contains(&format!(
+            "[smoke] starting reference-backend on :{}",
+            config.port
+        )),
         "expected smoke start step, got:\n{}",
         combined
     );
@@ -298,7 +439,7 @@ fn assert_reference_backend_postgres_smoke(database_url: &str) {
         combined
     );
     assert!(
-        combined.contains(r#""status":"processed""#),
+        combined.contains(r#"\"status\":\"processed\""#),
         "expected processed job payload in smoke output, got:\n{}",
         combined
     );
@@ -306,6 +447,75 @@ fn assert_reference_backend_postgres_smoke(database_url: &str) {
         !combined.contains(database_url),
         "smoke output must not echo DATABASE_URL\nlogs:\n{}",
         combined
+    );
+}
+
+fn query_database_rows(database_url: &str, sql: &str, params: &[&str]) -> Vec<DbRow> {
+    let mut conn = native_pg_connect(database_url)
+        .unwrap_or_else(|e| panic!("failed to connect to Postgres for query: {e}"));
+    let result = native_pg_query(&mut conn, sql, params);
+    native_pg_close(conn);
+    let rows = result.unwrap_or_else(|e| panic!("query failed: {e}\nsql: {sql}"));
+    rows.into_iter()
+        .map(|row| row.into_iter().collect())
+        .collect()
+}
+
+fn query_single_row(database_url: &str, sql: &str, params: &[&str]) -> DbRow {
+    let rows = query_database_rows(database_url, sql, params);
+    assert_eq!(rows.len(), 1, "expected exactly one row for SQL: {sql}");
+    rows.into_iter().next().unwrap()
+}
+
+fn execute_database_sql(database_url: &str, sql: &str, params: &[&str]) -> i64 {
+    let mut conn = native_pg_connect(database_url)
+        .unwrap_or_else(|e| panic!("failed to connect to Postgres for execute: {e}"));
+    let result = native_pg_execute(&mut conn, sql, params);
+    native_pg_close(conn);
+    result.unwrap_or_else(|e| panic!("execute failed: {e}\nsql: {sql}"))
+}
+
+fn reset_reference_backend_database(database_url: &str) {
+    let _ = execute_database_sql(database_url, "DROP TABLE IF EXISTS jobs", &[]);
+    let _ = execute_database_sql(database_url, "DROP TABLE IF EXISTS _mesh_migrations", &[]);
+}
+
+fn wait_for_processed_job_and_health(
+    config: &ReferenceBackendConfig,
+    job_id: &str,
+) -> (Value, Value) {
+    let mut last_job = Value::Null;
+    let mut last_health = Value::Null;
+
+    for attempt in 0..120 {
+        if attempt > 0 {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+
+        let job = get_json(config, &format!("/jobs/{job_id}"), 200);
+        let health = get_json(config, "/health", 200);
+
+        let job_status = job["status"].as_str().unwrap_or("");
+        let processed_at = job["processed_at"].as_str().unwrap_or("");
+        let health_last_job_id = health["worker"]["last_job_id"].as_str().unwrap_or("");
+        let health_processed_jobs = health["worker"]["processed_jobs"].as_i64().unwrap_or(-1);
+        let health_failed_jobs = health["worker"]["failed_jobs"].as_i64().unwrap_or(-1);
+
+        if job_status == "processed"
+            && !processed_at.is_empty()
+            && health_last_job_id == job_id
+            && health_processed_jobs == 1
+            && health_failed_jobs == 0
+        {
+            return (job, health);
+        }
+
+        last_job = job;
+        last_health = health;
+    }
+
+    panic!(
+        "job {job_id} never reached processed health-aligned state; last_job={last_job}; last_health={last_health}"
     );
 }
 
@@ -327,6 +537,201 @@ fn e2e_reference_backend_runtime_starts() {
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set for e2e_reference_backend_runtime_starts");
     assert_reference_backend_runtime_starts(&database_url);
+}
+
+#[test]
+#[ignore]
+fn e2e_reference_backend_migration_status_and_apply() {
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set for e2e_reference_backend_migration_status_and_apply");
+
+    reset_reference_backend_database(&database_url);
+    assert_reference_backend_build_succeeds();
+
+    let status_before = run_reference_backend_migration(&database_url, "status");
+    assert_command_success(
+        &status_before,
+        "meshc migrate reference-backend status (before up)",
+    );
+    let status_before_text = command_output_text(&status_before);
+    assert!(
+        status_before_text.contains("Migration Status:"),
+        "expected status banner, got:\n{}",
+        status_before_text
+    );
+    assert!(
+        status_before_text.contains(&format!(
+            "[ ] {}_{}",
+            REFERENCE_BACKEND_MIGRATION_VERSION, REFERENCE_BACKEND_MIGRATION_NAME
+        )),
+        "expected pending migration before apply, got:\n{}",
+        status_before_text
+    );
+    assert!(
+        status_before_text.contains("0 applied, 1 pending"),
+        "expected 0 applied, 1 pending before apply, got:\n{}",
+        status_before_text
+    );
+
+    let rows_before = query_database_rows(
+        &database_url,
+        "SELECT version::text AS version, name FROM _mesh_migrations ORDER BY version",
+        &[],
+    );
+    assert!(
+        rows_before.is_empty(),
+        "expected no applied migrations before up, got: {:?}",
+        rows_before
+    );
+
+    let up_output = run_reference_backend_migration(&database_url, "up");
+    assert_command_success(&up_output, "meshc migrate reference-backend up");
+    let up_text = command_output_text(&up_output);
+    assert!(
+        up_text.contains(&format!(
+            "Applying: {}_{}",
+            REFERENCE_BACKEND_MIGRATION_VERSION, REFERENCE_BACKEND_MIGRATION_NAME
+        )),
+        "expected migration apply log, got:\n{}",
+        up_text
+    );
+    assert!(
+        up_text.contains("Applied 1 migration(s)"),
+        "expected applied count after up, got:\n{}",
+        up_text
+    );
+
+    let status_after = run_reference_backend_migration(&database_url, "status");
+    assert_command_success(
+        &status_after,
+        "meshc migrate reference-backend status (after up)",
+    );
+    let status_after_text = command_output_text(&status_after);
+    assert!(
+        status_after_text.contains(&format!(
+            "[x] {}_{}",
+            REFERENCE_BACKEND_MIGRATION_VERSION, REFERENCE_BACKEND_MIGRATION_NAME
+        )),
+        "expected applied migration after up, got:\n{}",
+        status_after_text
+    );
+    assert!(
+        status_after_text.contains("1 applied, 0 pending"),
+        "expected 1 applied, 0 pending after apply, got:\n{}",
+        status_after_text
+    );
+
+    let rows_after = query_database_rows(
+        &database_url,
+        "SELECT version::text AS version, name FROM _mesh_migrations ORDER BY version",
+        &[],
+    );
+    assert_eq!(rows_after.len(), 1, "expected one applied migration row");
+    let applied = &rows_after[0];
+    assert_eq!(
+        applied.get("version").map(String::as_str),
+        Some("20260323010000")
+    );
+    assert_eq!(
+        applied.get("name").map(String::as_str),
+        Some(REFERENCE_BACKEND_MIGRATION_NAME)
+    );
+}
+
+#[test]
+#[ignore]
+fn e2e_reference_backend_job_flow_updates_health_and_db() {
+    let database_url = std::env::var("DATABASE_URL").expect(
+        "DATABASE_URL must be set for e2e_reference_backend_job_flow_updates_health_and_db",
+    );
+
+    reset_reference_backend_database(&database_url);
+    assert_reference_backend_build_succeeds();
+    assert_reference_backend_migration_succeeds(&database_url, "up");
+
+    let config = reference_backend_test_config(100);
+    let spawned = spawn_reference_backend(&database_url, config);
+    let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let startup_health = wait_for_reference_backend(&config);
+        assert_eq!(startup_health["status"].as_str(), Some("ok"));
+        assert_eq!(startup_health["worker"]["poll_ms"].as_i64(), Some(100));
+        assert_eq!(startup_health["worker"]["processed_jobs"].as_i64(), Some(0));
+        assert_eq!(startup_health["worker"]["failed_jobs"].as_i64(), Some(0));
+
+        let payload_body = r#"{"kind":"demo","attempt":1,"source":"rust-harness"}"#;
+        let payload_json: Value =
+            serde_json::from_str(payload_body).expect("payload must be valid JSON");
+        let created_job = post_json(&config, "/jobs", payload_body, 201);
+
+        assert_eq!(created_job["status"].as_str(), Some("pending"));
+        assert_eq!(created_job["attempts"].as_i64(), Some(0));
+        assert!(created_job["processed_at"].is_null());
+        assert!(created_job["last_error"].is_null());
+        assert_eq!(created_job["payload"], payload_json);
+
+        let job_id = created_job["id"]
+            .as_str()
+            .expect("created job id must be a string")
+            .to_string();
+
+        let (job_json, health_json) = wait_for_processed_job_and_health(&config, &job_id);
+        let db_row = query_single_row(
+            &database_url,
+            "SELECT id::text, status, attempts::text, COALESCE(last_error, '') AS last_error, payload::text, COALESCE(processed_at::text, '') AS processed_at FROM jobs WHERE id = $1::uuid",
+            &[&job_id],
+        );
+
+        assert_eq!(job_json["id"].as_str(), Some(job_id.as_str()));
+        assert_eq!(job_json["status"].as_str(), Some("processed"));
+        assert_eq!(job_json["attempts"].as_i64(), Some(1));
+        assert_eq!(job_json["last_error"], Value::Null);
+        assert_eq!(job_json["payload"], payload_json);
+        let processed_at = job_json["processed_at"]
+            .as_str()
+            .expect("processed job must expose processed_at");
+        assert!(!processed_at.is_empty(), "processed_at must be non-empty");
+
+        assert_eq!(db_row.get("id").map(String::as_str), Some(job_id.as_str()));
+        assert_eq!(db_row.get("status").map(String::as_str), Some("processed"));
+        assert_eq!(db_row.get("attempts").map(String::as_str), Some("1"));
+        assert_eq!(db_row.get("last_error").map(String::as_str), Some(""));
+        assert_eq!(
+            db_row.get("processed_at").map(String::as_str),
+            Some(processed_at)
+        );
+        let db_payload = serde_json::from_str::<Value>(
+            db_row.get("payload").expect("payload column must exist"),
+        )
+        .expect("DB payload must be valid JSON");
+        assert_eq!(db_payload, job_json["payload"]);
+
+        assert_eq!(health_json["status"].as_str(), Some("ok"));
+        assert_eq!(
+            health_json["worker"]["last_job_id"].as_str(),
+            Some(job_id.as_str())
+        );
+        assert_eq!(health_json["worker"]["processed_jobs"].as_i64(), Some(1));
+        assert_eq!(health_json["worker"]["failed_jobs"].as_i64(), Some(0));
+        assert_eq!(health_json["worker"]["last_error"], Value::Null);
+        let worker_status = health_json["worker"]["status"]
+            .as_str()
+            .expect("worker status must be a string");
+        assert!(
+            matches!(worker_status, "processed" | "idle"),
+            "expected worker status to show a healthy post-processing state, got {worker_status}"
+        );
+    }));
+    let (stdout, stderr, combined) = stop_reference_backend(spawned);
+
+    match test_result {
+        Ok(()) => assert_startup_logs(&combined, &config, &database_url),
+        Err(payload) => panic!(
+            "reference-backend job-flow assertions failed: {}\nstdout: {}\nstderr: {}",
+            panic_payload_to_string(payload),
+            stdout,
+            stderr
+        ),
+    }
 }
 
 #[test]

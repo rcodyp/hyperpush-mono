@@ -314,12 +314,7 @@ fn build_signature_info(
                 })
                 .collect();
 
-            let label = format!(
-                "{}({}) -> {}",
-                callee_name,
-                param_labels.join(", "),
-                ret,
-            );
+            let label = format!("{}({}) -> {}", callee_name, param_labels.join(", "), ret,);
 
             Some(SignatureInformation {
                 label,
@@ -374,7 +369,10 @@ mod tests {
         // "let x = add(" starts at line 3, "add(" -> character 8+4 = 12.
         // Position: line 3, character 12 -> inside the call at the `1`.
         let result = sig_help_at(source, 3, 12);
-        assert!(result.is_some(), "Should return signature help inside add(1, 2)");
+        assert!(
+            result.is_some(),
+            "Should return signature help inside add(1, 2)"
+        );
         let help = result.unwrap();
         assert_eq!(help.signatures.len(), 1);
         let sig = &help.signatures[0];

@@ -64,9 +64,9 @@ unsafe fn alloc_list_from(src: *const u64, len: u64, cap: u64) -> *mut u8 {
 pub(crate) unsafe fn alloc_pair(a: u64, b: u64) -> *mut u8 {
     let total = 8 + 2 * 8; // len field + 2 elements
     let p = mesh_gc_alloc_actor(total as u64, 8);
-    *(p as *mut u64) = 2;           // len = 2
-    *((p as *mut u64).add(1)) = a;  // first element
-    *((p as *mut u64).add(2)) = b;  // second element
+    *(p as *mut u64) = 2; // len = 2
+    *((p as *mut u64).add(1)) = a; // first element
+    *((p as *mut u64).add(2)) = b; // second element
     p
 }
 
@@ -131,10 +131,7 @@ pub extern "C" fn mesh_list_get(list: *mut u8, index: i64) -> u64 {
     unsafe {
         let len = list_len(list);
         if index < 0 || index as u64 >= len {
-            panic!(
-                "mesh_list_get: index {} out of bounds (len {})",
-                index, len
-            );
+            panic!("mesh_list_get: index {} out of bounds (len {})", index, len);
         }
         *list_data(list).add(index as usize)
     }
@@ -184,11 +181,7 @@ pub extern "C" fn mesh_list_reverse(list: *mut u8) -> *mut u8 {
 /// If `env_ptr` is null, `fn_ptr` is called as `fn(element) -> result`.
 /// If `env_ptr` is non-null, `fn_ptr` is called as `fn(env_ptr, element) -> result`.
 #[no_mangle]
-pub extern "C" fn mesh_list_map(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_list_map(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -216,11 +209,7 @@ pub extern "C" fn mesh_list_map(
 
 /// Keep elements where the closure returns non-zero (true).
 #[no_mangle]
-pub extern "C" fn mesh_list_filter(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_list_filter(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -326,11 +315,7 @@ pub extern "C" fn mesh_list_from_array(data: *const u64, count: i64) -> *mut u8 
 /// `elem_eq` is a bare function pointer `fn(u64, u64) -> i8` that returns 1
 /// if two elements are equal, 0 otherwise. Returns 1 if lists are equal, 0 if not.
 #[no_mangle]
-pub extern "C" fn mesh_list_eq(
-    list_a: *mut u8,
-    list_b: *mut u8,
-    elem_eq: *mut u8,
-) -> i8 {
+pub extern "C" fn mesh_list_eq(list_a: *mut u8, list_b: *mut u8, elem_eq: *mut u8) -> i8 {
     type ElemEq = unsafe extern "C" fn(u64, u64) -> i8;
 
     unsafe {
@@ -357,11 +342,7 @@ pub extern "C" fn mesh_list_eq(
 /// negative if a < b, 0 if equal, positive if a > b. Returns negative/0/positive
 /// for the lexicographic ordering of the two lists.
 #[no_mangle]
-pub extern "C" fn mesh_list_compare(
-    list_a: *mut u8,
-    list_b: *mut u8,
-    elem_cmp: *mut u8,
-) -> i64 {
+pub extern "C" fn mesh_list_compare(list_a: *mut u8, list_b: *mut u8, elem_cmp: *mut u8) -> i64 {
     type ElemCmp = unsafe extern "C" fn(u64, u64) -> i64;
 
     unsafe {
@@ -394,10 +375,7 @@ pub extern "C" fn mesh_list_compare(
 /// lowerer passes the appropriate runtime to_string function (e.g.,
 /// `mesh_int_to_string` for `List<Int>`).
 #[no_mangle]
-pub extern "C" fn mesh_list_to_string(
-    list: *mut u8,
-    elem_to_str: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_list_to_string(list: *mut u8, elem_to_str: *mut u8) -> *mut u8 {
     type ElemToStr = unsafe extern "C" fn(u64) -> *mut u8;
 
     unsafe {
@@ -438,11 +416,7 @@ pub extern "C" fn mesh_list_to_string(
 /// If `env_ptr` is null, `fn_ptr` is called as `fn(a, b) -> i64`.
 /// If `env_ptr` is non-null, `fn_ptr` is called as `fn(env_ptr, a, b) -> i64`.
 #[no_mangle]
-pub extern "C" fn mesh_list_sort(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_list_sort(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64, u64) -> i64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64, u64) -> i64;
 
@@ -501,11 +475,7 @@ pub extern "C" fn mesh_list_sort(
 /// If `env_ptr` is null, `fn_ptr` is called as `fn(elem) -> u64` (nonzero = true).
 /// If `env_ptr` is non-null, `fn_ptr` is called as `fn(env_ptr, elem) -> u64`.
 #[no_mangle]
-pub extern "C" fn mesh_list_find(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_list_find(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -538,11 +508,7 @@ pub extern "C" fn mesh_list_find(
 /// Returns 1 (true) if at least one element matches, 0 (false) otherwise.
 /// Short-circuits on first match.
 #[no_mangle]
-pub extern "C" fn mesh_list_any(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> i8 {
+pub extern "C" fn mesh_list_any(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> i8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -573,11 +539,7 @@ pub extern "C" fn mesh_list_any(
 /// Returns 1 (true) if every element matches, 0 (false) otherwise.
 /// Short-circuits on first non-match.
 #[no_mangle]
-pub extern "C" fn mesh_list_all(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> i8 {
+pub extern "C" fn mesh_list_all(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> i8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -671,11 +633,7 @@ pub extern "C" fn mesh_list_zip(a: *mut u8, b: *mut u8) -> *mut u8 {
 /// If `env_ptr` is null, `fn_ptr` is called as `fn(element) -> list_ptr_as_u64`.
 /// If `env_ptr` is non-null, `fn_ptr` is called as `fn(env_ptr, element) -> list_ptr_as_u64`.
 #[no_mangle]
-pub extern "C" fn mesh_list_flat_map(
-    list: *mut u8,
-    fn_ptr: *mut u8,
-    env_ptr: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_list_flat_map(list: *mut u8, fn_ptr: *mut u8, env_ptr: *mut u8) -> *mut u8 {
     type BareFn = unsafe extern "C" fn(u64) -> u64;
     type ClosureFn = unsafe extern "C" fn(*mut u8, u64) -> u64;
 
@@ -964,7 +922,11 @@ mod tests {
 
         // Keep only even numbers (value % 2 == 0).
         unsafe extern "C" fn is_even(x: u64) -> u64 {
-            if x % 2 == 0 { 1 } else { 0 }
+            if x % 2 == 0 {
+                1
+            } else {
+                0
+            }
         }
 
         let filtered = mesh_list_filter(list, is_even as *mut u8, std::ptr::null_mut());
@@ -1050,10 +1012,7 @@ mod tests {
         let list = mesh_list_append(list, 2);
         let list = mesh_list_append(list, 3);
 
-        let result = mesh_list_to_string(
-            list,
-            crate::string::mesh_int_to_string as *mut u8,
-        );
+        let result = mesh_list_to_string(list, crate::string::mesh_int_to_string as *mut u8);
         let s = unsafe { &*(result as *const crate::string::MeshString) };
         let text = unsafe { s.as_str() };
         assert_eq!(text, "[1, 2, 3]");
@@ -1072,7 +1031,11 @@ mod tests {
         let b = mesh_list_append(b, 3);
 
         unsafe extern "C" fn int_eq(a: u64, b: u64) -> i8 {
-            if a == b { 1 } else { 0 }
+            if a == b {
+                1
+            } else {
+                0
+            }
         }
 
         assert_eq!(mesh_list_eq(a, b, int_eq as *mut u8), 1);
@@ -1089,7 +1052,11 @@ mod tests {
         let b = mesh_list_append(b, 3);
 
         unsafe extern "C" fn int_eq(a: u64, b: u64) -> i8 {
-            if a == b { 1 } else { 0 }
+            if a == b {
+                1
+            } else {
+                0
+            }
         }
 
         assert_eq!(mesh_list_eq(a, b, int_eq as *mut u8), 0);
@@ -1105,7 +1072,11 @@ mod tests {
         let b = mesh_list_append(b, 1);
 
         unsafe extern "C" fn int_eq(a: u64, b: u64) -> i8 {
-            if a == b { 1 } else { 0 }
+            if a == b {
+                1
+            } else {
+                0
+            }
         }
 
         assert_eq!(mesh_list_eq(a, b, int_eq as *mut u8), 0);
@@ -1168,10 +1139,7 @@ mod tests {
         mesh_rt_init();
         let list = mesh_list_new();
 
-        let result = mesh_list_to_string(
-            list,
-            crate::string::mesh_int_to_string as *mut u8,
-        );
+        let result = mesh_list_to_string(list, crate::string::mesh_int_to_string as *mut u8);
         let s = unsafe { &*(result as *const crate::string::MeshString) };
         let text = unsafe { s.as_str() };
         assert_eq!(text, "[]");

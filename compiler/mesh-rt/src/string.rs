@@ -11,9 +11,9 @@
 use std::io::Write;
 use std::ptr;
 
+use crate::collections::list::{mesh_list_builder_new, mesh_list_builder_push};
 use crate::gc::mesh_gc_alloc_actor;
 use crate::option::alloc_option;
-use crate::collections::list::{mesh_list_builder_new, mesh_list_builder_push};
 
 /// A GC-managed Mesh string.
 ///
@@ -173,11 +173,7 @@ pub extern "C" fn mesh_string_length(s: *const MeshString) -> i64 {
 
 /// Codepoint-based slice (0-indexed, exclusive end). Clamps to bounds.
 #[no_mangle]
-pub extern "C" fn mesh_string_slice(
-    s: *const MeshString,
-    start: i64,
-    end: i64,
-) -> *mut MeshString {
+pub extern "C" fn mesh_string_slice(s: *const MeshString, start: i64, end: i64) -> *mut MeshString {
     unsafe {
         let text = (*s).as_str();
         let char_count = text.chars().count();
@@ -205,10 +201,7 @@ pub extern "C" fn mesh_string_contains(
 
 /// Returns 1 if string starts with prefix, 0 otherwise.
 #[no_mangle]
-pub extern "C" fn mesh_string_starts_with(
-    s: *const MeshString,
-    prefix: *const MeshString,
-) -> i8 {
+pub extern "C" fn mesh_string_starts_with(s: *const MeshString, prefix: *const MeshString) -> i8 {
     unsafe {
         if (*s).as_str().starts_with((*prefix).as_str()) {
             1
@@ -220,10 +213,7 @@ pub extern "C" fn mesh_string_starts_with(
 
 /// Returns 1 if string ends with suffix, 0 otherwise.
 #[no_mangle]
-pub extern "C" fn mesh_string_ends_with(
-    s: *const MeshString,
-    suffix: *const MeshString,
-) -> i8 {
+pub extern "C" fn mesh_string_ends_with(s: *const MeshString, suffix: *const MeshString) -> i8 {
     unsafe {
         if (*s).as_str().ends_with((*suffix).as_str()) {
             1
@@ -268,9 +258,7 @@ pub extern "C" fn mesh_string_replace(
     to: *const MeshString,
 ) -> *mut MeshString {
     unsafe {
-        let result = (*s)
-            .as_str()
-            .replace((*from).as_str(), (*to).as_str());
+        let result = (*s).as_str().replace((*from).as_str(), (*to).as_str());
         mesh_string_new(result.as_ptr(), result.len() as u64)
     }
 }
@@ -293,10 +281,7 @@ pub extern "C" fn mesh_string_eq(a: *const MeshString, b: *const MeshString) -> 
 ///
 /// Uses the list builder API to construct the result list efficiently.
 #[no_mangle]
-pub extern "C" fn mesh_string_split(
-    s: *const MeshString,
-    delim: *const MeshString,
-) -> *mut u8 {
+pub extern "C" fn mesh_string_split(s: *const MeshString, delim: *const MeshString) -> *mut u8 {
     unsafe {
         let text = (*s).as_str();
         let delimiter = (*delim).as_str();
@@ -316,10 +301,7 @@ pub extern "C" fn mesh_string_split(
 /// List layout: u64 length at offset 0, u64 elements starting at offset 16
 /// (after length + capacity header).
 #[no_mangle]
-pub extern "C" fn mesh_string_join(
-    list: *mut u8,
-    sep: *const MeshString,
-) -> *mut u8 {
+pub extern "C" fn mesh_string_join(list: *mut u8, sep: *const MeshString) -> *mut u8 {
     unsafe {
         let separator = (*sep).as_str();
         let len = *(list as *const u64) as usize;

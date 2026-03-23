@@ -19,26 +19,19 @@ impl<'ctx> CodeGen<'ctx> {
     /// Generate LLVM IR for a MIR expression.
     ///
     /// Returns the LLVM value representing the expression result.
-    pub(crate) fn codegen_expr(
-        &mut self,
-        expr: &MirExpr,
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    pub(crate) fn codegen_expr(&mut self, expr: &MirExpr) -> Result<BasicValueEnum<'ctx>, String> {
         match expr {
             MirExpr::IntLit(val, _) => {
                 Ok(self.context.i64_type().const_int(*val as u64, true).into())
             }
 
-            MirExpr::FloatLit(val, _) => {
-                Ok(self.context.f64_type().const_float(*val).into())
-            }
+            MirExpr::FloatLit(val, _) => Ok(self.context.f64_type().const_float(*val).into()),
 
-            MirExpr::BoolLit(val, _) => {
-                Ok(self
-                    .context
-                    .bool_type()
-                    .const_int(if *val { 1 } else { 0 }, false)
-                    .into())
-            }
+            MirExpr::BoolLit(val, _) => Ok(self
+                .context
+                .bool_type()
+                .const_int(if *val { 1 } else { 0 }, false)
+                .into()),
 
             MirExpr::StringLit(s, _) => self.codegen_string_lit(s),
 
@@ -135,7 +128,9 @@ impl<'ctx> CodeGen<'ctx> {
                 timeout_ms,
                 timeout_body,
                 ty,
-            } => self.codegen_actor_receive(arms, timeout_ms.as_deref(), timeout_body.as_deref(), ty),
+            } => {
+                self.codegen_actor_receive(arms, timeout_ms.as_deref(), timeout_body.as_deref(), ty)
+            }
 
             MirExpr::ActorSelf { ty: _ } => self.codegen_actor_self(),
 
@@ -149,25 +144,94 @@ impl<'ctx> CodeGen<'ctx> {
 
             MirExpr::Continue => self.codegen_continue(),
 
-            MirExpr::ForInRange { var, start, end, filter, body, ty } => {
-                self.codegen_for_in_range(var, start, end, filter.as_deref(), body, ty)
-            }
+            MirExpr::ForInRange {
+                var,
+                start,
+                end,
+                filter,
+                body,
+                ty,
+            } => self.codegen_for_in_range(var, start, end, filter.as_deref(), body, ty),
 
-            MirExpr::ForInList { var, collection, filter, body, elem_ty, body_ty, ty } => {
-                self.codegen_for_in_list(var, collection, filter.as_deref(), body, elem_ty, body_ty, ty)
-            }
+            MirExpr::ForInList {
+                var,
+                collection,
+                filter,
+                body,
+                elem_ty,
+                body_ty,
+                ty,
+            } => self.codegen_for_in_list(
+                var,
+                collection,
+                filter.as_deref(),
+                body,
+                elem_ty,
+                body_ty,
+                ty,
+            ),
 
-            MirExpr::ForInMap { key_var, val_var, collection, filter, body, key_ty, val_ty, body_ty, ty } => {
-                self.codegen_for_in_map(key_var, val_var, collection, filter.as_deref(), body, key_ty, val_ty, body_ty, ty)
-            }
+            MirExpr::ForInMap {
+                key_var,
+                val_var,
+                collection,
+                filter,
+                body,
+                key_ty,
+                val_ty,
+                body_ty,
+                ty,
+            } => self.codegen_for_in_map(
+                key_var,
+                val_var,
+                collection,
+                filter.as_deref(),
+                body,
+                key_ty,
+                val_ty,
+                body_ty,
+                ty,
+            ),
 
-            MirExpr::ForInSet { var, collection, filter, body, elem_ty, body_ty, ty } => {
-                self.codegen_for_in_set(var, collection, filter.as_deref(), body, elem_ty, body_ty, ty)
-            }
+            MirExpr::ForInSet {
+                var,
+                collection,
+                filter,
+                body,
+                elem_ty,
+                body_ty,
+                ty,
+            } => self.codegen_for_in_set(
+                var,
+                collection,
+                filter.as_deref(),
+                body,
+                elem_ty,
+                body_ty,
+                ty,
+            ),
 
-            MirExpr::ForInIterator { var, iterator, filter, body, elem_ty, body_ty, next_fn, iter_fn, ty } => {
-                self.codegen_for_in_iterator(var, iterator, filter.as_deref(), body, elem_ty, body_ty, next_fn, iter_fn, ty)
-            }
+            MirExpr::ForInIterator {
+                var,
+                iterator,
+                filter,
+                body,
+                elem_ty,
+                body_ty,
+                next_fn,
+                iter_fn,
+                ty,
+            } => self.codegen_for_in_iterator(
+                var,
+                iterator,
+                filter.as_deref(),
+                body,
+                elem_ty,
+                body_ty,
+                next_fn,
+                iter_fn,
+                ty,
+            ),
 
             MirExpr::SupervisorStart {
                 name,
@@ -176,10 +240,17 @@ impl<'ctx> CodeGen<'ctx> {
                 max_seconds,
                 children,
                 ty: _,
-            } => self.codegen_supervisor_start(name, *strategy, *max_restarts, *max_seconds, children),
+            } => self.codegen_supervisor_start(
+                name,
+                *strategy,
+                *max_restarts,
+                *max_seconds,
+                children,
+            ),
 
             MirExpr::TailCall { args, .. } => {
-                let tce_loop_bb = self.tce_loop_header
+                let tce_loop_bb = self
+                    .tce_loop_header
                     .ok_or("TailCall encountered but no TCE loop header set")?;
 
                 // Step 1: Evaluate ALL arguments to temporary values FIRST.
@@ -227,19 +298,12 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Call mesh_string_new(data_ptr, len)
         let data_ptr = global.as_pointer_value();
-        let len = self
-            .context
-            .i64_type()
-            .const_int(s.len() as u64, false);
+        let len = self.context.i64_type().const_int(s.len() as u64, false);
 
         let string_new = get_intrinsic(&self.module, "mesh_string_new");
         let result = self
             .builder
-            .build_call(
-                string_new,
-                &[data_ptr.into(), len.into()],
-                "str",
-            )
+            .build_call(string_new, &[data_ptr.into(), len.into()], "str")
             .map_err(|e| e.to_string())?;
 
         result
@@ -250,14 +314,14 @@ impl<'ctx> CodeGen<'ctx> {
 
     // ── Variable reference ───────────────────────────────────────────
 
-    fn codegen_var(
-        &mut self,
-        name: &str,
-        ty: &MirType,
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    fn codegen_var(&mut self, name: &str, ty: &MirType) -> Result<BasicValueEnum<'ctx>, String> {
         // Math.pi constant (Phase 43) -- accessed without parentheses as a variable
         if name == "mesh_math_pi" {
-            return Ok(self.context.f64_type().const_float(std::f64::consts::PI).into());
+            return Ok(self
+                .context
+                .f64_type()
+                .const_float(std::f64::consts::PI)
+                .into());
         }
 
         // Check if it's a known function reference (for passing as fn ptr)
@@ -337,17 +401,61 @@ impl<'ctx> CodeGen<'ctx> {
         let r = rhs.into_int_value();
 
         let result: BasicValueEnum<'ctx> = match op {
-            BinOp::Add => self.builder.build_int_add(l, r, "add").map_err(|e| e.to_string())?.into(),
-            BinOp::Sub => self.builder.build_int_sub(l, r, "sub").map_err(|e| e.to_string())?.into(),
-            BinOp::Mul => self.builder.build_int_mul(l, r, "mul").map_err(|e| e.to_string())?.into(),
-            BinOp::Div => self.builder.build_int_signed_div(l, r, "div").map_err(|e| e.to_string())?.into(),
-            BinOp::Mod => self.builder.build_int_signed_rem(l, r, "mod").map_err(|e| e.to_string())?.into(),
-            BinOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, l, r, "eq").map_err(|e| e.to_string())?.into(),
-            BinOp::NotEq => self.builder.build_int_compare(IntPredicate::NE, l, r, "ne").map_err(|e| e.to_string())?.into(),
-            BinOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, l, r, "lt").map_err(|e| e.to_string())?.into(),
-            BinOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, l, r, "gt").map_err(|e| e.to_string())?.into(),
-            BinOp::LtEq => self.builder.build_int_compare(IntPredicate::SLE, l, r, "le").map_err(|e| e.to_string())?.into(),
-            BinOp::GtEq => self.builder.build_int_compare(IntPredicate::SGE, l, r, "ge").map_err(|e| e.to_string())?.into(),
+            BinOp::Add => self
+                .builder
+                .build_int_add(l, r, "add")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Sub => self
+                .builder
+                .build_int_sub(l, r, "sub")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Mul => self
+                .builder
+                .build_int_mul(l, r, "mul")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Div => self
+                .builder
+                .build_int_signed_div(l, r, "div")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Mod => self
+                .builder
+                .build_int_signed_rem(l, r, "mod")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Eq => self
+                .builder
+                .build_int_compare(IntPredicate::EQ, l, r, "eq")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::NotEq => self
+                .builder
+                .build_int_compare(IntPredicate::NE, l, r, "ne")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Lt => self
+                .builder
+                .build_int_compare(IntPredicate::SLT, l, r, "lt")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Gt => self
+                .builder
+                .build_int_compare(IntPredicate::SGT, l, r, "gt")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::LtEq => self
+                .builder
+                .build_int_compare(IntPredicate::SLE, l, r, "le")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::GtEq => self
+                .builder
+                .build_int_compare(IntPredicate::SGE, l, r, "ge")
+                .map_err(|e| e.to_string())?
+                .into(),
             _ => return Err(format!("Unsupported int binop: {:?}", op)),
         };
         Ok(result)
@@ -363,17 +471,61 @@ impl<'ctx> CodeGen<'ctx> {
         let r = rhs.into_float_value();
 
         let result: BasicValueEnum<'ctx> = match op {
-            BinOp::Add => self.builder.build_float_add(l, r, "fadd").map_err(|e| e.to_string())?.into(),
-            BinOp::Sub => self.builder.build_float_sub(l, r, "fsub").map_err(|e| e.to_string())?.into(),
-            BinOp::Mul => self.builder.build_float_mul(l, r, "fmul").map_err(|e| e.to_string())?.into(),
-            BinOp::Div => self.builder.build_float_div(l, r, "fdiv").map_err(|e| e.to_string())?.into(),
-            BinOp::Mod => self.builder.build_float_rem(l, r, "fmod").map_err(|e| e.to_string())?.into(),
-            BinOp::Eq => self.builder.build_float_compare(inkwell::FloatPredicate::OEQ, l, r, "feq").map_err(|e| e.to_string())?.into(),
-            BinOp::NotEq => self.builder.build_float_compare(inkwell::FloatPredicate::ONE, l, r, "fne").map_err(|e| e.to_string())?.into(),
-            BinOp::Lt => self.builder.build_float_compare(inkwell::FloatPredicate::OLT, l, r, "flt").map_err(|e| e.to_string())?.into(),
-            BinOp::Gt => self.builder.build_float_compare(inkwell::FloatPredicate::OGT, l, r, "fgt").map_err(|e| e.to_string())?.into(),
-            BinOp::LtEq => self.builder.build_float_compare(inkwell::FloatPredicate::OLE, l, r, "fle").map_err(|e| e.to_string())?.into(),
-            BinOp::GtEq => self.builder.build_float_compare(inkwell::FloatPredicate::OGE, l, r, "fge").map_err(|e| e.to_string())?.into(),
+            BinOp::Add => self
+                .builder
+                .build_float_add(l, r, "fadd")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Sub => self
+                .builder
+                .build_float_sub(l, r, "fsub")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Mul => self
+                .builder
+                .build_float_mul(l, r, "fmul")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Div => self
+                .builder
+                .build_float_div(l, r, "fdiv")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Mod => self
+                .builder
+                .build_float_rem(l, r, "fmod")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Eq => self
+                .builder
+                .build_float_compare(inkwell::FloatPredicate::OEQ, l, r, "feq")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::NotEq => self
+                .builder
+                .build_float_compare(inkwell::FloatPredicate::ONE, l, r, "fne")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Lt => self
+                .builder
+                .build_float_compare(inkwell::FloatPredicate::OLT, l, r, "flt")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::Gt => self
+                .builder
+                .build_float_compare(inkwell::FloatPredicate::OGT, l, r, "fgt")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::LtEq => self
+                .builder
+                .build_float_compare(inkwell::FloatPredicate::OLE, l, r, "fle")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::GtEq => self
+                .builder
+                .build_float_compare(inkwell::FloatPredicate::OGE, l, r, "fge")
+                .map_err(|e| e.to_string())?
+                .into(),
             _ => return Err(format!("Unsupported float binop: {:?}", op)),
         };
         Ok(result)
@@ -389,8 +541,16 @@ impl<'ctx> CodeGen<'ctx> {
         let r = rhs.into_int_value();
 
         let result: BasicValueEnum<'ctx> = match op {
-            BinOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, l, r, "beq").map_err(|e| e.to_string())?.into(),
-            BinOp::NotEq => self.builder.build_int_compare(IntPredicate::NE, l, r, "bne").map_err(|e| e.to_string())?.into(),
+            BinOp::Eq => self
+                .builder
+                .build_int_compare(IntPredicate::EQ, l, r, "beq")
+                .map_err(|e| e.to_string())?
+                .into(),
+            BinOp::NotEq => self
+                .builder
+                .build_int_compare(IntPredicate::NE, l, r, "bne")
+                .map_err(|e| e.to_string())?
+                .into(),
             _ => return Err(format!("Unsupported bool binop: {:?}", op)),
         };
         Ok(result)
@@ -427,13 +587,10 @@ impl<'ctx> CodeGen<'ctx> {
             .map_err(|e| e.to_string())?;
 
         let false_val = self.context.bool_type().const_int(0, false);
-        let lhs_bb = fn_val
-            .get_basic_blocks()
-            .into_iter()
-            .find(|bb| {
-                // Find the block that branches to merge_bb but is not rhs_end_bb
-                bb != &rhs_bb && bb != &merge_bb && bb != &rhs_end_bb
-            });
+        let lhs_bb = fn_val.get_basic_blocks().into_iter().find(|bb| {
+            // Find the block that branches to merge_bb but is not rhs_end_bb
+            bb != &rhs_bb && bb != &merge_bb && bb != &rhs_end_bb
+        });
 
         // Use the block where lhs was evaluated (could be entry or wherever)
         if let Some(lhs_end_bb) = lhs_bb {
@@ -496,20 +653,22 @@ impl<'ctx> CodeGen<'ctx> {
             BasicValueEnum::StructValue(sv) if sv.get_type().count_fields() == 0 => {
                 ptr_ty.const_null().into()
             }
-            BasicValueEnum::IntValue(iv) => {
-                self.builder.build_int_to_ptr(iv, ptr_ty, "concat_arg_ptr")
-                    .map_err(|e| e.to_string())?.into()
-            }
+            BasicValueEnum::IntValue(iv) => self
+                .builder
+                .build_int_to_ptr(iv, ptr_ty, "concat_arg_ptr")
+                .map_err(|e| e.to_string())?
+                .into(),
             other => other.into(),
         };
         let rhs_coerced: BasicMetadataValueEnum<'ctx> = match rhs {
             BasicValueEnum::StructValue(sv) if sv.get_type().count_fields() == 0 => {
                 ptr_ty.const_null().into()
             }
-            BasicValueEnum::IntValue(iv) => {
-                self.builder.build_int_to_ptr(iv, ptr_ty, "concat_arg_ptr")
-                    .map_err(|e| e.to_string())?.into()
-            }
+            BasicValueEnum::IntValue(iv) => self
+                .builder
+                .build_int_to_ptr(iv, ptr_ty, "concat_arg_ptr")
+                .map_err(|e| e.to_string())?
+                .into(),
             other => other.into(),
         };
         let result = self
@@ -583,27 +742,25 @@ impl<'ctx> CodeGen<'ctx> {
     ) -> Result<BasicValueEnum<'ctx>, String> {
         let val = self.codegen_expr(operand)?;
         match op {
-            UnaryOp::Neg => {
-                match operand.ty() {
-                    MirType::Int => {
-                        let int_val = val.into_int_value();
-                        Ok(self
-                            .builder
-                            .build_int_neg(int_val, "neg")
-                            .map_err(|e| e.to_string())?
-                            .into())
-                    }
-                    MirType::Float => {
-                        let float_val = val.into_float_value();
-                        Ok(self
-                            .builder
-                            .build_float_neg(float_val, "fneg")
-                            .map_err(|e| e.to_string())?
-                            .into())
-                    }
-                    _ => Err(format!("Cannot negate type {:?}", operand.ty())),
+            UnaryOp::Neg => match operand.ty() {
+                MirType::Int => {
+                    let int_val = val.into_int_value();
+                    Ok(self
+                        .builder
+                        .build_int_neg(int_val, "neg")
+                        .map_err(|e| e.to_string())?
+                        .into())
                 }
-            }
+                MirType::Float => {
+                    let float_val = val.into_float_value();
+                    Ok(self
+                        .builder
+                        .build_float_neg(float_val, "fneg")
+                        .map_err(|e| e.to_string())?
+                        .into())
+                }
+                _ => Err(format!("Cannot negate type {:?}", operand.ty())),
+            },
             UnaryOp::Not => {
                 let bool_val = val.into_int_value();
                 Ok(self
@@ -640,18 +797,24 @@ impl<'ctx> CodeGen<'ctx> {
         // we check whether expanding closures/FnPtrs would exceed the target function's
         // declared parameter count.
         let target_param_count: Option<usize> = if let MirExpr::Var(name, _) = func {
-            self.module.get_function(name).map(|f| f.count_params() as usize)
+            self.module
+                .get_function(name)
+                .map(|f| f.count_params() as usize)
         } else {
             None
         };
         // Pre-compute how many LLVM args we'd produce with expansion.
-        let expanded_arg_count: usize = args.iter().map(|arg| {
-            if !is_user_fn && matches!(arg.ty(), MirType::Closure(_, _) | MirType::FnPtr(_, _)) {
-                2 // fn_ptr + env_ptr
-            } else {
-                1
-            }
-        }).sum();
+        let expanded_arg_count: usize = args
+            .iter()
+            .map(|arg| {
+                if !is_user_fn && matches!(arg.ty(), MirType::Closure(_, _) | MirType::FnPtr(_, _))
+                {
+                    2 // fn_ptr + env_ptr
+                } else {
+                    1
+                }
+            })
+            .sum();
         // Only expand closure/FnPtr args if the expanded count matches the target's param count.
         // If expansion would cause a mismatch, pass values as-is.
         let should_expand_closures = match target_param_count {
@@ -767,16 +930,20 @@ impl<'ctx> CodeGen<'ctx> {
             }
             // List.contains on String elements: redirect to mesh_list_contains_str which
             // uses mesh_string_eq (byte comparison) instead of raw pointer equality.
-            if name == "mesh_list_contains" && args.len() == 2
+            if name == "mesh_list_contains"
+                && args.len() == 2
                 && matches!(args[1].ty(), MirType::String)
             {
                 let list_val = self.codegen_expr(&args[0])?;
                 let elem_val = self.codegen_expr(&args[1])?;
                 let f = get_intrinsic(&self.module, "mesh_list_contains_str");
-                let result = self.builder
+                let result = self
+                    .builder
                     .build_call(f, &[list_val.into(), elem_val.into()], "list_contains_str")
                     .map_err(|e| e.to_string())?;
-                return result.try_as_basic_value().basic()
+                return result
+                    .try_as_basic_value()
+                    .basic()
                     .ok_or_else(|| "mesh_list_contains_str returned void".to_string());
             }
         }
@@ -789,24 +956,38 @@ impl<'ctx> CodeGen<'ctx> {
                     return match args[0].ty() {
                         MirType::Int => {
                             // llvm.abs.i64(val, is_int_min_poison=false)
-                            let intrinsic = Intrinsic::find("llvm.abs").ok_or("llvm.abs not found")?;
+                            let intrinsic =
+                                Intrinsic::find("llvm.abs").ok_or("llvm.abs not found")?;
                             let i64_ty = self.context.i64_type();
-                            let decl = intrinsic.get_declaration(&self.module, &[i64_ty.into()])
+                            let decl = intrinsic
+                                .get_declaration(&self.module, &[i64_ty.into()])
                                 .ok_or("Failed to get llvm.abs declaration")?;
                             let is_poison = self.context.bool_type().const_int(0, false);
-                            let result = self.builder.build_call(decl, &[arg_val.into(), is_poison.into()], "abs")
+                            let result = self
+                                .builder
+                                .build_call(decl, &[arg_val.into(), is_poison.into()], "abs")
                                 .map_err(|e| e.to_string())?;
-                            result.try_as_basic_value().basic().ok_or("abs returned void".into())
+                            result
+                                .try_as_basic_value()
+                                .basic()
+                                .ok_or("abs returned void".into())
                         }
                         MirType::Float => {
                             // llvm.fabs.f64(val)
-                            let intrinsic = Intrinsic::find("llvm.fabs").ok_or("llvm.fabs not found")?;
+                            let intrinsic =
+                                Intrinsic::find("llvm.fabs").ok_or("llvm.fabs not found")?;
                             let f64_ty = self.context.f64_type();
-                            let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                            let decl = intrinsic
+                                .get_declaration(&self.module, &[f64_ty.into()])
                                 .ok_or("Failed to get llvm.fabs declaration")?;
-                            let result = self.builder.build_call(decl, &[arg_val.into()], "fabs")
+                            let result = self
+                                .builder
+                                .build_call(decl, &[arg_val.into()], "fabs")
                                 .map_err(|e| e.to_string())?;
-                            result.try_as_basic_value().basic().ok_or("fabs returned void".into())
+                            result
+                                .try_as_basic_value()
+                                .basic()
+                                .ok_or("fabs returned void".into())
                         }
                         other => Err(format!("Math.abs: unsupported type {:?}", other)),
                     };
@@ -816,22 +997,36 @@ impl<'ctx> CodeGen<'ctx> {
                     let rhs = self.codegen_expr(&args[1])?;
                     return match args[0].ty() {
                         MirType::Int => {
-                            let intrinsic = Intrinsic::find("llvm.smin").ok_or("llvm.smin not found")?;
+                            let intrinsic =
+                                Intrinsic::find("llvm.smin").ok_or("llvm.smin not found")?;
                             let i64_ty = self.context.i64_type();
-                            let decl = intrinsic.get_declaration(&self.module, &[i64_ty.into()])
+                            let decl = intrinsic
+                                .get_declaration(&self.module, &[i64_ty.into()])
                                 .ok_or("Failed to get llvm.smin declaration")?;
-                            let result = self.builder.build_call(decl, &[lhs.into(), rhs.into()], "smin")
+                            let result = self
+                                .builder
+                                .build_call(decl, &[lhs.into(), rhs.into()], "smin")
                                 .map_err(|e| e.to_string())?;
-                            result.try_as_basic_value().basic().ok_or("smin returned void".into())
+                            result
+                                .try_as_basic_value()
+                                .basic()
+                                .ok_or("smin returned void".into())
                         }
                         MirType::Float => {
-                            let intrinsic = Intrinsic::find("llvm.minnum").ok_or("llvm.minnum not found")?;
+                            let intrinsic =
+                                Intrinsic::find("llvm.minnum").ok_or("llvm.minnum not found")?;
                             let f64_ty = self.context.f64_type();
-                            let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                            let decl = intrinsic
+                                .get_declaration(&self.module, &[f64_ty.into()])
                                 .ok_or("Failed to get llvm.minnum declaration")?;
-                            let result = self.builder.build_call(decl, &[lhs.into(), rhs.into()], "minnum")
+                            let result = self
+                                .builder
+                                .build_call(decl, &[lhs.into(), rhs.into()], "minnum")
                                 .map_err(|e| e.to_string())?;
-                            result.try_as_basic_value().basic().ok_or("minnum returned void".into())
+                            result
+                                .try_as_basic_value()
+                                .basic()
+                                .ok_or("minnum returned void".into())
                         }
                         other => Err(format!("Math.min: unsupported type {:?}", other)),
                     };
@@ -841,22 +1036,36 @@ impl<'ctx> CodeGen<'ctx> {
                     let rhs = self.codegen_expr(&args[1])?;
                     return match args[0].ty() {
                         MirType::Int => {
-                            let intrinsic = Intrinsic::find("llvm.smax").ok_or("llvm.smax not found")?;
+                            let intrinsic =
+                                Intrinsic::find("llvm.smax").ok_or("llvm.smax not found")?;
                             let i64_ty = self.context.i64_type();
-                            let decl = intrinsic.get_declaration(&self.module, &[i64_ty.into()])
+                            let decl = intrinsic
+                                .get_declaration(&self.module, &[i64_ty.into()])
                                 .ok_or("Failed to get llvm.smax declaration")?;
-                            let result = self.builder.build_call(decl, &[lhs.into(), rhs.into()], "smax")
+                            let result = self
+                                .builder
+                                .build_call(decl, &[lhs.into(), rhs.into()], "smax")
                                 .map_err(|e| e.to_string())?;
-                            result.try_as_basic_value().basic().ok_or("smax returned void".into())
+                            result
+                                .try_as_basic_value()
+                                .basic()
+                                .ok_or("smax returned void".into())
                         }
                         MirType::Float => {
-                            let intrinsic = Intrinsic::find("llvm.maxnum").ok_or("llvm.maxnum not found")?;
+                            let intrinsic =
+                                Intrinsic::find("llvm.maxnum").ok_or("llvm.maxnum not found")?;
                             let f64_ty = self.context.f64_type();
-                            let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                            let decl = intrinsic
+                                .get_declaration(&self.module, &[f64_ty.into()])
                                 .ok_or("Failed to get llvm.maxnum declaration")?;
-                            let result = self.builder.build_call(decl, &[lhs.into(), rhs.into()], "maxnum")
+                            let result = self
+                                .builder
+                                .build_call(decl, &[lhs.into(), rhs.into()], "maxnum")
                                 .map_err(|e| e.to_string())?;
-                            result.try_as_basic_value().basic().ok_or("maxnum returned void".into())
+                            result
+                                .try_as_basic_value()
+                                .basic()
+                                .ok_or("maxnum returned void".into())
                         }
                         other => Err(format!("Math.max: unsupported type {:?}", other)),
                     };
@@ -864,7 +1073,8 @@ impl<'ctx> CodeGen<'ctx> {
                 "mesh_int_to_float" => {
                     let arg_val = self.codegen_expr(&args[0])?;
                     let int_val = arg_val.into_int_value();
-                    let float_val = self.builder
+                    let float_val = self
+                        .builder
                         .build_signed_int_to_float(int_val, self.context.f64_type(), "int_to_float")
                         .map_err(|e| e.to_string())?;
                     return Ok(float_val.into());
@@ -872,8 +1082,13 @@ impl<'ctx> CodeGen<'ctx> {
                 "mesh_float_to_int" => {
                     let arg_val = self.codegen_expr(&args[0])?;
                     let float_val = arg_val.into_float_value();
-                    let int_val = self.builder
-                        .build_float_to_signed_int(float_val, self.context.i64_type(), "float_to_int")
+                    let int_val = self
+                        .builder
+                        .build_float_to_signed_int(
+                            float_val,
+                            self.context.i64_type(),
+                            "float_to_int",
+                        )
                         .map_err(|e| e.to_string())?;
                     return Ok(int_val.into());
                 }
@@ -883,33 +1098,55 @@ impl<'ctx> CodeGen<'ctx> {
                     let exp_val = self.codegen_expr(&args[1])?;
                     let intrinsic = Intrinsic::find("llvm.pow").ok_or("llvm.pow not found")?;
                     let f64_ty = self.context.f64_type();
-                    let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                    let decl = intrinsic
+                        .get_declaration(&self.module, &[f64_ty.into()])
                         .ok_or("Failed to get llvm.pow declaration")?;
-                    let result = self.builder.build_call(decl, &[base_val.into(), exp_val.into()], "pow")
+                    let result = self
+                        .builder
+                        .build_call(decl, &[base_val.into(), exp_val.into()], "pow")
                         .map_err(|e| e.to_string())?;
-                    return result.try_as_basic_value().basic().ok_or("pow returned void".into());
+                    return result
+                        .try_as_basic_value()
+                        .basic()
+                        .ok_or("pow returned void".into());
                 }
                 "mesh_math_sqrt" => {
                     let arg_val = self.codegen_expr(&args[0])?;
                     let intrinsic = Intrinsic::find("llvm.sqrt").ok_or("llvm.sqrt not found")?;
                     let f64_ty = self.context.f64_type();
-                    let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                    let decl = intrinsic
+                        .get_declaration(&self.module, &[f64_ty.into()])
                         .ok_or("Failed to get llvm.sqrt declaration")?;
-                    let result = self.builder.build_call(decl, &[arg_val.into()], "sqrt")
+                    let result = self
+                        .builder
+                        .build_call(decl, &[arg_val.into()], "sqrt")
                         .map_err(|e| e.to_string())?;
-                    return result.try_as_basic_value().basic().ok_or("sqrt returned void".into());
+                    return result
+                        .try_as_basic_value()
+                        .basic()
+                        .ok_or("sqrt returned void".into());
                 }
                 "mesh_math_floor" => {
                     let arg_val = self.codegen_expr(&args[0])?;
                     let intrinsic = Intrinsic::find("llvm.floor").ok_or("llvm.floor not found")?;
                     let f64_ty = self.context.f64_type();
-                    let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                    let decl = intrinsic
+                        .get_declaration(&self.module, &[f64_ty.into()])
                         .ok_or("Failed to get llvm.floor declaration")?;
-                    let float_result = self.builder.build_call(decl, &[arg_val.into()], "floor")
+                    let float_result = self
+                        .builder
+                        .build_call(decl, &[arg_val.into()], "floor")
                         .map_err(|e| e.to_string())?
-                        .try_as_basic_value().basic().ok_or("floor returned void")?;
-                    let int_result = self.builder
-                        .build_float_to_signed_int(float_result.into_float_value(), self.context.i64_type(), "floor_to_int")
+                        .try_as_basic_value()
+                        .basic()
+                        .ok_or("floor returned void")?;
+                    let int_result = self
+                        .builder
+                        .build_float_to_signed_int(
+                            float_result.into_float_value(),
+                            self.context.i64_type(),
+                            "floor_to_int",
+                        )
                         .map_err(|e| e.to_string())?;
                     return Ok(int_result.into());
                 }
@@ -917,13 +1154,23 @@ impl<'ctx> CodeGen<'ctx> {
                     let arg_val = self.codegen_expr(&args[0])?;
                     let intrinsic = Intrinsic::find("llvm.ceil").ok_or("llvm.ceil not found")?;
                     let f64_ty = self.context.f64_type();
-                    let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                    let decl = intrinsic
+                        .get_declaration(&self.module, &[f64_ty.into()])
                         .ok_or("Failed to get llvm.ceil declaration")?;
-                    let float_result = self.builder.build_call(decl, &[arg_val.into()], "ceil")
+                    let float_result = self
+                        .builder
+                        .build_call(decl, &[arg_val.into()], "ceil")
                         .map_err(|e| e.to_string())?
-                        .try_as_basic_value().basic().ok_or("ceil returned void")?;
-                    let int_result = self.builder
-                        .build_float_to_signed_int(float_result.into_float_value(), self.context.i64_type(), "ceil_to_int")
+                        .try_as_basic_value()
+                        .basic()
+                        .ok_or("ceil returned void")?;
+                    let int_result = self
+                        .builder
+                        .build_float_to_signed_int(
+                            float_result.into_float_value(),
+                            self.context.i64_type(),
+                            "ceil_to_int",
+                        )
                         .map_err(|e| e.to_string())?;
                     return Ok(int_result.into());
                 }
@@ -931,13 +1178,23 @@ impl<'ctx> CodeGen<'ctx> {
                     let arg_val = self.codegen_expr(&args[0])?;
                     let intrinsic = Intrinsic::find("llvm.round").ok_or("llvm.round not found")?;
                     let f64_ty = self.context.f64_type();
-                    let decl = intrinsic.get_declaration(&self.module, &[f64_ty.into()])
+                    let decl = intrinsic
+                        .get_declaration(&self.module, &[f64_ty.into()])
                         .ok_or("Failed to get llvm.round declaration")?;
-                    let float_result = self.builder.build_call(decl, &[arg_val.into()], "round")
+                    let float_result = self
+                        .builder
+                        .build_call(decl, &[arg_val.into()], "round")
                         .map_err(|e| e.to_string())?
-                        .try_as_basic_value().basic().ok_or("round returned void")?;
-                    let int_result = self.builder
-                        .build_float_to_signed_int(float_result.into_float_value(), self.context.i64_type(), "round_to_int")
+                        .try_as_basic_value()
+                        .basic()
+                        .ok_or("round returned void")?;
+                    let int_result = self
+                        .builder
+                        .build_float_to_signed_int(
+                            float_result.into_float_value(),
+                            self.context.i64_type(),
+                            "round_to_int",
+                        )
                         .map_err(|e| e.to_string())?;
                     return Ok(int_result.into());
                 }
@@ -964,16 +1221,27 @@ impl<'ctx> CodeGen<'ctx> {
                                     } else if let inkwell::types::BasicMetadataTypeEnum::PointerType(pt) = param_ty {
                                         coerced_args[i] = pt.const_null().into();
                                     }
-                                } else if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = param_ty {
+                                } else if let inkwell::types::BasicMetadataTypeEnum::PointerType(
+                                    _,
+                                ) = param_ty
+                                {
                                     // Non-empty struct -> ptr: heap-alloc + store
                                     let sv_ty = sv.get_type();
                                     let i64_type = self.context.i64_type();
-                                    let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
+                                    let size =
+                                        sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
                                     let align = i64_type.const_int(8, false);
-                                    let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                                    let gc_alloc = self
+                                        .module
+                                        .get_function("mesh_gc_alloc_actor")
                                         .ok_or("mesh_gc_alloc_actor not found")?;
-                                    let heap_ptr = self.builder
-                                        .build_call(gc_alloc, &[size.into(), align.into()], "arg_struct_heap")
+                                    let heap_ptr = self
+                                        .builder
+                                        .build_call(
+                                            gc_alloc,
+                                            &[size.into(), align.into()],
+                                            "arg_struct_heap",
+                                        )
                                         .map_err(|e| e.to_string())?
                                         .try_as_basic_value()
                                         .basic()
@@ -983,17 +1251,28 @@ impl<'ctx> CodeGen<'ctx> {
                                         .build_store(heap_ptr, sv)
                                         .map_err(|e| e.to_string())?;
                                     coerced_args[i] = heap_ptr.into();
-                                } else if let inkwell::types::BasicMetadataTypeEnum::IntType(it) = param_ty {
+                                } else if let inkwell::types::BasicMetadataTypeEnum::IntType(it) =
+                                    param_ty
+                                {
                                     if it.get_bit_width() == 64 {
                                         // Non-empty struct -> i64: heap-alloc + ptrtoint
                                         let sv_ty = sv.get_type();
                                         let i64_type = self.context.i64_type();
-                                        let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
+                                        let size = sv_ty
+                                            .size_of()
+                                            .unwrap_or(i64_type.const_int(64, false));
                                         let align = i64_type.const_int(8, false);
-                                        let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                                        let gc_alloc = self
+                                            .module
+                                            .get_function("mesh_gc_alloc_actor")
                                             .ok_or("mesh_gc_alloc_actor not found")?;
-                                        let heap_ptr = self.builder
-                                            .build_call(gc_alloc, &[size.into(), align.into()], "arg_struct_heap")
+                                        let heap_ptr = self
+                                            .builder
+                                            .build_call(
+                                                gc_alloc,
+                                                &[size.into(), align.into()],
+                                                "arg_struct_heap",
+                                            )
                                             .map_err(|e| e.to_string())?
                                             .try_as_basic_value()
                                             .basic()
@@ -1002,7 +1281,8 @@ impl<'ctx> CodeGen<'ctx> {
                                         self.builder
                                             .build_store(heap_ptr, sv)
                                             .map_err(|e| e.to_string())?;
-                                        let cast = self.builder
+                                        let cast = self
+                                            .builder
                                             .build_ptr_to_int(heap_ptr, *it, "struct_ptr_to_i64")
                                             .map_err(|e| e.to_string())?;
                                         coerced_args[i] = cast.into();
@@ -1010,17 +1290,25 @@ impl<'ctx> CodeGen<'ctx> {
                                 }
                             }
                             BasicMetadataValueEnum::IntValue(iv) => {
-                                if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = param_ty {
+                                if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) =
+                                    param_ty
+                                {
                                     if iv.get_type().get_bit_width() == 64 {
-                                        let ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
-                                        let cast = self.builder
+                                        let ptr_ty =
+                                            self.context.ptr_type(inkwell::AddressSpace::default());
+                                        let cast = self
+                                            .builder
                                             .build_int_to_ptr(iv, ptr_ty, "i64_to_ptr")
                                             .map_err(|e| e.to_string())?;
                                         coerced_args[i] = cast.into();
                                     }
-                                } else if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) = param_ty {
+                                } else if let inkwell::types::BasicMetadataTypeEnum::IntType(
+                                    param_it,
+                                ) = param_ty
+                                {
                                     if iv.get_type().get_bit_width() < param_it.get_bit_width() {
-                                        let extended = self.builder
+                                        let extended = self
+                                            .builder
                                             .build_int_z_extend(iv, *param_it, "zext_arg")
                                             .map_err(|e| e.to_string())?;
                                         coerced_args[i] = extended.into();
@@ -1028,9 +1316,12 @@ impl<'ctx> CodeGen<'ctx> {
                                 }
                             }
                             BasicMetadataValueEnum::PointerValue(pv) => {
-                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) = param_ty {
+                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) =
+                                    param_ty
+                                {
                                     if param_it.get_bit_width() == 64 {
-                                        let cast = self.builder
+                                        let cast = self
+                                            .builder
                                             .build_ptr_to_int(pv, *param_it, "ptr_to_i64")
                                             .map_err(|e| e.to_string())?;
                                         coerced_args[i] = cast.into();
@@ -1068,9 +1359,12 @@ impl<'ctx> CodeGen<'ctx> {
                         let i64_type = self.context.i64_type();
                         let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
                         let align = i64_type.const_int(8, false);
-                        let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                        let gc_alloc = self
+                            .module
+                            .get_function("mesh_gc_alloc_actor")
                             .ok_or("mesh_gc_alloc_actor not found")?;
-                        let heap_ptr = self.builder
+                        let heap_ptr = self
+                            .builder
                             .build_call(gc_alloc, &[size.into(), align.into()], "struct_to_ptr")
                             .map_err(|e| e.to_string())?
                             .try_as_basic_value()
@@ -1099,19 +1393,26 @@ impl<'ctx> CodeGen<'ctx> {
                     if i < coerced_args.len() {
                         match coerced_args[i] {
                             BasicMetadataValueEnum::IntValue(arg_iv) => {
-                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) = param_ty {
-                                    if arg_iv.get_type().get_bit_width() < param_it.get_bit_width() {
+                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) =
+                                    param_ty
+                                {
+                                    if arg_iv.get_type().get_bit_width() < param_it.get_bit_width()
+                                    {
                                         let extended = self
                                             .builder
                                             .build_int_z_extend(arg_iv, *param_it, "zext_arg")
                                             .map_err(|e| e.to_string())?;
                                         coerced_args[i] = extended.into();
                                     }
-                                } else if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = param_ty {
+                                } else if let inkwell::types::BasicMetadataTypeEnum::PointerType(
+                                    _,
+                                ) = param_ty
+                                {
                                     // Runtime function expects ptr but we have i64
                                     // (e.g., connection handle passed to mesh_ws_send).
                                     if arg_iv.get_type().get_bit_width() == 64 {
-                                        let ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
+                                        let ptr_ty =
+                                            self.context.ptr_type(inkwell::AddressSpace::default());
                                         let cast = self
                                             .builder
                                             .build_int_to_ptr(arg_iv, ptr_ty, "i64_to_ptr")
@@ -1123,7 +1424,9 @@ impl<'ctx> CodeGen<'ctx> {
                             BasicMetadataValueEnum::PointerValue(arg_pv) => {
                                 // If the runtime function expects i64 but we have a pointer
                                 // (e.g., string values passed to mesh_map_put), cast ptr->i64.
-                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) = param_ty {
+                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) =
+                                    param_ty
+                                {
                                     if param_it.get_bit_width() == 64 {
                                         let cast = self
                                             .builder
@@ -1136,7 +1439,9 @@ impl<'ctx> CodeGen<'ctx> {
                             BasicMetadataValueEnum::FloatValue(arg_fv) => {
                                 // If the runtime function expects i64 but we have a float
                                 // (e.g., Float values passed to mesh_list_append), bitcast f64->i64.
-                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) = param_ty {
+                                if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) =
+                                    param_ty
+                                {
                                     if param_it.get_bit_width() == 64 {
                                         let cast = self
                                             .builder
@@ -1151,24 +1456,41 @@ impl<'ctx> CodeGen<'ctx> {
                                 // This occurs when type resolution couldn't determine the variable's
                                 // type and defaulted to Unit.
                                 if arg_sv.get_type().count_fields() == 0 {
-                                    if let inkwell::types::BasicMetadataTypeEnum::PointerType(pt) = param_ty {
+                                    if let inkwell::types::BasicMetadataTypeEnum::PointerType(pt) =
+                                        param_ty
+                                    {
                                         coerced_args[i] = pt.const_null().into();
-                                    } else if let inkwell::types::BasicMetadataTypeEnum::IntType(it) = param_ty {
+                                    } else if let inkwell::types::BasicMetadataTypeEnum::IntType(
+                                        it,
+                                    ) = param_ty
+                                    {
                                         coerced_args[i] = it.const_zero().into();
                                     }
                                 }
                                 // If the runtime function expects i64 but we have a struct value
                                 // (e.g., ConnectionState passed to mesh_map_put), heap-alloc + ptrtoint.
-                                else if let inkwell::types::BasicMetadataTypeEnum::IntType(param_it) = param_ty {
+                                else if let inkwell::types::BasicMetadataTypeEnum::IntType(
+                                    param_it,
+                                ) = param_ty
+                                {
                                     if param_it.get_bit_width() == 64 {
                                         let sv_ty = arg_sv.get_type();
                                         let i64_type = self.context.i64_type();
-                                        let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
+                                        let size = sv_ty
+                                            .size_of()
+                                            .unwrap_or(i64_type.const_int(64, false));
                                         let align = i64_type.const_int(8, false);
-                                        let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                                        let gc_alloc = self
+                                            .module
+                                            .get_function("mesh_gc_alloc_actor")
                                             .ok_or("mesh_gc_alloc_actor not found")?;
-                                        let heap_ptr = self.builder
-                                            .build_call(gc_alloc, &[size.into(), align.into()], "struct_heap")
+                                        let heap_ptr = self
+                                            .builder
+                                            .build_call(
+                                                gc_alloc,
+                                                &[size.into(), align.into()],
+                                                "struct_heap",
+                                            )
                                             .map_err(|e| e.to_string())?
                                             .try_as_basic_value()
                                             .basic()
@@ -1179,7 +1501,11 @@ impl<'ctx> CodeGen<'ctx> {
                                             .map_err(|e| e.to_string())?;
                                         let cast = self
                                             .builder
-                                            .build_ptr_to_int(heap_ptr, *param_it, "struct_ptr_to_i64")
+                                            .build_ptr_to_int(
+                                                heap_ptr,
+                                                *param_it,
+                                                "struct_ptr_to_i64",
+                                            )
                                             .map_err(|e| e.to_string())?;
                                         coerced_args[i] = cast.into();
                                     }
@@ -1188,16 +1514,28 @@ impl<'ctx> CodeGen<'ctx> {
                                 // (e.g., struct passed to mesh_alloc_result), heap-allocate + store + pass ptr.
                                 // Must use GC heap (not stack alloca) because the pointer may be stored
                                 // in a MeshResult that outlives the current stack frame.
-                                else if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = param_ty {
+                                else if let inkwell::types::BasicMetadataTypeEnum::PointerType(
+                                    _,
+                                ) = param_ty
+                                {
                                     let sv_ty = arg_sv.get_type();
                                     let i64_type = self.context.i64_type();
-                                    let _ptr_type = self.context.ptr_type(inkwell::AddressSpace::default());
-                                    let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
+                                    let _ptr_type =
+                                        self.context.ptr_type(inkwell::AddressSpace::default());
+                                    let size =
+                                        sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
                                     let align = i64_type.const_int(8, false);
-                                    let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                                    let gc_alloc = self
+                                        .module
+                                        .get_function("mesh_gc_alloc_actor")
                                         .ok_or("mesh_gc_alloc_actor not found")?;
-                                    let heap_ptr = self.builder
-                                        .build_call(gc_alloc, &[size.into(), align.into()], "struct_heap")
+                                    let heap_ptr = self
+                                        .builder
+                                        .build_call(
+                                            gc_alloc,
+                                            &[size.into(), align.into()],
+                                            "struct_heap",
+                                        )
                                         .map_err(|e| e.to_string())?
                                         .try_as_basic_value()
                                         .basic()
@@ -1261,9 +1599,14 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // Runtime functions returning i64 for pointer values (e.g., map_get
                 // returning a string pointer as u64) need inttoptr conversion.
-                if matches!(ty, MirType::String | MirType::Ptr
-                    | MirType::Struct(_) | MirType::SumType(_)
-                    | MirType::Pid(_)) {
+                if matches!(
+                    ty,
+                    MirType::String
+                        | MirType::Ptr
+                        | MirType::Struct(_)
+                        | MirType::SumType(_)
+                        | MirType::Pid(_)
+                ) {
                     if let BasicValueEnum::IntValue(iv) = result {
                         if iv.get_type().get_bit_width() == 64 {
                             let ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
@@ -1286,9 +1629,12 @@ impl<'ctx> CodeGen<'ctx> {
                         let i64_type = self.context.i64_type();
                         let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
                         let align = i64_type.const_int(8, false);
-                        let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                        let gc_alloc = self
+                            .module
+                            .get_function("mesh_gc_alloc_actor")
                             .ok_or("mesh_gc_alloc_actor not found")?;
-                        let heap_ptr = self.builder
+                        let heap_ptr = self
+                            .builder
                             .build_call(gc_alloc, &[size.into(), align.into()], "struct_to_ptr")
                             .map_err(|e| e.to_string())?
                             .try_as_basic_value()
@@ -1309,10 +1655,8 @@ impl<'ctx> CodeGen<'ctx> {
         // Indirect call through a function pointer or closure
         let fn_ptr = self.codegen_expr(func)?;
         let ret_ty = self.llvm_type(ty);
-        let param_types: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> = args
-            .iter()
-            .map(|a| self.llvm_type(a.ty()).into())
-            .collect();
+        let param_types: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> =
+            args.iter().map(|a| self.llvm_type(a.ty()).into()).collect();
         let fn_type = ret_ty.fn_type(&param_types, false);
 
         let call = self
@@ -1389,11 +1733,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Build the function type for the indirect call
         let ret_ty = self.llvm_type(ty);
-        let mut param_types: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> = vec![
-            self.context
-                .ptr_type(inkwell::AddressSpace::default())
-                .into(),
-        ];
+        let mut param_types: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> = vec![self
+            .context
+            .ptr_type(inkwell::AddressSpace::default())
+            .into()];
         for arg in args {
             param_types.push(self.llvm_type(arg.ty()).into());
         }
@@ -1461,7 +1804,13 @@ impl<'ctx> CodeGen<'ctx> {
         let then_val = self.codegen_expr(then_body)?;
         // Only store result and branch if block is not already terminated
         // (break/continue/return may have terminated the block)
-        if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+        if self
+            .builder
+            .get_insert_block()
+            .unwrap()
+            .get_terminator()
+            .is_none()
+        {
             self.builder
                 .build_store(result_alloca, then_val)
                 .map_err(|e| e.to_string())?;
@@ -1473,7 +1822,13 @@ impl<'ctx> CodeGen<'ctx> {
         // Else branch
         self.builder.position_at_end(else_bb);
         let else_val = self.codegen_expr(else_body)?;
-        if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+        if self
+            .builder
+            .get_insert_block()
+            .unwrap()
+            .get_terminator()
+            .is_none()
+        {
             self.builder
                 .build_store(result_alloca, else_val)
                 .map_err(|e| e.to_string())?;
@@ -1558,10 +1913,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     // ── Block expression ─────────────────────────────────────────────
 
-    fn codegen_block(
-        &mut self,
-        exprs: &[MirExpr],
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    fn codegen_block(&mut self, exprs: &[MirExpr]) -> Result<BasicValueEnum<'ctx>, String> {
         if exprs.is_empty() {
             return Ok(self.context.struct_type(&[], false).const_zero().into());
         }
@@ -1752,8 +2104,10 @@ impl<'ctx> CodeGen<'ctx> {
                     .builder
                     .build_struct_gep(struct_ty, base_alloca, i as u32, "base_field_ptr")
                     .map_err(|e| e.to_string())?;
-                let field_llvm_ty = struct_ty.get_field_type_at_index(i as u32)
-                    .ok_or_else(|| format!("No field at index {} in struct '{}'", i, struct_name))?;
+                let field_llvm_ty =
+                    struct_ty.get_field_type_at_index(i as u32).ok_or_else(|| {
+                        format!("No field at index {} in struct '{}'", i, struct_name)
+                    })?;
                 self.builder
                     .build_load(field_llvm_ty, field_ptr, "base_field_val")
                     .map_err(|e| e.to_string())?
@@ -1772,7 +2126,11 @@ impl<'ctx> CodeGen<'ctx> {
         // Load and return the new struct value.
         let result = self
             .builder
-            .build_load(struct_ty.as_basic_type_enum(), new_alloca, "struct_update_val")
+            .build_load(
+                struct_ty.as_basic_type_enum(),
+                new_alloca,
+                "struct_update_val",
+            )
             .map_err(|e| e.to_string())?;
 
         Ok(result)
@@ -1791,7 +2149,12 @@ impl<'ctx> CodeGen<'ctx> {
         // Determine the struct name
         let struct_name = match object.ty() {
             MirType::Struct(name) => name.clone(),
-            _ => return Err(format!("Field access on non-struct type: {:?}", object.ty())),
+            _ => {
+                return Err(format!(
+                    "Field access on non-struct type: {:?}",
+                    object.ty()
+                ))
+            }
         };
 
         let struct_ty = self
@@ -1825,7 +2188,11 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     /// Find the field index in a struct definition.
-    pub(crate) fn find_struct_field_index(&self, struct_name: &str, field: &str) -> Result<usize, String> {
+    pub(crate) fn find_struct_field_index(
+        &self,
+        struct_name: &str,
+        field: &str,
+    ) -> Result<usize, String> {
         let fields = self
             .mir_struct_defs
             .get(struct_name)
@@ -1881,8 +2248,12 @@ impl<'ctx> CodeGen<'ctx> {
         // Store fields: create variant overlay struct type and GEP into it
         if !fields.is_empty() {
             let field_types: Vec<MirType> = variant_def.fields.clone();
-            let variant_ty =
-                variant_struct_type(self.context, &field_types, &self.struct_types, &self.sum_type_layouts);
+            let variant_ty = variant_struct_type(
+                self.context,
+                &field_types,
+                &self.struct_types,
+                &self.sum_type_layouts,
+            );
 
             // Store each field via the variant overlay.
             // For generic sum types like Result/Option where the layout is {i8, ptr},
@@ -1903,7 +2274,9 @@ impl<'ctx> CodeGen<'ctx> {
                     let i64_ty = self.context.i64_type();
                     let target_data = self.target_machine.get_target_data();
                     let struct_size = target_data.get_store_size(&sv_ty);
-                    let size = sv_ty.size_of().unwrap_or(i64_ty.const_int(struct_size, false));
+                    let size = sv_ty
+                        .size_of()
+                        .unwrap_or(i64_ty.const_int(struct_size, false));
                     let align = i64_ty.const_int(8, false);
                     let gc_alloc = get_intrinsic(&self.module, "mesh_gc_alloc_actor");
                     let heap_ptr = self
@@ -1977,10 +2350,8 @@ impl<'ctx> CodeGen<'ctx> {
             env_raw.into_pointer_value()
         } else {
             // Build an env struct type from capture types
-            let cap_types: Vec<inkwell::types::BasicTypeEnum<'ctx>> = captures
-                .iter()
-                .map(|c| self.llvm_type(c.ty()))
-                .collect();
+            let cap_types: Vec<inkwell::types::BasicTypeEnum<'ctx>> =
+                captures.iter().map(|c| self.llvm_type(c.ty())).collect();
             let env_struct_ty = self.context.struct_type(&cap_types, false);
 
             // Calculate size via target data
@@ -2048,10 +2419,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     // ── Return ───────────────────────────────────────────────────────
 
-    fn codegen_return(
-        &mut self,
-        inner: &MirExpr,
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    fn codegen_return(&mut self, inner: &MirExpr) -> Result<BasicValueEnum<'ctx>, String> {
         let val = self.codegen_expr(inner)?;
 
         // When the inner expression produces a pointer but the function returns
@@ -2140,8 +2508,13 @@ impl<'ctx> CodeGen<'ctx> {
             let gc_alloc_fn = get_intrinsic(&self.module, "mesh_gc_alloc_actor");
             let size_val = i64_ty.const_int(total_size, false);
             let align_val = i64_ty.const_int(8, false);
-            let buf_alloca = self.builder
-                .build_call(gc_alloc_fn, &[size_val.into(), align_val.into()], "spawn_args")
+            let buf_alloca = self
+                .builder
+                .build_call(
+                    gc_alloc_fn,
+                    &[size_val.into(), align_val.into()],
+                    "spawn_args",
+                )
                 .map_err(|e| e.to_string())?
                 .try_as_basic_value()
                 .basic()
@@ -2157,7 +2530,12 @@ impl<'ctx> CodeGen<'ctx> {
                 } else {
                     unsafe {
                         self.builder
-                            .build_gep(i8_ty, buf_alloca, &[i64_ty.const_int(offset, false)], &format!("arg_ptr_{}", i))
+                            .build_gep(
+                                i8_ty,
+                                buf_alloca,
+                                &[i64_ty.const_int(offset, false)],
+                                &format!("arg_ptr_{}", i),
+                            )
                             .map_err(|e| e.to_string())?
                     }
                 };
@@ -2201,7 +2579,12 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_call(
                 spawn_fn,
-                &[fn_ptr.into(), args_ptr.into(), args_size.into(), priority_val.into()],
+                &[
+                    fn_ptr.into(),
+                    args_ptr.into(),
+                    args_size.into(),
+                    priority_val.into(),
+                ],
                 "pid",
             )
             .map_err(|e| e.to_string())?
@@ -2221,11 +2604,7 @@ impl<'ctx> CodeGen<'ctx> {
             };
             let set_terminate_fn = get_intrinsic(&self.module, "mesh_actor_set_terminate");
             self.builder
-                .build_call(
-                    set_terminate_fn,
-                    &[pid_val.into(), cb_ptr.into()],
-                    "",
-                )
+                .build_call(set_terminate_fn, &[pid_val.into(), cb_ptr.into()], "")
                 .map_err(|e| e.to_string())?;
         }
 
@@ -2316,7 +2695,12 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder
             .build_call(
                 send_after_fn,
-                &[pid_val.into(), ms_val.into(), msg_ptr.into(), msg_size.into()],
+                &[
+                    pid_val.into(),
+                    ms_val.into(),
+                    msg_ptr.into(),
+                    msg_size.into(),
+                ],
                 "",
             )
             .map_err(|e| e.to_string())?;
@@ -2335,7 +2719,13 @@ impl<'ctx> CodeGen<'ctx> {
     fn codegen_unpack_string(
         &mut self,
         string_val: BasicValueEnum<'ctx>,
-    ) -> Result<(inkwell::values::PointerValue<'ctx>, inkwell::values::IntValue<'ctx>), String> {
+    ) -> Result<
+        (
+            inkwell::values::PointerValue<'ctx>,
+            inkwell::values::IntValue<'ctx>,
+        ),
+        String,
+    > {
         let i64_ty = self.context.i64_type();
         let ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
 
@@ -2371,10 +2761,7 @@ impl<'ctx> CodeGen<'ctx> {
     ///
     /// Unpacks two MeshString args into (ptr, len) pairs and calls
     /// mesh_node_start(name_ptr, name_len, cookie_ptr, cookie_len).
-    fn codegen_node_start(
-        &mut self,
-        args: &[MirExpr],
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    fn codegen_node_start(&mut self, args: &[MirExpr]) -> Result<BasicValueEnum<'ctx>, String> {
         let name_val = self.codegen_expr(&args[0])?;
         let cookie_val = self.codegen_expr(&args[1])?;
 
@@ -2386,7 +2773,12 @@ impl<'ctx> CodeGen<'ctx> {
             .builder
             .build_call(
                 start_fn,
-                &[name_ptr.into(), name_len.into(), cookie_ptr.into(), cookie_len.into()],
+                &[
+                    name_ptr.into(),
+                    name_len.into(),
+                    cookie_ptr.into(),
+                    cookie_len.into(),
+                ],
                 "node_start",
             )
             .map_err(|e| e.to_string())?;
@@ -2411,11 +2803,7 @@ impl<'ctx> CodeGen<'ctx> {
         let func = get_intrinsic(&self.module, intrinsic_name);
         let result = self
             .builder
-            .build_call(
-                func,
-                &[data_ptr.into(), data_len.into()],
-                "node_call",
-            )
+            .build_call(func, &[data_ptr.into(), data_len.into()], "node_call")
             .map_err(|e| e.to_string())?;
 
         result
@@ -2529,7 +2917,11 @@ impl<'ctx> CodeGen<'ctx> {
             let align_val = i64_ty.const_int(8, false);
             let buf_ptr = self
                 .builder
-                .build_call(gc_alloc_fn, &[size_val.into(), align_val.into()], "spawn_args")
+                .build_call(
+                    gc_alloc_fn,
+                    &[size_val.into(), align_val.into()],
+                    "spawn_args",
+                )
                 .map_err(|e| e.to_string())?
                 .try_as_basic_value()
                 .basic()
@@ -2652,7 +3044,13 @@ impl<'ctx> CodeGen<'ctx> {
             // timeout_bb: execute the timeout body expression.
             self.builder.position_at_end(timeout_bb);
             let timeout_val = self.codegen_expr(timeout_expr)?;
-            if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+            if self
+                .builder
+                .get_insert_block()
+                .unwrap()
+                .get_terminator()
+                .is_none()
+            {
                 self.builder
                     .build_store(result_alloca, timeout_val)
                     .map_err(|e| e.to_string())?;
@@ -2665,7 +3063,13 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.position_at_end(msg_bb);
             let msg_val = self.codegen_recv_load_message(msg_ptr, result_ty)?;
             let msg_result = self.codegen_recv_process_arms(arms, msg_val)?;
-            if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+            if self
+                .builder
+                .get_insert_block()
+                .unwrap()
+                .get_terminator()
+                .is_none()
+            {
                 self.builder
                     .build_store(result_alloca, msg_result)
                     .map_err(|e| e.to_string())?;
@@ -2712,31 +3116,26 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Load the message data as the expected type.
         let msg_val: BasicValueEnum<'ctx> = match result_ty {
-            MirType::Int => {
-                self.builder
-                    .build_load(i64_ty, data_ptr, "msg_int")
-                    .map_err(|e| e.to_string())?
-            }
-            MirType::Float => {
-                self.builder
-                    .build_load(self.context.f64_type(), data_ptr, "msg_float")
-                    .map_err(|e| e.to_string())?
-            }
-            MirType::Bool => {
-                self.builder
-                    .build_load(self.context.i8_type(), data_ptr, "msg_bool")
-                    .map_err(|e| e.to_string())?
-            }
-            MirType::String => {
-                self.builder
-                    .build_load(ptr_ty, data_ptr, "msg_string")
-                    .map_err(|e| e.to_string())?
-            }
-            _ => {
-                self.builder
-                    .build_load(i64_ty, data_ptr, "msg_data")
-                    .map_err(|e| e.to_string())?
-            }
+            MirType::Int => self
+                .builder
+                .build_load(i64_ty, data_ptr, "msg_int")
+                .map_err(|e| e.to_string())?,
+            MirType::Float => self
+                .builder
+                .build_load(self.context.f64_type(), data_ptr, "msg_float")
+                .map_err(|e| e.to_string())?,
+            MirType::Bool => self
+                .builder
+                .build_load(self.context.i8_type(), data_ptr, "msg_bool")
+                .map_err(|e| e.to_string())?,
+            MirType::String => self
+                .builder
+                .build_load(ptr_ty, data_ptr, "msg_string")
+                .map_err(|e| e.to_string())?,
+            _ => self
+                .builder
+                .build_load(i64_ty, data_ptr, "msg_data")
+                .map_err(|e| e.to_string())?,
         };
 
         Ok(msg_val)
@@ -2798,10 +3197,7 @@ impl<'ctx> CodeGen<'ctx> {
         Ok(result)
     }
 
-    fn codegen_actor_link(
-        &mut self,
-        target: &MirExpr,
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    fn codegen_actor_link(&mut self, target: &MirExpr) -> Result<BasicValueEnum<'ctx>, String> {
         // Evaluate the target PID.
         let target_val = self.codegen_expr(target)?.into_int_value();
 
@@ -2890,19 +3286,26 @@ impl<'ctx> CodeGen<'ctx> {
         let end_val = self.codegen_expr(end_expr)?.into_int_value();
 
         // Compute range length: max(0, end - start).
-        let diff = self.builder.build_int_sub(end_val, start_val, "range_diff")
+        let diff = self
+            .builder
+            .build_int_sub(end_val, start_val, "range_diff")
             .map_err(|e| e.to_string())?;
         let zero = i64_ty.const_int(0, false);
-        let is_positive = self.builder.build_int_compare(
-            IntPredicate::SGT, diff, zero, "is_positive",
-        ).map_err(|e| e.to_string())?;
-        let range_len = self.builder.build_select(is_positive, diff, zero, "range_len")
+        let is_positive = self
+            .builder
+            .build_int_compare(IntPredicate::SGT, diff, zero, "is_positive")
+            .map_err(|e| e.to_string())?;
+        let range_len = self
+            .builder
+            .build_select(is_positive, diff, zero, "range_len")
             .map_err(|e| e.to_string())?
             .into_int_value();
 
         // Pre-allocate result list builder.
         let list_builder_new = get_intrinsic(&self.module, "mesh_list_builder_new");
-        let result_list = self.builder.build_call(list_builder_new, &[range_len.into()], "result_list")
+        let result_list = self
+            .builder
+            .build_call(list_builder_new, &[range_len.into()], "result_list")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -2910,15 +3313,21 @@ impl<'ctx> CodeGen<'ctx> {
             .into_pointer_value();
 
         // Alloca to hold the result list pointer (for break to return partial list).
-        let result_alloca = self.builder.build_alloca(ptr_ty, "result_alloca")
+        let result_alloca = self
+            .builder
+            .build_alloca(ptr_ty, "result_alloca")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(result_alloca, result_list)
+        self.builder
+            .build_store(result_alloca, result_list)
             .map_err(|e| e.to_string())?;
 
         // Create alloca for the loop counter.
-        let counter = self.builder.build_alloca(i64_ty, var)
+        let counter = self
+            .builder
+            .build_alloca(i64_ty, var)
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, start_val)
+        self.builder
+            .build_store(counter, start_val)
             .map_err(|e| e.to_string())?;
 
         // Create four basic blocks: header, body, latch, merge.
@@ -2931,18 +3340,23 @@ impl<'ctx> CodeGen<'ctx> {
         self.loop_stack.push((latch_bb, merge_bb));
 
         // Branch from current block to header.
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Header block: load counter, compare < end, branch --
         self.builder.position_at_end(header_bb);
-        let counter_val = self.builder.build_load(i64_ty, counter, "i")
+        let counter_val = self
+            .builder
+            .build_load(i64_ty, counter, "i")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let cmp = self.builder.build_int_compare(
-            IntPredicate::SLT, counter_val, end_val, "forin_cmp",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_conditional_branch(cmp, body_bb, merge_bb)
+        let cmp = self
+            .builder
+            .build_int_compare(IntPredicate::SLT, counter_val, end_val, "forin_cmp")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_conditional_branch(cmp, body_bb, merge_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Body block: bind loop variable, codegen body --
@@ -2954,10 +3368,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // If filter present, add conditional branch to skip body+push.
         if let Some(filter_expr) = filter {
-            let filter_val = self.codegen_expr(filter_expr)?
-                .into_int_value();
+            let filter_val = self.codegen_expr(filter_expr)?.into_int_value();
             let do_body_bb = self.context.append_basic_block(fn_val, "forin_do_body");
-            self.builder.build_conditional_branch(filter_val, do_body_bb, latch_bb)
+            self.builder
+                .build_conditional_branch(filter_val, do_body_bb, latch_bb)
                 .map_err(|e| e.to_string())?;
             self.builder.position_at_end(do_body_bb);
         }
@@ -2971,28 +3385,41 @@ impl<'ctx> CodeGen<'ctx> {
                 let body_ty = body_expr.ty();
                 let body_as_i64 = self.convert_to_list_element(body_val, body_ty)?;
                 let list_builder_push = get_intrinsic(&self.module, "mesh_list_builder_push");
-                let result_loaded = self.builder.build_load(ptr_ty, result_alloca, "res_list")
+                let result_loaded = self
+                    .builder
+                    .build_load(ptr_ty, result_alloca, "res_list")
                     .map_err(|e| e.to_string())?
                     .into_pointer_value();
-                self.builder.build_call(list_builder_push, &[result_loaded.into(), body_as_i64.into()], "")
+                self.builder
+                    .build_call(
+                        list_builder_push,
+                        &[result_loaded.into(), body_as_i64.into()],
+                        "",
+                    )
                     .map_err(|e| e.to_string())?;
-                self.builder.build_unconditional_branch(latch_bb)
+                self.builder
+                    .build_unconditional_branch(latch_bb)
                     .map_err(|e| e.to_string())?;
             }
         }
 
         // -- Latch block: increment counter, reduction check, branch to header --
         self.builder.position_at_end(latch_bb);
-        let latch_counter = self.builder.build_load(i64_ty, counter, "i_latch")
+        let latch_counter = self
+            .builder
+            .build_load(i64_ty, counter, "i_latch")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let incremented = self.builder.build_int_add(
-            latch_counter, i64_ty.const_int(1, false), "i_next",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, incremented)
+        let incremented = self
+            .builder
+            .build_int_add(latch_counter, i64_ty.const_int(1, false), "i_next")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_store(counter, incremented)
             .map_err(|e| e.to_string())?;
         self.emit_reduction_check();
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Cleanup --
@@ -3014,7 +3441,9 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(merge_bb);
 
         // Return the result list (comprehension semantics).
-        let final_result = self.builder.build_load(ptr_ty, result_alloca, "forin_result")
+        let final_result = self
+            .builder
+            .build_load(ptr_ty, result_alloca, "forin_result")
             .map_err(|e| e.to_string())?;
         Ok(final_result)
     }
@@ -3078,27 +3507,34 @@ impl<'ctx> CodeGen<'ctx> {
                     Ok(iv)
                 }
             }
-            BasicValueEnum::PointerValue(pv) => {
-                self.builder
-                    .build_ptr_to_int(pv, i64_ty, "ptr_to_i64")
-                    .map_err(|e| e.to_string())
-            }
+            BasicValueEnum::PointerValue(pv) => self
+                .builder
+                .build_ptr_to_int(pv, i64_ty, "ptr_to_i64")
+                .map_err(|e| e.to_string()),
             BasicValueEnum::FloatValue(fv) => {
-                let alloca = self.builder
+                let alloca = self
+                    .builder
                     .build_alloca(self.context.f64_type(), "f64_tmp")
                     .map_err(|e| e.to_string())?;
-                self.builder.build_store(alloca, fv).map_err(|e| e.to_string())?;
-                Ok(self.builder
+                self.builder
+                    .build_store(alloca, fv)
+                    .map_err(|e| e.to_string())?;
+                Ok(self
+                    .builder
                     .build_load(i64_ty, alloca, "f64_to_i64")
                     .map_err(|e| e.to_string())?
                     .into_int_value())
             }
             BasicValueEnum::StructValue(sv) => {
-                let alloca = self.builder
+                let alloca = self
+                    .builder
                     .build_alloca(sv.get_type(), "struct_tmp")
                     .map_err(|e| e.to_string())?;
-                self.builder.build_store(alloca, sv).map_err(|e| e.to_string())?;
-                Ok(self.builder
+                self.builder
+                    .build_store(alloca, sv)
+                    .map_err(|e| e.to_string())?;
+                Ok(self
+                    .builder
                     .build_load(i64_ty, alloca, "struct_to_i64")
                     .map_err(|e| e.to_string())?
                     .into_int_value())
@@ -3180,7 +3616,9 @@ impl<'ctx> CodeGen<'ctx> {
         // Create a global constant for the config buffer.
         let config_data = self.context.const_string(&config_bytes, false);
         let config_name = format!(".sup_config_{}", name);
-        let config_global = self.module.add_global(config_data.get_type(), None, &config_name);
+        let config_global = self
+            .module
+            .add_global(config_data.get_type(), None, &config_name);
         config_global.set_initializer(&config_data);
         config_global.set_constant(true);
         config_global.set_unnamed_addr(true);
@@ -3235,7 +3673,12 @@ impl<'ctx> CodeGen<'ctx> {
             let zero = self.context.i32_type().const_int(0, false);
             let elem_ptr = unsafe {
                 self.builder
-                    .build_gep(config_arr_ty, config_alloca, &[zero, offset_val], "fn_ptr_slot")
+                    .build_gep(
+                        config_arr_ty,
+                        config_alloca,
+                        &[zero, offset_val],
+                        "fn_ptr_slot",
+                    )
                     .map_err(|e| e.to_string())?
             };
 
@@ -3274,12 +3717,16 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create global constants for message and file strings
         let msg_val = self.context.const_string(message.as_bytes(), false);
-        let msg_global = self.module.add_global(msg_val.get_type(), None, ".panic_msg");
+        let msg_global = self
+            .module
+            .add_global(msg_val.get_type(), None, ".panic_msg");
         msg_global.set_initializer(&msg_val);
         msg_global.set_constant(true);
 
         let file_val = self.context.const_string(file.as_bytes(), false);
-        let file_global = self.module.add_global(file_val.get_type(), None, ".panic_file");
+        let file_global = self
+            .module
+            .add_global(file_val.get_type(), None, ".panic_file");
         file_global.set_initializer(&file_val);
         file_global.set_constant(true);
 
@@ -3289,10 +3736,7 @@ impl<'ctx> CodeGen<'ctx> {
             .i64_type()
             .const_int(message.len() as u64, false);
         let file_ptr = file_global.as_pointer_value();
-        let file_len = self
-            .context
-            .i64_type()
-            .const_int(file.len() as u64, false);
+        let file_len = self.context.i64_type().const_int(file.len() as u64, false);
         let line_val = self.context.i32_type().const_int(line as u64, false);
 
         self.builder
@@ -3345,15 +3789,17 @@ impl<'ctx> CodeGen<'ctx> {
         // All handlers share the same state type (the init function's return type).
         // The state may be a struct type (e.g., RateLimitState, StreamState), a pointer,
         // or i64. We must use the actual LLVM type, not just ptr-vs-i64.
-        let first_handler_name = call_handlers.first()
+        let first_handler_name = call_handlers
+            .first()
             .map(|(_, name, _)| name.as_str())
             .or_else(|| cast_handlers.first().map(|(_, name, _)| name.as_str()));
-        let state_llvm_ty: inkwell::types::BasicTypeEnum<'ctx> = if let Some(name) = first_handler_name {
+        let state_llvm_ty: inkwell::types::BasicTypeEnum<'ctx> = if let Some(name) =
+            first_handler_name
+        {
             if let Some(handler_fn) = self.functions.get(name) {
                 let param_types = handler_fn.get_type().get_param_types();
                 if !param_types.is_empty() {
-                    inkwell::types::BasicTypeEnum::try_from(param_types[0])
-                        .unwrap_or(i64_ty.into())
+                    inkwell::types::BasicTypeEnum::try_from(param_types[0]).unwrap_or(i64_ty.into())
                 } else {
                     i64_ty.into()
                 }
@@ -3366,18 +3812,23 @@ impl<'ctx> CodeGen<'ctx> {
 
         // The service loop function receives a ptr to the args buffer.
         // Load the initial state from the args buffer (first 8-byte slot).
-        let args_ptr_alloca = *self.locals.get("__args_ptr")
+        let args_ptr_alloca = *self
+            .locals
+            .get("__args_ptr")
             .ok_or("Missing __args_ptr parameter in service loop")?;
-        let args_ptr_val = self.builder
+        let args_ptr_val = self
+            .builder
             .build_load(ptr_ty, args_ptr_alloca, "args_ptr_val")
             .map_err(|e| e.to_string())?
             .into_pointer_value();
-        let init_state = self.builder
+        let init_state = self
+            .builder
             .build_load(state_llvm_ty, args_ptr_val, "init_state")
             .map_err(|e| e.to_string())?;
 
         // Create a state alloca to hold the mutable state across iterations.
-        let state_alloca = self.builder
+        let state_alloca = self
+            .builder
             .build_alloca(state_llvm_ty, "__state")
             .map_err(|e| e.to_string())?;
         self.builder
@@ -3392,14 +3843,16 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(loop_bb);
 
         // Load the current state from the state alloca.
-        let state_val = self.builder
+        let state_val = self
+            .builder
             .build_load(state_llvm_ty, state_alloca, "state")
             .map_err(|e| e.to_string())?;
 
         // Call mesh_actor_receive(-1) -> ptr (blocks until message arrives).
         let receive_fn = get_intrinsic(&self.module, "mesh_actor_receive");
         let timeout = i64_ty.const_int(u64::MAX, true); // -1
-        let msg_ptr = self.builder
+        let msg_ptr = self
+            .builder
             .build_call(receive_fn, &[timeout.into()], "msg_ptr")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
@@ -3410,7 +3863,8 @@ impl<'ctx> CodeGen<'ctx> {
         // Check for null (shutdown signal). If null, exit the loop.
         let exit_bb = self.context.append_basic_block(fn_val, "exit_loop");
         let continue_bb = self.context.append_basic_block(fn_val, "continue_loop");
-        let is_null = self.builder
+        let is_null = self
+            .builder
             .build_is_null(msg_ptr, "msg_is_null")
             .map_err(|e| e.to_string())?;
         self.builder
@@ -3435,7 +3889,8 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         // Extract type_tag (offset 0 from data_ptr).
-        let type_tag = self.builder
+        let type_tag = self
+            .builder
             .build_load(i64_ty, data_ptr, "type_tag")
             .map_err(|e| e.to_string())?
             .into_int_value();
@@ -3446,7 +3901,8 @@ impl<'ctx> CodeGen<'ctx> {
                 .build_gep(i8_ty, data_ptr, &[i64_ty.const_int(8, false)], "caller_ptr")
                 .map_err(|e| e.to_string())?
         };
-        let caller_pid = self.builder
+        let caller_pid = self
+            .builder
             .build_load(i64_ty, caller_ptr, "caller_pid")
             .map_err(|e| e.to_string())?
             .into_int_value();
@@ -3466,14 +3922,17 @@ impl<'ctx> CodeGen<'ctx> {
         let default_bb = self.context.append_basic_block(fn_val, "default");
 
         // Build the switch instruction.
-        let _switch = self.builder
+        let _switch = self
+            .builder
             .build_switch(
                 type_tag,
                 default_bb,
                 &all_handlers
                     .iter()
                     .map(|(tag, _, _, _)| {
-                        let bb = self.context.append_basic_block(fn_val, &format!("handler_{}", tag));
+                        let bb = self
+                            .context
+                            .append_basic_block(fn_val, &format!("handler_{}", tag));
                         (i64_ty.const_int(*tag, false), bb)
                     })
                     .collect::<Vec<_>>(),
@@ -3487,7 +3946,9 @@ impl<'ctx> CodeGen<'ctx> {
             .map(|(i, _)| {
                 // The switch cases are added in order; find the corresponding block.
                 let block_name = format!("handler_{}", all_handlers[i].0);
-                fn_val.get_basic_blocks().into_iter()
+                fn_val
+                    .get_basic_blocks()
+                    .into_iter()
                     .find(|bb| bb.get_name().to_str().unwrap_or("") == block_name)
                     .unwrap()
             })
@@ -3499,7 +3960,10 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.position_at_end(bb);
 
             // Look up handler function to get parameter types for correct arg loading.
-            let handler_fn = self.functions.get(*handler_fn_name).copied()
+            let handler_fn = self
+                .functions
+                .get(*handler_fn_name)
+                .copied()
                 .ok_or_else(|| format!("Handler function '{}' not found", handler_fn_name))?;
             let handler_param_types = handler_fn.get_type().get_param_types();
 
@@ -3521,12 +3985,16 @@ impl<'ctx> CodeGen<'ctx> {
                 // Load arg with the correct type based on handler function param type.
                 // Param index is arg_idx + 1 (first param is state).
                 let param_idx = arg_idx + 1;
-                let load_ty: inkwell::types::BasicTypeEnum<'ctx> = if param_idx < handler_param_types.len() && handler_param_types[param_idx].is_pointer_type() {
+                let load_ty: inkwell::types::BasicTypeEnum<'ctx> = if param_idx
+                    < handler_param_types.len()
+                    && handler_param_types[param_idx].is_pointer_type()
+                {
                     ptr_ty.into()
                 } else {
                     i64_ty.into()
                 };
-                let arg_val = self.builder
+                let arg_val = self
+                    .builder
                     .build_load(load_ty, arg_ptr, &format!("arg_{}", arg_idx))
                     .map_err(|e| e.to_string())?;
 
@@ -3552,21 +4020,39 @@ impl<'ctx> CodeGen<'ctx> {
                         }
                     } else if expected_meta_ty.is_float_type() {
                         // Float: bitcast i64 -> f64 via alloca
-                        let alloca = self.builder
-                            .build_alloca(self.context.i64_type(), &format!("arg_{}_f64_tmp", arg_idx))
+                        let alloca = self
+                            .builder
+                            .build_alloca(
+                                self.context.i64_type(),
+                                &format!("arg_{}_f64_tmp", arg_idx),
+                            )
                             .map_err(|e| e.to_string())?;
-                        self.builder.build_store(alloca, arg_val).map_err(|e| e.to_string())?;
                         self.builder
-                            .build_load(self.context.f64_type(), alloca, &format!("arg_{}_as_f64", arg_idx))
+                            .build_store(alloca, arg_val)
+                            .map_err(|e| e.to_string())?;
+                        self.builder
+                            .build_load(
+                                self.context.f64_type(),
+                                alloca,
+                                &format!("arg_{}_as_f64", arg_idx),
+                            )
                             .map_err(|e| e.to_string())?
                     } else if expected_meta_ty.is_struct_type() {
                         // Small struct: bitcast i64 -> struct via alloca
                         let expected_ty = inkwell::types::BasicTypeEnum::try_from(expected_meta_ty)
-                            .map_err(|_| format!("Cannot convert struct param type for arg {}", arg_idx))?;
-                        let alloca = self.builder
-                            .build_alloca(self.context.i64_type(), &format!("arg_{}_struct_tmp", arg_idx))
+                            .map_err(|_| {
+                                format!("Cannot convert struct param type for arg {}", arg_idx)
+                            })?;
+                        let alloca = self
+                            .builder
+                            .build_alloca(
+                                self.context.i64_type(),
+                                &format!("arg_{}_struct_tmp", arg_idx),
+                            )
                             .map_err(|e| e.to_string())?;
-                        self.builder.build_store(alloca, arg_val).map_err(|e| e.to_string())?;
+                        self.builder
+                            .build_store(alloca, arg_val)
+                            .map_err(|e| e.to_string())?;
                         self.builder
                             .build_load(expected_ty, alloca, &format!("arg_{}_as_struct", arg_idx))
                             .map_err(|e| e.to_string())?
@@ -3581,12 +4067,9 @@ impl<'ctx> CodeGen<'ctx> {
             }
 
             // Call the handler function.
-            let handler_result = self.builder
-                .build_call(
-                    handler_fn,
-                    &handler_args,
-                    "handler_result",
-                )
+            let handler_result = self
+                .builder
+                .build_call(handler_fn, &handler_args, "handler_result")
                 .map_err(|e| e.to_string())?
                 .try_as_basic_value()
                 .basic()
@@ -3691,7 +4174,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // Extract new_state = tuple_first(result_ptr) -> i64
                 let tuple_first_fn = get_intrinsic(&self.module, "mesh_tuple_first");
-                let new_state_val = self.builder
+                let new_state_val = self
+                    .builder
                     .build_call(tuple_first_fn, &[result_ptr.into()], "new_state")
                     .map_err(|e| e.to_string())?
                     .try_as_basic_value()
@@ -3701,7 +4185,8 @@ impl<'ctx> CodeGen<'ctx> {
 
                 // Extract reply = tuple_second(result_ptr) -> i64
                 let tuple_second_fn = get_intrinsic(&self.module, "mesh_tuple_second");
-                let reply_val = self.builder
+                let reply_val = self
+                    .builder
                     .build_call(tuple_second_fn, &[result_ptr.into()], "reply")
                     .map_err(|e| e.to_string())?
                     .try_as_basic_value()
@@ -3710,7 +4195,8 @@ impl<'ctx> CodeGen<'ctx> {
                     .into_int_value();
 
                 // Send reply to caller: mesh_service_reply(caller_pid, &reply, 8)
-                let reply_alloca = self.builder
+                let reply_alloca = self
+                    .builder
                     .build_alloca(i64_ty, "reply_buf")
                     .map_err(|e| e.to_string())?;
                 self.builder
@@ -3734,7 +4220,8 @@ impl<'ctx> CodeGen<'ctx> {
                 //   - Small structs (<= 8 bytes): bitcast from i64 (struct bits stored directly)
                 //   - Large structs (> 8 bytes): heap-allocated, i64 is pointer-as-int
                 if state_llvm_ty.is_pointer_type() {
-                    let state_ptr: inkwell::values::PointerValue<'ctx> = self.builder
+                    let state_ptr: inkwell::values::PointerValue<'ctx> = self
+                        .builder
                         .build_int_to_ptr(new_state_val, ptr_ty, "new_state_ptr")
                         .map_err(|e| e.to_string())?;
                     state_ptr.into()
@@ -3744,7 +4231,8 @@ impl<'ctx> CodeGen<'ctx> {
                     if struct_size <= 8 {
                         // Small struct (<= 8 bytes): the i64 IS the struct bits (bitcast).
                         // Reinterpret i64 bits as the struct type via alloca + load.
-                        let tmp = self.builder
+                        let tmp = self
+                            .builder
                             .build_alloca(i64_ty, "state_i64_tmp")
                             .map_err(|e| e.to_string())?;
                         self.builder
@@ -3756,7 +4244,8 @@ impl<'ctx> CodeGen<'ctx> {
                     } else {
                         // Large struct (> 8 bytes): the i64 from the tuple is a pointer
                         // to the heap-allocated struct. Convert to pointer, then load.
-                        let state_ptr = self.builder
+                        let state_ptr = self
+                            .builder
                             .build_int_to_ptr(new_state_val, ptr_ty, "new_state_struct_ptr")
                             .map_err(|e| e.to_string())?;
                         self.builder
@@ -3841,7 +4330,12 @@ impl<'ctx> CodeGen<'ctx> {
             let zero = self.context.i32_type().const_int(0, false);
             let element_ptr = unsafe {
                 self.builder
-                    .build_gep(arr_ty, args_ptr_val, &[zero, idx], &format!("arg_ptr_{}", i))
+                    .build_gep(
+                        arr_ty,
+                        args_ptr_val,
+                        &[zero, idx],
+                        &format!("arg_ptr_{}", i),
+                    )
                     .map_err(|e| e.to_string())?
             };
 
@@ -3912,7 +4406,8 @@ impl<'ctx> CodeGen<'ctx> {
         let gc_alloc = get_intrinsic(&self.module, "mesh_gc_alloc_actor");
         let size_val = i64_type.const_int(total_size as u64, false);
         let align_val = i64_type.const_int(8, false);
-        let tuple_ptr = self.builder
+        let tuple_ptr = self
+            .builder
             .build_call(gc_alloc, &[size_val.into(), align_val.into()], "tuple_ptr")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
@@ -3929,13 +4424,16 @@ impl<'ctx> CodeGen<'ctx> {
         // Store each element at offset 8 + i*8
         for (i, elem) in elements.iter().enumerate() {
             let offset = (8 + i * 8) as u64;
-            let base_int = self.builder
+            let base_int = self
+                .builder
                 .build_ptr_to_int(tuple_ptr, i64_type, "tuple_base")
                 .map_err(|e| format!("{}", e))?;
-            let addr_int = self.builder
+            let addr_int = self
+                .builder
                 .build_int_add(base_int, i64_type.const_int(offset, false), "elem_addr")
                 .map_err(|e| format!("{}", e))?;
-            let elem_ptr = self.builder
+            let elem_ptr = self
+                .builder
                 .build_int_to_ptr(addr_int, ptr_type, "elem_ptr")
                 .map_err(|e| format!("{}", e))?;
 
@@ -3950,14 +4448,14 @@ impl<'ctx> CodeGen<'ctx> {
                         iv
                     }
                 }
-                BasicMetadataValueEnum::PointerValue(pv) => {
-                    self.builder
-                        .build_ptr_to_int(pv, i64_type, "ptr_to_i64")
-                        .map_err(|e| e.to_string())?
-                }
+                BasicMetadataValueEnum::PointerValue(pv) => self
+                    .builder
+                    .build_ptr_to_int(pv, i64_type, "ptr_to_i64")
+                    .map_err(|e| e.to_string())?,
                 BasicMetadataValueEnum::FloatValue(fv) => {
                     // Bit-cast float to i64 for tuple storage.
-                    let fv_alloca = self.builder
+                    let fv_alloca = self
+                        .builder
                         .build_alloca(self.context.f64_type(), "float_tmp")
                         .map_err(|e| format!("{}", e))?;
                     self.builder
@@ -3974,7 +4472,8 @@ impl<'ctx> CodeGen<'ctx> {
                     let struct_size = target_data.get_store_size(&sv_ty);
                     if struct_size <= 8 {
                         // Small struct (e.g., tagged union {i8, ptr}): store as opaque i64 bits.
-                        let sv_alloca = self.builder
+                        let sv_alloca = self
+                            .builder
                             .build_alloca(sv_ty, "struct_tmp")
                             .map_err(|e| format!("{}", e))?;
                         self.builder
@@ -3987,11 +4486,16 @@ impl<'ctx> CodeGen<'ctx> {
                     } else {
                         // Large struct (e.g., service state): heap-allocate and store pointer.
                         // The tuple consumer (service loop) will inttoptr -> load to recover the struct.
-                        let size = sv_ty.size_of().unwrap_or(i64_type.const_int(struct_size, false));
+                        let size = sv_ty
+                            .size_of()
+                            .unwrap_or(i64_type.const_int(struct_size, false));
                         let align = i64_type.const_int(8, false);
-                        let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                        let gc_alloc = self
+                            .module
+                            .get_function("mesh_gc_alloc_actor")
                             .ok_or("mesh_gc_alloc_actor not found")?;
-                        let heap_ptr = self.builder
+                        let heap_ptr = self
+                            .builder
                             .build_call(gc_alloc, &[size.into(), align.into()], "struct_heap")
                             .map_err(|e| format!("{}", e))?
                             .try_as_basic_value()
@@ -4051,7 +4555,8 @@ impl<'ctx> CodeGen<'ctx> {
             (ptr_ty.const_null(), i64_ty.const_int(0, false))
         } else {
             let arr_ty = i64_ty.array_type(handler_args.len() as u32);
-            let buf = self.builder
+            let buf = self
+                .builder
                 .build_alloca(arr_ty, "call_payload")
                 .map_err(|e| e.to_string())?;
 
@@ -4073,10 +4578,16 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Call mesh_service_call(pid, tag, payload_ptr, payload_size) -> ptr
         let service_call_fn = get_intrinsic(&self.module, "mesh_service_call");
-        let result_ptr = self.builder
+        let result_ptr = self
+            .builder
             .build_call(
                 service_call_fn,
-                &[pid_val.into(), tag_val.into(), payload_ptr.into(), payload_size_val.into()],
+                &[
+                    pid_val.into(),
+                    tag_val.into(),
+                    payload_ptr.into(),
+                    payload_size_val.into(),
+                ],
                 "call_result",
             )
             .map_err(|e| e.to_string())?
@@ -4089,10 +4600,16 @@ impl<'ctx> CodeGen<'ctx> {
         // is the reply value (i64).
         let reply_data_ptr = unsafe {
             self.builder
-                .build_gep(i8_ty, result_ptr, &[i64_ty.const_int(16, false)], "reply_data")
+                .build_gep(
+                    i8_ty,
+                    result_ptr,
+                    &[i64_ty.const_int(16, false)],
+                    "reply_data",
+                )
                 .map_err(|e| e.to_string())?
         };
-        let reply_i64 = self.builder
+        let reply_i64 = self
+            .builder
             .build_load(i64_ty, reply_data_ptr, "reply_i64")
             .map_err(|e| e.to_string())?
             .into_int_value();
@@ -4108,70 +4625,82 @@ impl<'ctx> CodeGen<'ctx> {
         // We must reverse this encoding based on the reply type.
         match reply_ty {
             MirType::SumType(name) => {
-                let layout = self.lookup_sum_type_layout(name)
-                    .ok_or_else(|| format!("Unknown sum type layout '{}' in service call reply", name))?;
+                let layout = self.lookup_sum_type_layout(name).ok_or_else(|| {
+                    format!("Unknown sum type layout '{}' in service call reply", name)
+                })?;
                 let layout = *layout;
                 let target_data = self.target_machine.get_target_data();
                 let struct_size = target_data.get_store_size(&layout);
                 if struct_size <= 8 {
                     // Small sum type: i64 contains the struct bits (bitcast).
-                    let tmp = self.builder
+                    let tmp = self
+                        .builder
                         .build_alloca(i64_ty, "reply_i64_tmp")
                         .map_err(|e| e.to_string())?;
                     self.builder
                         .build_store(tmp, reply_i64)
                         .map_err(|e| e.to_string())?;
-                    let reply_val = self.builder
+                    let reply_val = self
+                        .builder
                         .build_load(layout, tmp, "reply_small_sum")
                         .map_err(|e| e.to_string())?;
                     Ok(reply_val)
                 } else {
                     // Large sum type: i64 is a heap pointer. Load the struct.
-                    let reply_ptr = self.builder
+                    let reply_ptr = self
+                        .builder
                         .build_int_to_ptr(reply_i64, ptr_ty, "reply_ptr")
                         .map_err(|e| e.to_string())?;
-                    let reply_val = self.builder
+                    let reply_val = self
+                        .builder
                         .build_load(layout, reply_ptr, "reply_sum")
                         .map_err(|e| e.to_string())?;
                     Ok(reply_val)
                 }
             }
             MirType::Struct(name) => {
-                let struct_ty = self.struct_types.get(name)
-                    .ok_or_else(|| format!("Unknown struct type '{}' in service call reply", name))?;
+                let struct_ty = self.struct_types.get(name).ok_or_else(|| {
+                    format!("Unknown struct type '{}' in service call reply", name)
+                })?;
                 let struct_ty = *struct_ty;
                 let target_data = self.target_machine.get_target_data();
                 let struct_size = target_data.get_store_size(&struct_ty);
                 if struct_size <= 8 {
-                    let tmp = self.builder
+                    let tmp = self
+                        .builder
                         .build_alloca(i64_ty, "reply_i64_tmp")
                         .map_err(|e| e.to_string())?;
                     self.builder
                         .build_store(tmp, reply_i64)
                         .map_err(|e| e.to_string())?;
-                    let reply_val = self.builder
+                    let reply_val = self
+                        .builder
                         .build_load(struct_ty, tmp, "reply_small_struct")
                         .map_err(|e| e.to_string())?;
                     Ok(reply_val)
                 } else {
-                    let reply_ptr = self.builder
+                    let reply_ptr = self
+                        .builder
                         .build_int_to_ptr(reply_i64, ptr_ty, "reply_ptr")
                         .map_err(|e| e.to_string())?;
-                    let reply_val = self.builder
+                    let reply_val = self
+                        .builder
                         .build_load(struct_ty, reply_ptr, "reply_struct")
                         .map_err(|e| e.to_string())?;
                     Ok(reply_val)
                 }
             }
             MirType::String | MirType::Ptr => {
-                let reply_ptr = self.builder
+                let reply_ptr = self
+                    .builder
                     .build_int_to_ptr(reply_i64, ptr_ty, "reply_ptr")
                     .map_err(|e| e.to_string())?;
                 Ok(reply_ptr.into())
             }
             MirType::Bool => {
                 // Bool is i1 in LLVM. Truncate the i64 reply to i1.
-                let bool_val = self.builder
+                let bool_val = self
+                    .builder
                     .build_int_truncate(reply_i64, self.context.bool_type(), "reply_bool")
                     .map_err(|e| e.to_string())?;
                 Ok(bool_val.into())
@@ -4179,13 +4708,15 @@ impl<'ctx> CodeGen<'ctx> {
             MirType::Float => {
                 // Float is f64 in LLVM. The i64 reply contains the float bits.
                 // Reinterpret via alloca store+load.
-                let tmp = self.builder
+                let tmp = self
+                    .builder
                     .build_alloca(i64_ty, "reply_float_tmp")
                     .map_err(|e| e.to_string())?;
                 self.builder
                     .build_store(tmp, reply_i64)
                     .map_err(|e| e.to_string())?;
-                let float_val = self.builder
+                let float_val = self
+                    .builder
                     .build_load(self.context.f64_type(), tmp, "reply_float")
                     .map_err(|e| e.to_string())?;
                 Ok(float_val)
@@ -4224,7 +4755,8 @@ impl<'ctx> CodeGen<'ctx> {
         // Build message buffer: [u64 type_tag][u64 0 (no caller)][i64 handler_args...]
         let num_elements = 2 + handler_args.len(); // tag + caller_pid + args
         let arr_ty = i64_ty.array_type(num_elements as u32);
-        let buf = self.builder
+        let buf = self
+            .builder
             .build_alloca(arr_ty, "cast_msg")
             .map_err(|e| e.to_string())?;
 
@@ -4268,11 +4800,7 @@ impl<'ctx> CodeGen<'ctx> {
         // Call mesh_actor_send(pid, msg_ptr, msg_size).
         let send_fn = get_intrinsic(&self.module, "mesh_actor_send");
         self.builder
-            .build_call(
-                send_fn,
-                &[pid_val.into(), buf.into(), msg_size.into()],
-                "",
-            )
+            .build_call(send_fn, &[pid_val.into(), buf.into(), msg_size.into()], "")
             .map_err(|e| e.to_string())?;
 
         // Cast returns Unit.
@@ -4281,17 +4809,16 @@ impl<'ctx> CodeGen<'ctx> {
 
     // ── List literal codegen ─────────────────────────────────────────
 
-    fn codegen_list_lit(
-        &mut self,
-        elements: &[MirExpr],
-    ) -> Result<BasicValueEnum<'ctx>, String> {
+    fn codegen_list_lit(&mut self, elements: &[MirExpr]) -> Result<BasicValueEnum<'ctx>, String> {
         // Placeholder: will be fully implemented in Task 2.
         // For now, stack-allocate an i64 array and call mesh_list_from_array.
         let i64_type = self.context.i64_type();
         let ptr_type = self.context.ptr_type(inkwell::AddressSpace::default());
         let count = elements.len();
         let array_type = i64_type.array_type(count as u32);
-        let array_alloca = self.builder.build_alloca(array_type, "list_arr")
+        let array_alloca = self
+            .builder
+            .build_alloca(array_type, "list_arr")
             .map_err(|e| e.to_string())?;
 
         for (i, elem) in elements.iter().enumerate() {
@@ -4301,24 +4828,30 @@ impl<'ctx> CodeGen<'ctx> {
             let idx = self.context.i32_type().const_int(i as u64, false);
             let zero = self.context.i32_type().const_int(0, false);
             let gep = unsafe {
-                self.builder.build_gep(array_type, array_alloca, &[zero, idx], "elem_ptr")
+                self.builder
+                    .build_gep(array_type, array_alloca, &[zero, idx], "elem_ptr")
                     .map_err(|e| e.to_string())?
             };
-            self.builder.build_store(gep, val_as_i64)
+            self.builder
+                .build_store(gep, val_as_i64)
                 .map_err(|e| e.to_string())?;
         }
 
-        let array_ptr = self.builder.build_pointer_cast(
-            array_alloca, ptr_type, "arr_ptr"
-        ).map_err(|e| e.to_string())?;
+        let array_ptr = self
+            .builder
+            .build_pointer_cast(array_alloca, ptr_type, "arr_ptr")
+            .map_err(|e| e.to_string())?;
         let count_val = i64_type.const_int(count as u64, false);
 
         let from_array_fn = get_intrinsic(&self.module, "mesh_list_from_array");
-        let result = self.builder
+        let result = self
+            .builder
             .build_call(from_array_fn, &[array_ptr.into(), count_val.into()], "list")
             .map_err(|e| e.to_string())?;
 
-        result.try_as_basic_value().basic()
+        result
+            .try_as_basic_value()
+            .basic()
             .ok_or_else(|| "mesh_list_from_array returned void".to_string())
     }
 
@@ -4336,19 +4869,26 @@ impl<'ctx> CodeGen<'ctx> {
         match mir_ty {
             MirType::Bool => {
                 let bool_val = val.into_int_value();
-                self.builder.build_int_z_extend(bool_val, i64_type, "bool_to_i64")
+                self.builder
+                    .build_int_z_extend(bool_val, i64_type, "bool_to_i64")
                     .map_err(|e| e.to_string())
             }
             MirType::Float => {
                 let float_val = val.into_float_value();
-                let cast_result = self.builder.build_bit_cast(float_val, i64_type, "float_to_i64")
+                let cast_result = self
+                    .builder
+                    .build_bit_cast(float_val, i64_type, "float_to_i64")
                     .map_err(|e| e.to_string())?;
                 Ok(cast_result.into_int_value())
             }
-            MirType::String | MirType::Ptr | MirType::Pid(_)
-            | MirType::Closure(_, _) | MirType::FnPtr(_, _) => {
+            MirType::String
+            | MirType::Ptr
+            | MirType::Pid(_)
+            | MirType::Closure(_, _)
+            | MirType::FnPtr(_, _) => {
                 let ptr_val = val.into_pointer_value();
-                self.builder.build_ptr_to_int(ptr_val, i64_type, "ptr_to_i64")
+                self.builder
+                    .build_ptr_to_int(ptr_val, i64_type, "ptr_to_i64")
                     .map_err(|e| e.to_string())
             }
             MirType::Struct(_) | MirType::SumType(_) => {
@@ -4359,20 +4899,22 @@ impl<'ctx> CodeGen<'ctx> {
                 let val_ty = struct_val.get_type();
                 let size = val_ty.size_of().unwrap_or(i64_type.const_int(8, false));
                 let align = i64_type.const_int(8, false);
-                let heap_ptr = self.builder
+                let heap_ptr = self
+                    .builder
                     .build_call(gc_alloc_fn, &[size.into(), align.into()], "heap_alloc")
                     .map_err(|e| e.to_string())?
-                    .try_as_basic_value().basic()
+                    .try_as_basic_value()
+                    .basic()
                     .ok_or("mesh_gc_alloc_actor returned void")?
                     .into_pointer_value();
-                self.builder.build_store(heap_ptr, struct_val)
+                self.builder
+                    .build_store(heap_ptr, struct_val)
                     .map_err(|e| e.to_string())?;
-                self.builder.build_ptr_to_int(heap_ptr, i64_type, "struct_ptr_to_i64")
+                self.builder
+                    .build_ptr_to_int(heap_ptr, i64_type, "struct_ptr_to_i64")
                     .map_err(|e| e.to_string())
             }
-            MirType::Int => {
-                Ok(val.into_int_value())
-            }
+            MirType::Int => Ok(val.into_int_value()),
             MirType::Unit => {
                 // Unit values are stored as 0 in lists.
                 Ok(self.context.i64_type().const_int(0, false))
@@ -4395,25 +4937,34 @@ impl<'ctx> CodeGen<'ctx> {
         match target_ty {
             MirType::Int => Ok(val.into()),
             MirType::Bool => {
-                let truncated = self.builder.build_int_truncate(val, self.context.bool_type(), "i64_to_bool")
+                let truncated = self
+                    .builder
+                    .build_int_truncate(val, self.context.bool_type(), "i64_to_bool")
                     .map_err(|e| e.to_string())?;
                 Ok(truncated.into())
             }
             MirType::Float => {
                 let f64_type = self.context.f64_type();
-                let cast_result = self.builder.build_bit_cast(val, f64_type, "i64_to_float")
+                let cast_result = self
+                    .builder
+                    .build_bit_cast(val, f64_type, "i64_to_float")
                     .map_err(|e| e.to_string())?;
                 Ok(cast_result)
             }
-            MirType::String | MirType::Ptr | MirType::Struct(_) | MirType::SumType(_)
-            | MirType::Pid(_) | MirType::Closure(_, _) | MirType::FnPtr(_, _) => {
-                let ptr_val = self.builder.build_int_to_ptr(val, ptr_type, "i64_to_ptr")
+            MirType::String
+            | MirType::Ptr
+            | MirType::Struct(_)
+            | MirType::SumType(_)
+            | MirType::Pid(_)
+            | MirType::Closure(_, _)
+            | MirType::FnPtr(_, _) => {
+                let ptr_val = self
+                    .builder
+                    .build_int_to_ptr(val, ptr_type, "i64_to_ptr")
                     .map_err(|e| e.to_string())?;
                 Ok(ptr_val.into())
             }
-            MirType::Unit => {
-                Ok(self.context.struct_type(&[], false).const_zero().into())
-            }
+            MirType::Unit => Ok(self.context.struct_type(&[], false).const_zero().into()),
             _ => {
                 // Best effort: return as i64.
                 Ok(val.into())
@@ -4442,7 +4993,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Get length of the list.
         let list_length = get_intrinsic(&self.module, "mesh_list_length");
-        let len = self.builder.build_call(list_length, &[collection.into()], "len")
+        let len = self
+            .builder
+            .build_call(list_length, &[collection.into()], "len")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4451,7 +5004,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Pre-allocate result list builder.
         let list_builder_new = get_intrinsic(&self.module, "mesh_list_builder_new");
-        let result_list = self.builder.build_call(list_builder_new, &[len.into()], "result_list")
+        let result_list = self
+            .builder
+            .build_call(list_builder_new, &[len.into()], "result_list")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4459,15 +5014,21 @@ impl<'ctx> CodeGen<'ctx> {
             .into_pointer_value();
 
         // Alloca for result list pointer (break returns partial list).
-        let result_alloca = self.builder.build_alloca(ptr_ty, "result_alloca")
+        let result_alloca = self
+            .builder
+            .build_alloca(ptr_ty, "result_alloca")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(result_alloca, result_list)
+        self.builder
+            .build_store(result_alloca, result_list)
             .map_err(|e| e.to_string())?;
 
         // Create counter alloca, store 0.
-        let counter = self.builder.build_alloca(i64_ty, "forin_counter")
+        let counter = self
+            .builder
+            .build_alloca(i64_ty, "forin_counter")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, i64_ty.const_int(0, false))
+        self.builder
+            .build_store(counter, i64_ty.const_int(0, false))
             .map_err(|e| e.to_string())?;
 
         // Four basic blocks.
@@ -4479,29 +5040,42 @@ impl<'ctx> CodeGen<'ctx> {
         // Push loop context: continue -> latch, break -> merge.
         self.loop_stack.push((latch_bb, merge_bb));
 
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Header: load counter, compare < len, branch --
         self.builder.position_at_end(header_bb);
-        let counter_val = self.builder.build_load(i64_ty, counter, "idx")
+        let counter_val = self
+            .builder
+            .build_load(i64_ty, counter, "idx")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let cmp = self.builder.build_int_compare(
-            IntPredicate::SLT, counter_val, len, "forin_cmp",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_conditional_branch(cmp, body_bb, merge_bb)
+        let cmp = self
+            .builder
+            .build_int_compare(IntPredicate::SLT, counter_val, len, "forin_cmp")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_conditional_branch(cmp, body_bb, merge_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Body: get element, bind loop variable, codegen body, push result --
         self.builder.position_at_end(body_bb);
-        let counter_in_body = self.builder.build_load(i64_ty, counter, "idx_body")
+        let counter_in_body = self
+            .builder
+            .build_load(i64_ty, counter, "idx_body")
             .map_err(|e| e.to_string())?
             .into_int_value();
 
         // Call mesh_list_get(collection, counter) -> u64.
         let list_get = get_intrinsic(&self.module, "mesh_list_get");
-        let raw_elem = self.builder.build_call(list_get, &[collection.into(), counter_in_body.into()], "raw_elem")
+        let raw_elem = self
+            .builder
+            .build_call(
+                list_get,
+                &[collection.into(), counter_in_body.into()],
+                "raw_elem",
+            )
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4513,9 +5087,12 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create alloca for loop variable.
         let elem_llvm_ty = self.llvm_type(elem_ty);
-        let var_alloca = self.builder.build_alloca(elem_llvm_ty, var)
+        let var_alloca = self
+            .builder
+            .build_alloca(elem_llvm_ty, var)
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(var_alloca, typed_elem)
+        self.builder
+            .build_store(var_alloca, typed_elem)
             .map_err(|e| e.to_string())?;
 
         // Save old locals for restoration.
@@ -4524,10 +5101,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // If filter present, add conditional branch to skip body+push.
         if let Some(filter_expr) = filter {
-            let filter_val = self.codegen_expr(filter_expr)?
-                .into_int_value();
+            let filter_val = self.codegen_expr(filter_expr)?.into_int_value();
             let do_body_bb = self.context.append_basic_block(fn_val, "forin_do_body");
-            self.builder.build_conditional_branch(filter_val, do_body_bb, latch_bb)
+            self.builder
+                .build_conditional_branch(filter_val, do_body_bb, latch_bb)
                 .map_err(|e| e.to_string())?;
             self.builder.position_at_end(do_body_bb);
         }
@@ -4540,28 +5117,41 @@ impl<'ctx> CodeGen<'ctx> {
             if bb.get_terminator().is_none() {
                 let body_as_i64 = self.convert_to_list_element(body_val, body_ty)?;
                 let list_builder_push = get_intrinsic(&self.module, "mesh_list_builder_push");
-                let result_loaded = self.builder.build_load(ptr_ty, result_alloca, "res_list")
+                let result_loaded = self
+                    .builder
+                    .build_load(ptr_ty, result_alloca, "res_list")
                     .map_err(|e| e.to_string())?
                     .into_pointer_value();
-                self.builder.build_call(list_builder_push, &[result_loaded.into(), body_as_i64.into()], "")
+                self.builder
+                    .build_call(
+                        list_builder_push,
+                        &[result_loaded.into(), body_as_i64.into()],
+                        "",
+                    )
                     .map_err(|e| e.to_string())?;
-                self.builder.build_unconditional_branch(latch_bb)
+                self.builder
+                    .build_unconditional_branch(latch_bb)
                     .map_err(|e| e.to_string())?;
             }
         }
 
         // -- Latch: increment counter, reduction check, branch to header --
         self.builder.position_at_end(latch_bb);
-        let latch_counter = self.builder.build_load(i64_ty, counter, "idx_latch")
+        let latch_counter = self
+            .builder
+            .build_load(i64_ty, counter, "idx_latch")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let incremented = self.builder.build_int_add(
-            latch_counter, i64_ty.const_int(1, false), "idx_next",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, incremented)
+        let incremented = self
+            .builder
+            .build_int_add(latch_counter, i64_ty.const_int(1, false), "idx_next")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_store(counter, incremented)
             .map_err(|e| e.to_string())?;
         self.emit_reduction_check();
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Cleanup --
@@ -4581,7 +5171,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Position at merge, return result list.
         self.builder.position_at_end(merge_bb);
-        let final_result = self.builder.build_load(ptr_ty, result_alloca, "forin_result")
+        let final_result = self
+            .builder
+            .build_load(ptr_ty, result_alloca, "forin_result")
             .map_err(|e| e.to_string())?;
         Ok(final_result)
     }
@@ -4641,9 +5233,12 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Step 2: If iter_fn is non-empty, call iter() to get the iterator.
         let iter_val = if !iter_fn.is_empty() {
-            let iter_func = self.resolve_iterator_fn(iter_fn)
+            let iter_func = self
+                .resolve_iterator_fn(iter_fn)
                 .unwrap_or_else(|| get_intrinsic(&self.module, iter_fn));
-            let result = self.builder.build_call(iter_func, &[collection_val.into()], "iter")
+            let result = self
+                .builder
+                .build_call(iter_func, &[collection_val.into()], "iter")
                 .map_err(|e| e.to_string())?
                 .try_as_basic_value()
                 .basic()
@@ -4655,23 +5250,35 @@ impl<'ctx> CodeGen<'ctx> {
         };
 
         // Step 3: Store iterator in alloca.
-        let iter_alloca = self.builder.build_alloca(ptr_ty, "iter_alloca")
+        let iter_alloca = self
+            .builder
+            .build_alloca(ptr_ty, "iter_alloca")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(iter_alloca, iter_val)
+        self.builder
+            .build_store(iter_alloca, iter_val)
             .map_err(|e| e.to_string())?;
 
         // Step 4: Pre-allocate result list builder (comprehension semantics).
         let list_builder_new = get_intrinsic(&self.module, "mesh_list_builder_new");
-        let result_list = self.builder.build_call(list_builder_new, &[i64_ty.const_int(0, false).into()], "result_list")
+        let result_list = self
+            .builder
+            .build_call(
+                list_builder_new,
+                &[i64_ty.const_int(0, false).into()],
+                "result_list",
+            )
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
             .ok_or_else(|| "mesh_list_builder_new returned void".to_string())?
             .into_pointer_value();
 
-        let result_alloca = self.builder.build_alloca(ptr_ty, "result_alloca")
+        let result_alloca = self
+            .builder
+            .build_alloca(ptr_ty, "result_alloca")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(result_alloca, result_list)
+        self.builder
+            .build_store(result_alloca, result_list)
             .map_err(|e| e.to_string())?;
 
         // Step 5: Create basic blocks.
@@ -4683,19 +5290,25 @@ impl<'ctx> CodeGen<'ctx> {
         // Push loop context for break/continue.
         self.loop_stack.push((latch_bb, merge_bb));
 
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // Step 6: Header -- call next(), check Option tag.
         self.builder.position_at_end(header_bb);
-        let iter_loaded = self.builder.build_load(ptr_ty, iter_alloca, "iter_loaded")
+        let iter_loaded = self
+            .builder
+            .build_load(ptr_ty, iter_alloca, "iter_loaded")
             .map_err(|e| e.to_string())?
             .into_pointer_value();
 
         // Call Iterator__next__TypeName(iter) or mesh_*_iter_next(iter).
-        let next_func = self.resolve_iterator_fn(next_fn)
+        let next_func = self
+            .resolve_iterator_fn(next_fn)
             .unwrap_or_else(|| get_intrinsic(&self.module, next_fn));
-        let next_result = self.builder.build_call(next_func, &[iter_loaded.into()], "next_result")
+        let next_result = self
+            .builder
+            .build_call(next_func, &[iter_loaded.into()], "next_result")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4705,51 +5318,73 @@ impl<'ctx> CodeGen<'ctx> {
         // Option is MeshOption { tag: u8, value: *mut u8 }.
         // tag 0 = Some, tag 1 = None.
         // GEP to tag field (index 0).
-        let mesh_option_ty = self.context.struct_type(
-            &[i8_ty.into(), ptr_ty.into()],
-            false,
-        );
-        let tag_ptr = self.builder.build_struct_gep(mesh_option_ty, next_result, 0, "tag_ptr")
+        let mesh_option_ty = self
+            .context
+            .struct_type(&[i8_ty.into(), ptr_ty.into()], false);
+        let tag_ptr = self
+            .builder
+            .build_struct_gep(mesh_option_ty, next_result, 0, "tag_ptr")
             .map_err(|e| e.to_string())?;
-        let tag_val = self.builder.build_load(i8_ty, tag_ptr, "tag")
+        let tag_val = self
+            .builder
+            .build_load(i8_ty, tag_ptr, "tag")
             .map_err(|e| e.to_string())?
             .into_int_value();
 
         // Compare tag == 0 (Some).
-        let is_some = self.builder.build_int_compare(
-            IntPredicate::EQ, tag_val, i8_ty.const_int(0, false), "is_some",
-        ).map_err(|e| e.to_string())?;
+        let is_some = self
+            .builder
+            .build_int_compare(
+                IntPredicate::EQ,
+                tag_val,
+                i8_ty.const_int(0, false),
+                "is_some",
+            )
+            .map_err(|e| e.to_string())?;
 
-        self.builder.build_conditional_branch(is_some, body_bb, merge_bb)
+        self.builder
+            .build_conditional_branch(is_some, body_bb, merge_bb)
             .map_err(|e| e.to_string())?;
 
         // Step 7: Body -- extract element, bind variable, run body, push result.
         self.builder.position_at_end(body_bb);
 
         // GEP to value field (index 1).
-        let value_ptr = self.builder.build_struct_gep(mesh_option_ty, next_result, 1, "value_ptr")
+        let value_ptr = self
+            .builder
+            .build_struct_gep(mesh_option_ty, next_result, 1, "value_ptr")
             .map_err(|e| e.to_string())?;
-        let raw_value = self.builder.build_load(ptr_ty, value_ptr, "raw_value")
+        let raw_value = self
+            .builder
+            .build_load(ptr_ty, value_ptr, "raw_value")
             .map_err(|e| e.to_string())?;
 
         // Convert from raw pointer to typed element.
         // For Int: ptr -> i64 via ptrtoint. For String/Ptr types: ptr -> ptr (no conversion).
         let typed_elem: BasicValueEnum<'ctx> = match elem_ty {
             MirType::Int => {
-                let as_int = self.builder.build_ptr_to_int(raw_value.into_pointer_value(), i64_ty, "as_int")
+                let as_int = self
+                    .builder
+                    .build_ptr_to_int(raw_value.into_pointer_value(), i64_ty, "as_int")
                     .map_err(|e| e.to_string())?;
                 as_int.into()
             }
             MirType::Float => {
-                let as_int = self.builder.build_ptr_to_int(raw_value.into_pointer_value(), i64_ty, "as_int_f")
+                let as_int = self
+                    .builder
+                    .build_ptr_to_int(raw_value.into_pointer_value(), i64_ty, "as_int_f")
                     .map_err(|e| e.to_string())?;
-                self.builder.build_bit_cast(as_int, self.context.f64_type(), "as_float")
+                self.builder
+                    .build_bit_cast(as_int, self.context.f64_type(), "as_float")
                     .map_err(|e| e.to_string())?
             }
             MirType::Bool => {
-                let as_int = self.builder.build_ptr_to_int(raw_value.into_pointer_value(), i64_ty, "as_int_b")
+                let as_int = self
+                    .builder
+                    .build_ptr_to_int(raw_value.into_pointer_value(), i64_ty, "as_int_b")
                     .map_err(|e| e.to_string())?;
-                self.builder.build_int_truncate(as_int, self.context.bool_type(), "as_bool")
+                self.builder
+                    .build_int_truncate(as_int, self.context.bool_type(), "as_bool")
                     .map_err(|e| e.to_string())?
                     .into()
             }
@@ -4761,9 +5396,12 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create alloca for loop variable.
         let elem_llvm_ty = self.llvm_type(elem_ty);
-        let var_alloca = self.builder.build_alloca(elem_llvm_ty, var)
+        let var_alloca = self
+            .builder
+            .build_alloca(elem_llvm_ty, var)
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(var_alloca, typed_elem)
+        self.builder
+            .build_store(var_alloca, typed_elem)
             .map_err(|e| e.to_string())?;
 
         // Save old locals.
@@ -4772,10 +5410,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Optional filter.
         if let Some(filter_expr) = filter {
-            let filter_val = self.codegen_expr(filter_expr)?
-                .into_int_value();
+            let filter_val = self.codegen_expr(filter_expr)?.into_int_value();
             let do_body_bb = self.context.append_basic_block(fn_val, "iter_do_body");
-            self.builder.build_conditional_branch(filter_val, do_body_bb, latch_bb)
+            self.builder
+                .build_conditional_branch(filter_val, do_body_bb, latch_bb)
                 .map_err(|e| e.to_string())?;
             self.builder.position_at_end(do_body_bb);
         }
@@ -4788,12 +5426,20 @@ impl<'ctx> CodeGen<'ctx> {
             if bb.get_terminator().is_none() {
                 let body_as_i64 = self.convert_to_list_element(body_val, body_ty)?;
                 let list_builder_push = get_intrinsic(&self.module, "mesh_list_builder_push");
-                let result_loaded = self.builder.build_load(ptr_ty, result_alloca, "res_list")
+                let result_loaded = self
+                    .builder
+                    .build_load(ptr_ty, result_alloca, "res_list")
                     .map_err(|e| e.to_string())?
                     .into_pointer_value();
-                self.builder.build_call(list_builder_push, &[result_loaded.into(), body_as_i64.into()], "")
+                self.builder
+                    .build_call(
+                        list_builder_push,
+                        &[result_loaded.into(), body_as_i64.into()],
+                        "",
+                    )
                     .map_err(|e| e.to_string())?;
-                self.builder.build_unconditional_branch(latch_bb)
+                self.builder
+                    .build_unconditional_branch(latch_bb)
                     .map_err(|e| e.to_string())?;
             }
         }
@@ -4801,7 +5447,8 @@ impl<'ctx> CodeGen<'ctx> {
         // Step 8: Latch -- reduction check, branch back to header.
         self.builder.position_at_end(latch_bb);
         self.emit_reduction_check();
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // Step 9: Cleanup.
@@ -4820,7 +5467,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Return result list.
         self.builder.position_at_end(merge_bb);
-        let final_result = self.builder.build_load(ptr_ty, result_alloca, "iter_result")
+        let final_result = self
+            .builder
+            .build_load(ptr_ty, result_alloca, "iter_result")
             .map_err(|e| e.to_string())?;
         Ok(final_result)
     }
@@ -4848,7 +5497,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Get size of the map.
         let map_size = get_intrinsic(&self.module, "mesh_map_size");
-        let len = self.builder.build_call(map_size, &[collection.into()], "map_len")
+        let len = self
+            .builder
+            .build_call(map_size, &[collection.into()], "map_len")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4857,7 +5508,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Pre-allocate result list builder.
         let list_builder_new = get_intrinsic(&self.module, "mesh_list_builder_new");
-        let result_list = self.builder.build_call(list_builder_new, &[len.into()], "result_list")
+        let result_list = self
+            .builder
+            .build_call(list_builder_new, &[len.into()], "result_list")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4865,15 +5518,21 @@ impl<'ctx> CodeGen<'ctx> {
             .into_pointer_value();
 
         // Alloca for result list pointer.
-        let result_alloca = self.builder.build_alloca(ptr_ty, "result_alloca")
+        let result_alloca = self
+            .builder
+            .build_alloca(ptr_ty, "result_alloca")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(result_alloca, result_list)
+        self.builder
+            .build_store(result_alloca, result_list)
             .map_err(|e| e.to_string())?;
 
         // Create counter alloca, store 0.
-        let counter = self.builder.build_alloca(i64_ty, "forin_counter")
+        let counter = self
+            .builder
+            .build_alloca(i64_ty, "forin_counter")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, i64_ty.const_int(0, false))
+        self.builder
+            .build_store(counter, i64_ty.const_int(0, false))
             .map_err(|e| e.to_string())?;
 
         // Four basic blocks.
@@ -4884,29 +5543,42 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.loop_stack.push((latch_bb, merge_bb));
 
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Header --
         self.builder.position_at_end(header_bb);
-        let counter_val = self.builder.build_load(i64_ty, counter, "idx")
+        let counter_val = self
+            .builder
+            .build_load(i64_ty, counter, "idx")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let cmp = self.builder.build_int_compare(
-            IntPredicate::SLT, counter_val, len, "forin_cmp",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_conditional_branch(cmp, body_bb, merge_bb)
+        let cmp = self
+            .builder
+            .build_int_compare(IntPredicate::SLT, counter_val, len, "forin_cmp")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_conditional_branch(cmp, body_bb, merge_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Body --
         self.builder.position_at_end(body_bb);
-        let counter_in_body = self.builder.build_load(i64_ty, counter, "idx_body")
+        let counter_in_body = self
+            .builder
+            .build_load(i64_ty, counter, "idx_body")
             .map_err(|e| e.to_string())?
             .into_int_value();
 
         // Get key and value for this entry.
         let map_entry_key = get_intrinsic(&self.module, "mesh_map_entry_key");
-        let raw_key = self.builder.build_call(map_entry_key, &[collection.into(), counter_in_body.into()], "raw_key")
+        let raw_key = self
+            .builder
+            .build_call(
+                map_entry_key,
+                &[collection.into(), counter_in_body.into()],
+                "raw_key",
+            )
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4914,7 +5586,13 @@ impl<'ctx> CodeGen<'ctx> {
             .into_int_value();
 
         let map_entry_value = get_intrinsic(&self.module, "mesh_map_entry_value");
-        let raw_val = self.builder.build_call(map_entry_value, &[collection.into(), counter_in_body.into()], "raw_val")
+        let raw_val = self
+            .builder
+            .build_call(
+                map_entry_value,
+                &[collection.into(), counter_in_body.into()],
+                "raw_val",
+            )
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -4927,15 +5605,21 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create allocas for key and value variables.
         let key_llvm_ty = self.llvm_type(key_ty);
-        let key_alloca = self.builder.build_alloca(key_llvm_ty, key_var)
+        let key_alloca = self
+            .builder
+            .build_alloca(key_llvm_ty, key_var)
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(key_alloca, typed_key)
+        self.builder
+            .build_store(key_alloca, typed_key)
             .map_err(|e| e.to_string())?;
 
         let val_llvm_ty = self.llvm_type(val_ty);
-        let val_alloca = self.builder.build_alloca(val_llvm_ty, val_var)
+        let val_alloca = self
+            .builder
+            .build_alloca(val_llvm_ty, val_var)
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(val_alloca, typed_val)
+        self.builder
+            .build_store(val_alloca, typed_val)
             .map_err(|e| e.to_string())?;
 
         // Save old locals.
@@ -4946,10 +5630,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // If filter present, add conditional branch to skip body+push.
         if let Some(filter_expr) = filter {
-            let filter_val = self.codegen_expr(filter_expr)?
-                .into_int_value();
+            let filter_val = self.codegen_expr(filter_expr)?.into_int_value();
             let do_body_bb = self.context.append_basic_block(fn_val, "forin_do_body");
-            self.builder.build_conditional_branch(filter_val, do_body_bb, latch_bb)
+            self.builder
+                .build_conditional_branch(filter_val, do_body_bb, latch_bb)
                 .map_err(|e| e.to_string())?;
             self.builder.position_at_end(do_body_bb);
         }
@@ -4962,28 +5646,41 @@ impl<'ctx> CodeGen<'ctx> {
             if bb.get_terminator().is_none() {
                 let body_as_i64 = self.convert_to_list_element(body_val, body_ty)?;
                 let list_builder_push = get_intrinsic(&self.module, "mesh_list_builder_push");
-                let result_loaded = self.builder.build_load(ptr_ty, result_alloca, "res_list")
+                let result_loaded = self
+                    .builder
+                    .build_load(ptr_ty, result_alloca, "res_list")
                     .map_err(|e| e.to_string())?
                     .into_pointer_value();
-                self.builder.build_call(list_builder_push, &[result_loaded.into(), body_as_i64.into()], "")
+                self.builder
+                    .build_call(
+                        list_builder_push,
+                        &[result_loaded.into(), body_as_i64.into()],
+                        "",
+                    )
                     .map_err(|e| e.to_string())?;
-                self.builder.build_unconditional_branch(latch_bb)
+                self.builder
+                    .build_unconditional_branch(latch_bb)
                     .map_err(|e| e.to_string())?;
             }
         }
 
         // -- Latch --
         self.builder.position_at_end(latch_bb);
-        let latch_counter = self.builder.build_load(i64_ty, counter, "idx_latch")
+        let latch_counter = self
+            .builder
+            .build_load(i64_ty, counter, "idx_latch")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let incremented = self.builder.build_int_add(
-            latch_counter, i64_ty.const_int(1, false), "idx_next",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, incremented)
+        let incremented = self
+            .builder
+            .build_int_add(latch_counter, i64_ty.const_int(1, false), "idx_next")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_store(counter, incremented)
             .map_err(|e| e.to_string())?;
         self.emit_reduction_check();
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Cleanup --
@@ -5013,7 +5710,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Position at merge, return result list.
         self.builder.position_at_end(merge_bb);
-        let final_result = self.builder.build_load(ptr_ty, result_alloca, "forin_result")
+        let final_result = self
+            .builder
+            .build_load(ptr_ty, result_alloca, "forin_result")
             .map_err(|e| e.to_string())?;
         Ok(final_result)
     }
@@ -5039,7 +5738,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Get size of the set.
         let set_size = get_intrinsic(&self.module, "mesh_set_size");
-        let len = self.builder.build_call(set_size, &[collection.into()], "set_len")
+        let len = self
+            .builder
+            .build_call(set_size, &[collection.into()], "set_len")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -5048,7 +5749,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Pre-allocate result list builder.
         let list_builder_new = get_intrinsic(&self.module, "mesh_list_builder_new");
-        let result_list = self.builder.build_call(list_builder_new, &[len.into()], "result_list")
+        let result_list = self
+            .builder
+            .build_call(list_builder_new, &[len.into()], "result_list")
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -5056,15 +5759,21 @@ impl<'ctx> CodeGen<'ctx> {
             .into_pointer_value();
 
         // Alloca for result list pointer.
-        let result_alloca = self.builder.build_alloca(ptr_ty, "result_alloca")
+        let result_alloca = self
+            .builder
+            .build_alloca(ptr_ty, "result_alloca")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(result_alloca, result_list)
+        self.builder
+            .build_store(result_alloca, result_list)
             .map_err(|e| e.to_string())?;
 
         // Create counter alloca, store 0.
-        let counter = self.builder.build_alloca(i64_ty, "forin_counter")
+        let counter = self
+            .builder
+            .build_alloca(i64_ty, "forin_counter")
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, i64_ty.const_int(0, false))
+        self.builder
+            .build_store(counter, i64_ty.const_int(0, false))
             .map_err(|e| e.to_string())?;
 
         // Four basic blocks.
@@ -5075,29 +5784,42 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.loop_stack.push((latch_bb, merge_bb));
 
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Header --
         self.builder.position_at_end(header_bb);
-        let counter_val = self.builder.build_load(i64_ty, counter, "idx")
+        let counter_val = self
+            .builder
+            .build_load(i64_ty, counter, "idx")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let cmp = self.builder.build_int_compare(
-            IntPredicate::SLT, counter_val, len, "forin_cmp",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_conditional_branch(cmp, body_bb, merge_bb)
+        let cmp = self
+            .builder
+            .build_int_compare(IntPredicate::SLT, counter_val, len, "forin_cmp")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_conditional_branch(cmp, body_bb, merge_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Body --
         self.builder.position_at_end(body_bb);
-        let counter_in_body = self.builder.build_load(i64_ty, counter, "idx_body")
+        let counter_in_body = self
+            .builder
+            .build_load(i64_ty, counter, "idx_body")
             .map_err(|e| e.to_string())?
             .into_int_value();
 
         // Call mesh_set_element_at(collection, counter) -> u64.
         let set_element_at = get_intrinsic(&self.module, "mesh_set_element_at");
-        let raw_elem = self.builder.build_call(set_element_at, &[collection.into(), counter_in_body.into()], "raw_elem")
+        let raw_elem = self
+            .builder
+            .build_call(
+                set_element_at,
+                &[collection.into(), counter_in_body.into()],
+                "raw_elem",
+            )
             .map_err(|e| e.to_string())?
             .try_as_basic_value()
             .basic()
@@ -5109,9 +5831,12 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Create alloca for loop variable.
         let elem_llvm_ty = self.llvm_type(elem_ty);
-        let var_alloca = self.builder.build_alloca(elem_llvm_ty, var)
+        let var_alloca = self
+            .builder
+            .build_alloca(elem_llvm_ty, var)
             .map_err(|e| e.to_string())?;
-        self.builder.build_store(var_alloca, typed_elem)
+        self.builder
+            .build_store(var_alloca, typed_elem)
             .map_err(|e| e.to_string())?;
 
         // Save old locals.
@@ -5120,10 +5845,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // If filter present, add conditional branch to skip body+push.
         if let Some(filter_expr) = filter {
-            let filter_val = self.codegen_expr(filter_expr)?
-                .into_int_value();
+            let filter_val = self.codegen_expr(filter_expr)?.into_int_value();
             let do_body_bb = self.context.append_basic_block(fn_val, "forin_do_body");
-            self.builder.build_conditional_branch(filter_val, do_body_bb, latch_bb)
+            self.builder
+                .build_conditional_branch(filter_val, do_body_bb, latch_bb)
                 .map_err(|e| e.to_string())?;
             self.builder.position_at_end(do_body_bb);
         }
@@ -5136,28 +5861,41 @@ impl<'ctx> CodeGen<'ctx> {
             if bb.get_terminator().is_none() {
                 let body_as_i64 = self.convert_to_list_element(body_val, body_ty)?;
                 let list_builder_push = get_intrinsic(&self.module, "mesh_list_builder_push");
-                let result_loaded = self.builder.build_load(ptr_ty, result_alloca, "res_list")
+                let result_loaded = self
+                    .builder
+                    .build_load(ptr_ty, result_alloca, "res_list")
                     .map_err(|e| e.to_string())?
                     .into_pointer_value();
-                self.builder.build_call(list_builder_push, &[result_loaded.into(), body_as_i64.into()], "")
+                self.builder
+                    .build_call(
+                        list_builder_push,
+                        &[result_loaded.into(), body_as_i64.into()],
+                        "",
+                    )
                     .map_err(|e| e.to_string())?;
-                self.builder.build_unconditional_branch(latch_bb)
+                self.builder
+                    .build_unconditional_branch(latch_bb)
                     .map_err(|e| e.to_string())?;
             }
         }
 
         // -- Latch --
         self.builder.position_at_end(latch_bb);
-        let latch_counter = self.builder.build_load(i64_ty, counter, "idx_latch")
+        let latch_counter = self
+            .builder
+            .build_load(i64_ty, counter, "idx_latch")
             .map_err(|e| e.to_string())?
             .into_int_value();
-        let incremented = self.builder.build_int_add(
-            latch_counter, i64_ty.const_int(1, false), "idx_next",
-        ).map_err(|e| e.to_string())?;
-        self.builder.build_store(counter, incremented)
+        let incremented = self
+            .builder
+            .build_int_add(latch_counter, i64_ty.const_int(1, false), "idx_next")
+            .map_err(|e| e.to_string())?;
+        self.builder
+            .build_store(counter, incremented)
             .map_err(|e| e.to_string())?;
         self.emit_reduction_check();
-        self.builder.build_unconditional_branch(header_bb)
+        self.builder
+            .build_unconditional_branch(header_bb)
             .map_err(|e| e.to_string())?;
 
         // -- Cleanup --
@@ -5177,7 +5915,9 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Position at merge, return result list.
         self.builder.position_at_end(merge_bb);
-        let final_result = self.builder.build_load(ptr_ty, result_alloca, "forin_result")
+        let final_result = self
+            .builder
+            .build_load(ptr_ty, result_alloca, "forin_result")
             .map_err(|e| e.to_string())?;
         Ok(final_result)
     }

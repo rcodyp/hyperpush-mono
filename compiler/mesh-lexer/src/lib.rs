@@ -56,7 +56,9 @@ impl<'src> Lexer<'src> {
 
     /// Current lexer state (top of stack).
     fn current_state(&self) -> &LexerState {
-        self.state_stack.last().expect("state stack must never be empty")
+        self.state_stack
+            .last()
+            .expect("state stack must never be empty")
     }
 
     /// Produce the next token based on current state.
@@ -126,7 +128,7 @@ impl<'src> Lexer<'src> {
             // ── Regex literal: ~r/pattern/flags ─────────────────────────
             '~' => {
                 self.cursor.advance(); // consume '~'
-                // Only ~r/.../ is currently valid; anything else is an error.
+                                       // Only ~r/.../ is currently valid; anything else is an error.
                 if self.cursor.peek() == Some('r') {
                     self.lex_regex_literal(start)
                 } else {
@@ -391,7 +393,11 @@ impl<'src> Lexer<'src> {
             }
         }
 
-        Token::new(TokenKind::RegexLiteral(pattern, flags), start, self.cursor.pos())
+        Token::new(
+            TokenKind::RegexLiteral(pattern, flags),
+            start,
+            self.cursor.pos(),
+        )
     }
 
     // ── Comments ──────────────────────────────────────────────────────
@@ -412,7 +418,7 @@ impl<'src> Lexer<'src> {
             if self.cursor.peek() == Some('!') {
                 // Module doc comment: ##!
                 self.cursor.advance(); // consume '!'
-                // Skip optional leading space
+                                       // Skip optional leading space
                 if self.cursor.peek() == Some(' ') {
                     self.cursor.advance();
                 }
@@ -502,10 +508,7 @@ impl<'src> Lexer<'src> {
 
         // Check for float: `.` followed by a digit (not `..` range)
         if self.cursor.peek() == Some('.')
-            && self
-                .cursor
-                .peek_next()
-                .is_some_and(|c| c.is_ascii_digit())
+            && self.cursor.peek_next().is_some_and(|c| c.is_ascii_digit())
         {
             self.cursor.advance(); // consume '.'
             self.cursor.eat_while(|c| c.is_ascii_digit() || c == '_');
@@ -530,24 +533,21 @@ impl<'src> Lexer<'src> {
     /// Lex hex digits after `0x`/`0X`.
     fn lex_hex(&mut self, start: u32) -> Token {
         self.cursor.advance(); // consume 'x'/'X'
-        self.cursor
-            .eat_while(|c| c.is_ascii_hexdigit() || c == '_');
+        self.cursor.eat_while(|c| c.is_ascii_hexdigit() || c == '_');
         Token::new(TokenKind::IntLiteral, start, self.cursor.pos())
     }
 
     /// Lex binary digits after `0b`/`0B`.
     fn lex_binary(&mut self, start: u32) -> Token {
         self.cursor.advance(); // consume 'b'/'B'
-        self.cursor
-            .eat_while(|c| c == '0' || c == '1' || c == '_');
+        self.cursor.eat_while(|c| c == '0' || c == '1' || c == '_');
         Token::new(TokenKind::IntLiteral, start, self.cursor.pos())
     }
 
     /// Lex octal digits after `0o`/`0O`.
     fn lex_octal(&mut self, start: u32) -> Token {
         self.cursor.advance(); // consume 'o'/'O'
-        self.cursor
-            .eat_while(|c| matches!(c, '0'..='7' | '_'));
+        self.cursor.eat_while(|c| matches!(c, '0'..='7' | '_'));
         Token::new(TokenKind::IntLiteral, start, self.cursor.pos())
     }
 
@@ -576,7 +576,8 @@ impl<'src> Lexer<'src> {
             self.state_stack.push(LexerState::InString { triple: true });
             Token::new(TokenKind::StringStart, start, self.cursor.pos())
         } else {
-            self.state_stack.push(LexerState::InString { triple: false });
+            self.state_stack
+                .push(LexerState::InString { triple: false });
             Token::new(TokenKind::StringStart, start, self.cursor.pos())
         }
     }
@@ -613,10 +614,15 @@ impl<'src> Lexer<'src> {
                     // Pop InString, push InString back (we'll return to it),
                     // then push InInterpolation on top.
                     // Actually, we keep InString on the stack and push InInterpolation on top.
-                    self.state_stack.push(LexerState::InInterpolation { brace_depth: 0 });
+                    self.state_stack
+                        .push(LexerState::InInterpolation { brace_depth: 0 });
 
                     // Queue the InterpolationStart token
-                    self.pending.push(Token::new(TokenKind::InterpolationStart, content_end, interp_end));
+                    self.pending.push(Token::new(
+                        TokenKind::InterpolationStart,
+                        content_end,
+                        interp_end,
+                    ));
 
                     if content_end > start {
                         // There's content before the interpolation
@@ -632,9 +638,14 @@ impl<'src> Lexer<'src> {
                     self.cursor.advance(); // consume '{'
                     let interp_end = self.cursor.pos();
 
-                    self.state_stack.push(LexerState::InInterpolation { brace_depth: 0 });
+                    self.state_stack
+                        .push(LexerState::InInterpolation { brace_depth: 0 });
 
-                    self.pending.push(Token::new(TokenKind::InterpolationStart, content_end, interp_end));
+                    self.pending.push(Token::new(
+                        TokenKind::InterpolationStart,
+                        content_end,
+                        interp_end,
+                    ));
 
                     if content_end > start {
                         return Token::new(TokenKind::StringContent, start, content_end);
@@ -651,7 +662,8 @@ impl<'src> Lexer<'src> {
                     self.state_stack.pop();
 
                     // Queue StringEnd
-                    self.pending.push(Token::new(TokenKind::StringEnd, content_end, str_end));
+                    self.pending
+                        .push(Token::new(TokenKind::StringEnd, content_end, str_end));
 
                     if content_end > start {
                         return Token::new(TokenKind::StringContent, start, content_end);
@@ -675,7 +687,8 @@ impl<'src> Lexer<'src> {
                             self.state_stack.pop();
 
                             // Queue StringEnd
-                            self.pending.push(Token::new(TokenKind::StringEnd, saved_pos, str_end));
+                            self.pending
+                                .push(Token::new(TokenKind::StringEnd, saved_pos, str_end));
 
                             if saved_pos > start {
                                 return Token::new(TokenKind::StringContent, start, saved_pos);
@@ -720,13 +733,18 @@ impl<'src> Lexer<'src> {
         match c {
             '{' => {
                 // Increment brace depth
-                if let Some(LexerState::InInterpolation { ref mut brace_depth }) = self.state_stack.last_mut() {
+                if let Some(LexerState::InInterpolation {
+                    ref mut brace_depth,
+                }) = self.state_stack.last_mut()
+                {
                     *brace_depth += 1;
                 }
                 self.single_char_token(TokenKind::LBrace, start)
             }
             '}' => {
-                let brace_depth = if let Some(LexerState::InInterpolation { brace_depth }) = self.state_stack.last() {
+                let brace_depth = if let Some(LexerState::InInterpolation { brace_depth }) =
+                    self.state_stack.last()
+                {
                     *brace_depth
                 } else {
                     0
@@ -740,7 +758,10 @@ impl<'src> Lexer<'src> {
                     Token::new(TokenKind::InterpolationEnd, start, end)
                 } else {
                     // Decrement brace depth
-                    if let Some(LexerState::InInterpolation { ref mut brace_depth }) = self.state_stack.last_mut() {
+                    if let Some(LexerState::InInterpolation {
+                        ref mut brace_depth,
+                    }) = self.state_stack.last_mut()
+                    {
                         *brace_depth -= 1;
                     }
                     self.single_char_token(TokenKind::RBrace, start)
@@ -898,11 +919,11 @@ mod tests {
             kinds,
             vec![
                 &TokenKind::StringStart,
-                &TokenKind::StringContent,       // "hello "
-                &TokenKind::InterpolationStart,   // ${
-                &TokenKind::Ident,                // name
-                &TokenKind::InterpolationEnd,     // }
-                &TokenKind::StringContent,        // " world"
+                &TokenKind::StringContent,      // "hello "
+                &TokenKind::InterpolationStart, // ${
+                &TokenKind::Ident,              // name
+                &TokenKind::InterpolationEnd,   // }
+                &TokenKind::StringContent,      // " world"
                 &TokenKind::StringEnd,
                 &TokenKind::Eof,
             ]
@@ -913,13 +934,7 @@ mod tests {
     fn lex_nested_block_comment() {
         let tokens = Lexer::tokenize("#= outer #= inner =# still =#");
         let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
-        assert_eq!(
-            kinds,
-            vec![
-                &TokenKind::Comment,
-                &TokenKind::Eof,
-            ]
-        );
+        assert_eq!(kinds, vec![&TokenKind::Comment, &TokenKind::Eof,]);
     }
 
     #[test]

@@ -21,12 +21,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
-use rustls_pki_types::ServerName;
 use hmac::{Hmac, Mac};
 use md5::{Digest, Md5};
 use pbkdf2::pbkdf2_hmac;
 use rand::Rng;
+use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
+use rustls_pki_types::ServerName;
 use sha2::Sha256;
 
 use crate::collections::list::{mesh_list_append, mesh_list_get, mesh_list_length, mesh_list_new};
@@ -105,10 +105,9 @@ fn percent_decode(s: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(byte) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
-                16,
-            ) {
+            if let Ok(byte) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+            {
                 result.push(byte);
                 i += 3;
                 continue;
@@ -322,9 +321,7 @@ fn upgrade_to_tls(
     stream: TcpStream,
     hostname: &str,
 ) -> Result<StreamOwned<ClientConnection, TcpStream>, String> {
-    let root_store = RootCertStore::from_iter(
-        webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
-    );
+    let root_store = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     let config = ClientConfig::builder()
         .with_root_certificates(root_store)
         .with_no_client_auth();
@@ -448,8 +445,7 @@ fn scram_client_first(_username: &str) -> (String, String) {
 
 /// Compute HMAC-SHA-256.
 fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac =
-        HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }
@@ -496,12 +492,7 @@ fn scram_client_final(
 
     // SaltedPassword = PBKDF2(password, salt, iterations, SHA-256)
     let mut salted_password = [0u8; 32];
-    pbkdf2_hmac::<Sha256>(
-        password.as_bytes(),
-        &salt,
-        iterations,
-        &mut salted_password,
-    );
+    pbkdf2_hmac::<Sha256>(password.as_bytes(), &salt, iterations, &mut salted_password);
 
     // ClientKey = HMAC(SaltedPassword, "Client Key")
     let client_key = hmac_sha256(&salted_password, b"Client Key");
@@ -531,11 +522,7 @@ fn scram_client_final(
     // ServerSignature = HMAC(ServerKey, AuthMessage)
     let server_signature = hmac_sha256(&server_key, auth_message.as_bytes());
 
-    let client_final = format!(
-        "{},p={}",
-        client_final_without_proof,
-        BASE64.encode(&proof)
-    );
+    let client_final = format!("{},p={}", client_final_without_proof, BASE64.encode(&proof));
     Ok((client_final, server_signature))
 }
 
@@ -546,13 +533,13 @@ fn scram_client_final(
 /// Contains SQLSTATE code, human-readable message, and optional constraint/table/column info
 /// for mapping database constraint violations to user-friendly changeset errors.
 pub(crate) struct PgError {
-    pub sqlstate: String,           // 'C' field (e.g., "23505")
-    pub message: String,            // 'M' field
+    pub sqlstate: String, // 'C' field (e.g., "23505")
+    pub message: String,  // 'M' field
     #[allow(dead_code)]
-    pub detail: Option<String>,     // 'D' field
+    pub detail: Option<String>, // 'D' field
     pub constraint: Option<String>, // 'n' field
-    pub table: Option<String>,      // 't' field
-    pub column: Option<String>,     // 'c' field
+    pub table: Option<String>, // 't' field
+    pub column: Option<String>, // 'c' field
 }
 
 /// Parse all tagged fields from an ErrorResponse body.
@@ -597,7 +584,14 @@ pub(crate) fn parse_error_response_full(body: &[u8]) -> PgError {
         message = "unknown PostgreSQL error".to_string();
     }
 
-    PgError { sqlstate, message, detail, constraint, table, column }
+    PgError {
+        sqlstate,
+        message,
+        detail,
+        constraint,
+        table,
+        column,
+    }
 }
 
 /// Extract the human-readable message from an ErrorResponse body.
@@ -617,8 +611,10 @@ fn format_pg_error_string(pg_err: &PgError) -> String {
     let constraint_str = pg_err.constraint.as_deref().unwrap_or("");
     let table_str = pg_err.table.as_deref().unwrap_or("");
     let column_str = pg_err.column.as_deref().unwrap_or("");
-    format!("{}\t{}\t{}\t{}\t{}",
-        pg_err.sqlstate, constraint_str, table_str, column_str, pg_err.message)
+    format!(
+        "{}\t{}\t{}\t{}\t{}",
+        pg_err.sqlstate, constraint_str, table_str, column_str, pg_err.message
+    )
 }
 
 // ── MeshString / MeshResult Helpers ────────────────────────────────────
@@ -767,7 +763,10 @@ pub extern "C" fn mesh_pg_connect(url: *const MeshString) -> *mut u8 {
                 if tag == b'E' {
                     return err_result(&parse_error_response(&body));
                 }
-                if tag != b'R' || body.len() < 4 || i32::from_be_bytes([body[0], body[1], body[2], body[3]]) != 0 {
+                if tag != b'R'
+                    || body.len() < 4
+                    || i32::from_be_bytes([body[0], body[1], body[2], body[3]]) != 0
+                {
                     return err_result("MD5 authentication failed");
                 }
             }
@@ -783,11 +782,7 @@ pub extern "C" fn mesh_pg_connect(url: *const MeshString) -> *mut u8 {
                 let (client_first, client_nonce) = scram_client_first(&pg_url.user);
 
                 let mut buf = Vec::new();
-                write_sasl_initial_response(
-                    &mut buf,
-                    "SCRAM-SHA-256",
-                    client_first.as_bytes(),
-                );
+                write_sasl_initial_response(&mut buf, "SCRAM-SHA-256", client_first.as_bytes());
                 if let Err(e) = stream.write_all(&buf) {
                     return err_result(&format!("send SASL initial: {}", e));
                 }
@@ -861,7 +856,10 @@ pub extern "C" fn mesh_pg_connect(url: *const MeshString) -> *mut u8 {
                 if tag == b'E' {
                     return err_result(&parse_error_response(&body));
                 }
-                if tag != b'R' || body.len() < 4 || i32::from_be_bytes([body[0], body[1], body[2], body[3]]) != 0 {
+                if tag != b'R'
+                    || body.len() < 4
+                    || i32::from_be_bytes([body[0], body[1], body[2], body[3]]) != 0
+                {
                     return err_result("SCRAM authentication failed");
                 }
             }
@@ -879,7 +877,10 @@ pub extern "C" fn mesh_pg_connect(url: *const MeshString) -> *mut u8 {
                 if tag == b'E' {
                     return err_result(&parse_error_response(&body));
                 }
-                if tag != b'R' || body.len() < 4 || i32::from_be_bytes([body[0], body[1], body[2], body[3]]) != 0 {
+                if tag != b'R'
+                    || body.len() < 4
+                    || i32::from_be_bytes([body[0], body[1], body[2], body[3]]) != 0
+                {
                     return err_result("cleartext authentication failed");
                 }
             }
@@ -901,9 +902,9 @@ pub extern "C" fn mesh_pg_connect(url: *const MeshString) -> *mut u8 {
                     last_txn_status = if !body.is_empty() { body[0] } else { b'I' };
                     break;
                 }
-                b'S' => {}                    // ParameterStatus -- skip
-                b'K' => {}                    // BackendKeyData -- skip
-                b'N' => {}                    // NoticeResponse -- skip
+                b'S' => {} // ParameterStatus -- skip
+                b'K' => {} // BackendKeyData -- skip
+                b'N' => {} // NoticeResponse -- skip
                 b'E' => {
                     return err_result(&parse_error_response(&body));
                 }
@@ -912,7 +913,10 @@ pub extern "C" fn mesh_pg_connect(url: *const MeshString) -> *mut u8 {
         }
 
         // Create the PgConn handle
-        let conn = Box::new(PgConn { stream, txn_status: last_txn_status });
+        let conn = Box::new(PgConn {
+            stream,
+            txn_status: last_txn_status,
+        });
         let handle = Box::into_raw(conn) as u64;
         alloc_result(0, handle as *mut u8) as *mut u8
     }
@@ -996,7 +1000,7 @@ pub extern "C" fn mesh_pg_execute(
                     conn.txn_status = if !body.is_empty() { body[0] } else { b'I' };
                     break;
                 }
-                b'N' => {}     // NoticeResponse -- skip
+                b'N' => {} // NoticeResponse -- skip
                 _ => {}
             }
         }
@@ -1071,12 +1075,11 @@ pub extern "C" fn mesh_pg_query(
                         while offset < body.len() && body[offset] != 0 {
                             offset += 1;
                         }
-                        let name =
-                            String::from_utf8_lossy(&body[name_start..offset]).into_owned();
+                        let name = String::from_utf8_lossy(&body[name_start..offset]).into_owned();
                         col_names.push(name);
                         offset += 1; // skip null terminator
-                        // Skip 18 bytes: table OID (4) + column number (2) + type OID (4)
-                        //   + type size (2) + type modifier (4) + format code (2)
+                                     // Skip 18 bytes: table OID (4) + column number (2) + type OID (4)
+                                     //   + type size (2) + type modifier (4) + format code (2)
                         offset += 18;
                     }
                 }
@@ -1095,8 +1098,12 @@ pub extern "C" fn mesh_pg_query(
                         if offset + 4 > body.len() {
                             break;
                         }
-                        let col_len =
-                            i32::from_be_bytes([body[offset], body[offset + 1], body[offset + 2], body[offset + 3]]);
+                        let col_len = i32::from_be_bytes([
+                            body[offset],
+                            body[offset + 1],
+                            body[offset + 2],
+                            body[offset + 3],
+                        ]);
                         offset += 4;
 
                         let value_str = if col_len == -1 {
@@ -1132,7 +1139,7 @@ pub extern "C" fn mesh_pg_query(
                     conn.txn_status = if !body.is_empty() { body[0] } else { b'I' };
                     break;
                 }
-                b'N' => {}     // NoticeResponse -- skip
+                b'N' => {} // NoticeResponse -- skip
                 _ => {}
             }
         }
@@ -1157,14 +1164,19 @@ pub(super) fn pg_simple_command(conn: &mut PgConn, sql: &str) -> Result<(), Stri
     let len = (body.len() + 4) as i32;
     buf.extend_from_slice(&len.to_be_bytes());
     buf.extend_from_slice(body.as_bytes());
-    conn.stream.write_all(&buf).map_err(|e| format!("send {}: {}", sql, e))?;
+    conn.stream
+        .write_all(&buf)
+        .map_err(|e| format!("send {}: {}", sql, e))?;
 
     let mut error_msg: Option<String> = None;
     loop {
-        let (tag, body) = read_message(&mut conn.stream).map_err(|e| format!("read {}: {}", sql, e))?;
+        let (tag, body) =
+            read_message(&mut conn.stream).map_err(|e| format!("read {}: {}", sql, e))?;
         match tag {
             b'C' => {} // CommandComplete
-            b'E' => { error_msg = Some(parse_error_response(&body)); }
+            b'E' => {
+                error_msg = Some(parse_error_response(&body));
+            }
             b'Z' => {
                 conn.txn_status = if !body.is_empty() { body[0] } else { b'I' };
                 break;
@@ -1387,10 +1399,7 @@ pub fn native_pg_connect(url: &str) -> Result<NativePgConn, String> {
         if tag == b'E' {
             return Err(parse_error_response(&body));
         }
-        return Err(format!(
-            "expected auth message, got '{}'",
-            tag as char
-        ));
+        return Err(format!("expected auth message, got '{}'", tag as char));
     }
     if body.len() < 4 {
         return Err("auth message too short".to_string());
@@ -1498,15 +1507,16 @@ pub fn native_pg_connect(url: &str) -> Result<NativePgConn, String> {
     }
 
     Ok(NativePgConn {
-        inner: PgConn {
-            stream,
-            txn_status,
-        },
+        inner: PgConn { stream, txn_status },
     })
 }
 
 /// Execute a SQL statement via native connection. Returns rows affected.
-pub fn native_pg_execute(conn: &mut NativePgConn, sql: &str, params: &[&str]) -> Result<i64, String> {
+pub fn native_pg_execute(
+    conn: &mut NativePgConn,
+    sql: &str,
+    params: &[&str],
+) -> Result<i64, String> {
     let mut buf = Vec::new();
     write_parse(&mut buf, sql);
     write_bind(&mut buf, params);
@@ -1522,8 +1532,8 @@ pub fn native_pg_execute(conn: &mut NativePgConn, sql: &str, params: &[&str]) ->
     let mut error_msg: Option<String> = None;
 
     loop {
-        let (tag, body) = read_message(&mut conn.inner.stream)
-            .map_err(|e| format!("read execute: {}", e))?;
+        let (tag, body) =
+            read_message(&mut conn.inner.stream).map_err(|e| format!("read execute: {}", e))?;
         match tag {
             b'1' | b'2' => {}
             b'C' => {
@@ -1572,8 +1582,8 @@ pub fn native_pg_query(
     let mut error_msg: Option<String> = None;
 
     loop {
-        let (tag, body) = read_message(&mut conn.inner.stream)
-            .map_err(|e| format!("read query: {}", e))?;
+        let (tag, body) =
+            read_message(&mut conn.inner.stream).map_err(|e| format!("read query: {}", e))?;
         match tag {
             b'1' | b'2' | b'n' => {} // ParseComplete, BindComplete, NoData
             b'T' => {
@@ -1582,10 +1592,7 @@ pub fn native_pg_query(
                     let num_fields = i16::from_be_bytes([body[0], body[1]]) as usize;
                     let mut offset = 2;
                     for _ in 0..num_fields {
-                        let name_end = body[offset..]
-                            .iter()
-                            .position(|&b| b == 0)
-                            .unwrap_or(0);
+                        let name_end = body[offset..].iter().position(|&b| b == 0).unwrap_or(0);
                         let name =
                             String::from_utf8_lossy(&body[offset..offset + name_end]).to_string();
                         columns.push(name);

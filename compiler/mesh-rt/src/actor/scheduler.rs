@@ -494,11 +494,14 @@ fn worker_loop(
             // no Ready actors remaining. If so, force-terminate them. This
             // handles service loops that block forever on receive after the
             // main actor has exited.
-            let all_waiting = !suspended.is_empty() && suspended.iter().all(|(pid, _)| {
-                process_table.read().get(pid)
-                    .map(|p| matches!(p.lock().state, ProcessState::Waiting))
-                    .unwrap_or(true)
-            });
+            let all_waiting = !suspended.is_empty()
+                && suspended.iter().all(|(pid, _)| {
+                    process_table
+                        .read()
+                        .get(pid)
+                        .map(|p| matches!(p.lock().state, ProcessState::Waiting))
+                        .unwrap_or(true)
+                });
 
             if all_waiting {
                 // Check globally: are there any non-waiting active processes?
@@ -624,8 +627,12 @@ fn handle_process_exit(process_table: &ProcessTable, pid: ProcessId, reason: Exi
     }
 
     // Step 2: Partition links into local and remote, then propagate.
-    let (local_links, remote_links): (std::collections::HashSet<ProcessId>, std::collections::HashSet<ProcessId>) =
-        linked_pids.into_iter().partition(|linked_pid| linked_pid.node_id() == 0);
+    let (local_links, remote_links): (
+        std::collections::HashSet<ProcessId>,
+        std::collections::HashSet<ProcessId>,
+    ) = linked_pids
+        .into_iter()
+        .partition(|linked_pid| linked_pid.node_id() == 0);
 
     // Propagate exit signals to local linked processes.
     let woken = link::propagate_exit(pid, &reason, local_links, |linked_pid| {
@@ -751,7 +758,11 @@ mod tests {
         sched.run();
 
         let delta = SPAWN_COUNTER.load(Ordering::SeqCst) - initial;
-        assert!(delta >= 1, "Expected at least 1 actor to complete, got delta={}", delta);
+        assert!(
+            delta >= 1,
+            "Expected at least 1 actor to complete, got delta={}",
+            delta
+        );
     }
 
     #[test]
@@ -896,7 +907,11 @@ mod tests {
         sched.signal_shutdown();
         sched.run();
 
-        assert_eq!(PRIO_COUNTER.load(Ordering::SeqCst), 6, "All priority levels should complete");
+        assert_eq!(
+            PRIO_COUNTER.load(Ordering::SeqCst),
+            6,
+            "All priority levels should complete"
+        );
     }
 
     #[test]

@@ -59,9 +59,7 @@ pub extern "C" fn mesh_service_call(
     data.extend_from_slice(&caller_pid.to_le_bytes());
 
     if !payload_ptr.is_null() && payload_size > 0 {
-        let payload = unsafe {
-            std::slice::from_raw_parts(payload_ptr, payload_size as usize)
-        };
+        let payload = unsafe { std::slice::from_raw_parts(payload_ptr, payload_size as usize) };
         data.extend_from_slice(payload);
     }
 
@@ -123,11 +121,7 @@ pub extern "C" fn mesh_service_call(
 /// - `reply_ptr`: pointer to the reply data bytes
 /// - `reply_size`: size of the reply data in bytes
 #[no_mangle]
-pub extern "C" fn mesh_service_reply(
-    caller_pid: u64,
-    reply_ptr: *const u8,
-    reply_size: u64,
-) {
+pub extern "C" fn mesh_service_reply(caller_pid: u64, reply_ptr: *const u8, reply_size: u64) {
     // Send the reply data to the caller using mesh_actor_send.
     super::mesh_actor_send(caller_pid, reply_ptr, reply_size);
 }

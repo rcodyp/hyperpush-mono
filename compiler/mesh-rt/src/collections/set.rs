@@ -205,10 +205,7 @@ pub extern "C" fn mesh_set_element_at(set: *mut u8, index: i64) -> u64 {
 /// `elem_to_str` is a bare function pointer `fn(u64) -> *mut u8` that converts
 /// each element to a MeshString pointer.
 #[no_mangle]
-pub extern "C" fn mesh_set_to_string(
-    set: *mut u8,
-    elem_to_str: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_set_to_string(set: *mut u8, elem_to_str: *mut u8) -> *mut u8 {
     type ElemToStr = unsafe extern "C" fn(u64) -> *mut u8;
 
     unsafe {
@@ -432,10 +429,7 @@ mod tests {
         let set = mesh_set_add(set, 20);
         let set = mesh_set_add(set, 30);
 
-        let result = mesh_set_to_string(
-            set,
-            crate::string::mesh_int_to_string as *mut u8,
-        );
+        let result = mesh_set_to_string(set, crate::string::mesh_int_to_string as *mut u8);
         let s = unsafe { &*(result as *const crate::string::MeshString) };
         let text = unsafe { s.as_str() };
         assert_eq!(text, "#{10, 20, 30}");
@@ -446,10 +440,7 @@ mod tests {
         mesh_rt_init();
         let set = mesh_set_new();
 
-        let result = mesh_set_to_string(
-            set,
-            crate::string::mesh_int_to_string as *mut u8,
-        );
+        let result = mesh_set_to_string(set, crate::string::mesh_int_to_string as *mut u8);
         let s = unsafe { &*(result as *const crate::string::MeshString) };
         let text = unsafe { s.as_str() };
         assert_eq!(text, "#{}");

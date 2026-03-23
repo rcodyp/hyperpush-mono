@@ -31,15 +31,15 @@ unsafe fn build_with_flags(pattern: &str, flags_bits: i64) -> Result<regex::Rege
 /// Panics on compile error (the pattern is a compile-time literal, so errors
 /// should have been caught by the developer before shipping).
 #[no_mangle]
-pub extern "C" fn mesh_regex_from_literal(
-    pattern: *const MeshString,
-    flags_bits: i64,
-) -> *mut u8 {
+pub extern "C" fn mesh_regex_from_literal(pattern: *const MeshString, flags_bits: i64) -> *mut u8 {
     unsafe {
         let pat = (*pattern).as_str();
         match build_with_flags(pat, flags_bits) {
             Ok(rx) => Box::into_raw(Box::new(rx)) as *mut u8,
-            Err(e) => panic!("mesh_regex_from_literal: invalid regex pattern {:?}: {}", pat, e),
+            Err(e) => panic!(
+                "mesh_regex_from_literal: invalid regex pattern {:?}: {}",
+                pat, e
+            ),
         }
     }
 }
@@ -75,7 +75,11 @@ pub extern "C" fn mesh_regex_match(rx_ptr: *const u8, s: *const MeshString) -> i
     unsafe {
         let rx = &*(rx_ptr as *const regex::Regex);
         let text = (*s).as_str();
-        if rx.is_match(text) { 1 } else { 0 }
+        if rx.is_match(text) {
+            1
+        } else {
+            0
+        }
     }
 }
 

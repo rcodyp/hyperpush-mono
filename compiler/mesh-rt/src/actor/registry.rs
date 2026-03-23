@@ -66,20 +66,13 @@ impl ProcessRegistry {
         let mut names = self.names.write();
 
         if let Some(&existing_pid) = names.get(&name) {
-            return Err(NameAlreadyRegistered {
-                name,
-                existing_pid,
-            });
+            return Err(NameAlreadyRegistered { name, existing_pid });
         }
 
         names.insert(name.clone(), pid);
 
         // Update reverse index.
-        self.pid_names
-            .write()
-            .entry(pid)
-            .or_default()
-            .push(name);
+        self.pid_names.write().entry(pid).or_default().push(name);
 
         Ok(())
     }

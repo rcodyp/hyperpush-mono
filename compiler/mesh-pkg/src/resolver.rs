@@ -208,19 +208,16 @@ pub fn fetch_git_dep(
     } else {
         // Clone fresh
         if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                format!("Failed to create directory {}: {}", parent.display(), e)
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
         }
-        git2::Repository::clone(url, dest)
-            .map_err(|e| format!("Failed to clone {}: {}", url, e))?
+        git2::Repository::clone(url, dest).map_err(|e| format!("Failed to clone {}: {}", url, e))?
     };
 
     // Resolve the target commit
     let oid = if let Some(rev) = rev {
         // Exact revision
-        git2::Oid::from_str(rev)
-            .map_err(|e| format!("Invalid revision '{}': {}", rev, e))?
+        git2::Oid::from_str(rev).map_err(|e| format!("Invalid revision '{}': {}", rev, e))?
     } else if let Some(tag_name) = tag {
         // Tag -> resolve to commit
         let ref_name = format!("refs/tags/{}", tag_name);
@@ -234,14 +231,20 @@ pub fn fetch_git_dep(
     } else if let Some(branch_name) = branch {
         // Branch -> resolve HEAD of branch
         let ref_name = format!("refs/remotes/origin/{}", branch_name);
-        let reference = repo.find_reference(&ref_name).or_else(|_| {
-            // Try local branch
-            let local_ref = format!("refs/heads/{}", branch_name);
-            repo.find_reference(&local_ref)
-        }).map_err(|e| format!("Failed to find branch '{}': {}", branch_name, e))?;
-        let commit = reference
-            .peel_to_commit()
-            .map_err(|e| format!("Failed to resolve branch '{}' to commit: {}", branch_name, e))?;
+        let reference = repo
+            .find_reference(&ref_name)
+            .or_else(|_| {
+                // Try local branch
+                let local_ref = format!("refs/heads/{}", branch_name);
+                repo.find_reference(&local_ref)
+            })
+            .map_err(|e| format!("Failed to find branch '{}': {}", branch_name, e))?;
+        let commit = reference.peel_to_commit().map_err(|e| {
+            format!(
+                "Failed to resolve branch '{}' to commit: {}",
+                branch_name, e
+            )
+        })?;
         commit.id()
     } else {
         // Default branch HEAD
@@ -270,9 +273,7 @@ pub fn fetch_git_dep(
 ///
 /// Reads mesh.toml from `project_dir`, resolves all dependencies, and produces
 /// a lockfile. Returns the resolved dependencies and lockfile.
-pub fn resolve_dependencies(
-    project_dir: &Path,
-) -> Result<(Vec<ResolvedDep>, Lockfile), String> {
+pub fn resolve_dependencies(project_dir: &Path) -> Result<(Vec<ResolvedDep>, Lockfile), String> {
     let manifest_path = project_dir.join("mesh.toml");
     let manifest = Manifest::from_file(&manifest_path)?;
 
@@ -340,7 +341,10 @@ version = "0.1.0"
         assert_eq!(resolved[0].revision, "local");
         match &resolved[0].source {
             DepSource::Path { path } => {
-                assert_eq!(path.canonicalize().unwrap(), dep_dir.canonicalize().unwrap());
+                assert_eq!(
+                    path.canonicalize().unwrap(),
+                    dep_dir.canonicalize().unwrap()
+                );
             }
             _ => panic!("Expected path dependency"),
         }
@@ -536,7 +540,11 @@ version = "1.0.0"
 
         // Init repo with initial commit on main
         let repo = git2::Repository::init(&git_repo_dir).unwrap();
-        std::fs::write(git_repo_dir.join("mesh.toml"), "[package]\nname = \"branch-lib\"\nversion = \"0.1.0\"\n").unwrap();
+        std::fs::write(
+            git_repo_dir.join("mesh.toml"),
+            "[package]\nname = \"branch-lib\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
 
         let mut index = repo.index().unwrap();
         index.add_path(Path::new("mesh.toml")).unwrap();
@@ -544,13 +552,16 @@ version = "1.0.0"
         let tree_oid = index.write_tree().unwrap();
         let tree = repo.find_tree(tree_oid).unwrap();
         let sig = git2::Signature::now("Test", "test@example.com").unwrap();
-        let initial_commit = repo.commit(Some("HEAD"), &sig, &sig, "Initial", &tree, &[]).unwrap();
+        let initial_commit = repo
+            .commit(Some("HEAD"), &sig, &sig, "Initial", &tree, &[])
+            .unwrap();
         let initial = repo.find_commit(initial_commit).unwrap();
 
         // Create a "dev" branch with a new commit
         repo.branch("dev", &initial, false).unwrap();
         repo.set_head("refs/heads/dev").unwrap();
-        repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force())).unwrap();
+        repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
+            .unwrap();
 
         std::fs::write(git_repo_dir.join("extra.txt"), "dev content").unwrap();
         let mut index = repo.index().unwrap();
@@ -558,7 +569,16 @@ version = "1.0.0"
         index.write().unwrap();
         let tree_oid = index.write_tree().unwrap();
         let tree = repo.find_tree(tree_oid).unwrap();
-        let dev_commit_oid = repo.commit(Some("refs/heads/dev"), &sig, &sig, "Dev commit", &tree, &[&initial]).unwrap();
+        let dev_commit_oid = repo
+            .commit(
+                Some("refs/heads/dev"),
+                &sig,
+                &sig,
+                "Dev commit",
+                &tree,
+                &[&initial],
+            )
+            .unwrap();
 
         // Go back to default branch
         repo.set_head("refs/heads/main").ok();

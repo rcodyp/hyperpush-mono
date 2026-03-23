@@ -109,9 +109,7 @@ fn collect_function_refs(expr: &MirExpr, refs: &mut Vec<String>) {
                 collect_function_refs(arg, refs);
             }
         }
-        MirExpr::ClosureCall {
-            closure, args, ..
-        } => {
+        MirExpr::ClosureCall { closure, args, .. } => {
             collect_function_refs(closure, refs);
             for arg in args {
                 collect_function_refs(arg, refs);
@@ -167,7 +165,9 @@ fn collect_function_refs(expr: &MirExpr, refs: &mut Vec<String>) {
                 collect_function_refs(val, refs);
             }
         }
-        MirExpr::StructUpdate { base, overrides, .. } => {
+        MirExpr::StructUpdate {
+            base, overrides, ..
+        } => {
             collect_function_refs(base, refs);
             for (_, val) in overrides {
                 collect_function_refs(val, refs);
@@ -195,7 +195,12 @@ fn collect_function_refs(expr: &MirExpr, refs: &mut Vec<String>) {
         | MirExpr::Panic { .. }
         | MirExpr::Unit => {}
         // Actor primitives
-        MirExpr::ActorSpawn { func, args, terminate_callback, .. } => {
+        MirExpr::ActorSpawn {
+            func,
+            args,
+            terminate_callback,
+            ..
+        } => {
             collect_function_refs(func, refs);
             for arg in args {
                 collect_function_refs(arg, refs);
@@ -204,11 +209,18 @@ fn collect_function_refs(expr: &MirExpr, refs: &mut Vec<String>) {
                 collect_function_refs(cb, refs);
             }
         }
-        MirExpr::ActorSend { target, message, .. } => {
+        MirExpr::ActorSend {
+            target, message, ..
+        } => {
             collect_function_refs(target, refs);
             collect_function_refs(message, refs);
         }
-        MirExpr::ActorReceive { arms, timeout_ms, timeout_body, .. } => {
+        MirExpr::ActorReceive {
+            arms,
+            timeout_ms,
+            timeout_body,
+            ..
+        } => {
             for arm in arms {
                 if let Some(guard) = &arm.guard {
                     collect_function_refs(guard, refs);
@@ -245,7 +257,13 @@ fn collect_function_refs(expr: &MirExpr, refs: &mut Vec<String>) {
             collect_function_refs(body, refs);
         }
         MirExpr::Break | MirExpr::Continue => {}
-        MirExpr::ForInRange { start, end, filter, body, .. } => {
+        MirExpr::ForInRange {
+            start,
+            end,
+            filter,
+            body,
+            ..
+        } => {
             collect_function_refs(start, refs);
             collect_function_refs(end, refs);
             if let Some(f) = filter {
@@ -253,28 +271,50 @@ fn collect_function_refs(expr: &MirExpr, refs: &mut Vec<String>) {
             }
             collect_function_refs(body, refs);
         }
-        MirExpr::ForInList { collection, filter, body, .. } => {
+        MirExpr::ForInList {
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             collect_function_refs(collection, refs);
             if let Some(f) = filter {
                 collect_function_refs(f, refs);
             }
             collect_function_refs(body, refs);
         }
-        MirExpr::ForInMap { collection, filter, body, .. } => {
+        MirExpr::ForInMap {
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             collect_function_refs(collection, refs);
             if let Some(f) = filter {
                 collect_function_refs(f, refs);
             }
             collect_function_refs(body, refs);
         }
-        MirExpr::ForInSet { collection, filter, body, .. } => {
+        MirExpr::ForInSet {
+            collection,
+            filter,
+            body,
+            ..
+        } => {
             collect_function_refs(collection, refs);
             if let Some(f) = filter {
                 collect_function_refs(f, refs);
             }
             collect_function_refs(body, refs);
         }
-        MirExpr::ForInIterator { iterator, filter, body, next_fn, iter_fn, .. } => {
+        MirExpr::ForInIterator {
+            iterator,
+            filter,
+            body,
+            next_fn,
+            iter_fn,
+            ..
+        } => {
             collect_function_refs(iterator, refs);
             if let Some(f) = filter {
                 collect_function_refs(f, refs);
@@ -351,7 +391,10 @@ mod tests {
         let names: Vec<&str> = module.functions.iter().map(|f| f.name.as_str()).collect();
         assert!(names.contains(&"main"));
         assert!(names.contains(&"helper"));
-        assert!(!names.contains(&"unused"), "unused function should be removed");
+        assert!(
+            !names.contains(&"unused"),
+            "unused function should be removed"
+        );
     }
 
     #[test]

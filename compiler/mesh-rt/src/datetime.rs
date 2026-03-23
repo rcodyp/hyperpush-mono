@@ -9,8 +9,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::io::{MeshResult, alloc_result};
-use crate::string::{MeshString, mesh_string_new};
+use crate::io::{alloc_result, MeshResult};
+use crate::string::{mesh_string_new, MeshString};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
 
 // ── utc_now ──────────────────────────────────────────────────────────────────
@@ -59,8 +59,8 @@ pub extern "C" fn mesh_datetime_from_iso8601(s: *const MeshString) -> *mut MeshR
 /// Always emits Z suffix and 3 decimal digits: "2024-01-15T10:30:00.000Z"
 #[no_mangle]
 pub extern "C" fn mesh_datetime_to_iso8601(ms: i64) -> *mut MeshString {
-    let dt: DateTime<Utc> = DateTime::from_timestamp_millis(ms)
-        .expect("mesh_datetime_to_iso8601: ms out of range");
+    let dt: DateTime<Utc> =
+        DateTime::from_timestamp_millis(ms).expect("mesh_datetime_to_iso8601: ms out of range");
     // SecondsFormat::Millis + true (use_z=true) -> always Z, always 3 decimal digits
     let s = dt.to_rfc3339_opts(SecondsFormat::Millis, true);
     mesh_string_new(s.as_ptr(), s.len() as u64)
@@ -87,7 +87,7 @@ pub extern "C" fn mesh_datetime_from_unix_ms(ms: i64) -> *mut MeshResult {
 /// DateTime.to_unix_ms(dt) -> Int
 #[no_mangle]
 pub extern "C" fn mesh_datetime_to_unix_ms(ms: i64) -> i64 {
-    ms  // Already stored as ms — identity conversion
+    ms // Already stored as ms — identity conversion
 }
 
 /// DateTime.from_unix_secs(s) -> Result<DateTime, String>
@@ -120,11 +120,7 @@ pub extern "C" fn mesh_datetime_to_unix_secs(ms: i64) -> i64 {
 /// Unknown unit panics with a clear message.
 /// n can be negative (equivalent to subtraction).
 #[no_mangle]
-pub extern "C" fn mesh_datetime_add(
-    ms: i64,
-    n: i64,
-    unit: *const MeshString,
-) -> i64 {
+pub extern "C" fn mesh_datetime_add(ms: i64, n: i64, unit: *const MeshString) -> i64 {
     unsafe {
         let unit_str = (*unit).as_str();
         // Atom literals are lowered without the leading ':' (e.g. :day -> "day").
@@ -140,8 +136,8 @@ pub extern "C" fn mesh_datetime_add(
                 other
             ),
         };
-        let dt: DateTime<Utc> = DateTime::from_timestamp_millis(ms)
-            .expect("DateTime.add: invalid ms timestamp");
+        let dt: DateTime<Utc> =
+            DateTime::from_timestamp_millis(ms).expect("DateTime.add: invalid ms timestamp");
         (dt + delta).timestamp_millis()
     }
 }
@@ -152,11 +148,7 @@ pub extern "C" fn mesh_datetime_add(
 /// Positive if dt1 is after dt2, negative if dt1 is before dt2.
 /// Supported units (atom literals without leading colon): ms, second, minute, hour, day, week
 #[no_mangle]
-pub extern "C" fn mesh_datetime_diff(
-    dt1_ms: i64,
-    dt2_ms: i64,
-    unit: *const MeshString,
-) -> f64 {
+pub extern "C" fn mesh_datetime_diff(dt1_ms: i64, dt2_ms: i64, unit: *const MeshString) -> f64 {
     unsafe {
         let unit_str = (*unit).as_str();
         // Atom literals are lowered without the leading ':' (e.g. :day -> "day").
@@ -181,11 +173,19 @@ pub extern "C" fn mesh_datetime_diff(
 /// DateTime.is_before(dt1, dt2) -> Bool (i8: 1=true, 0=false)
 #[no_mangle]
 pub extern "C" fn mesh_datetime_before(dt1_ms: i64, dt2_ms: i64) -> i8 {
-    if dt1_ms < dt2_ms { 1 } else { 0 }
+    if dt1_ms < dt2_ms {
+        1
+    } else {
+        0
+    }
 }
 
 /// DateTime.is_after(dt1, dt2) -> Bool (i8: 1=true, 0=false)
 #[no_mangle]
 pub extern "C" fn mesh_datetime_after(dt1_ms: i64, dt2_ms: i64) -> i8 {
-    if dt1_ms > dt2_ms { 1 } else { 0 }
+    if dt1_ms > dt2_ms {
+        1
+    } else {
+        0
+    }
 }

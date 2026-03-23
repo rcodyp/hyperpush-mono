@@ -128,7 +128,11 @@ pub fn topological_sort(graph: &ModuleGraph) -> Result<Vec<ModuleId>, CycleError
         .map(|i| ModuleId(i as u32))
         .collect();
     // Sort alphabetically by module name for determinism.
-    ready.sort_by(|a, b| graph.modules[a.0 as usize].name.cmp(&graph.modules[b.0 as usize].name));
+    ready.sort_by(|a, b| {
+        graph.modules[a.0 as usize]
+            .name
+            .cmp(&graph.modules[b.0 as usize].name)
+    });
 
     let mut queue = VecDeque::from(ready);
     let mut order = Vec::with_capacity(n);
@@ -273,7 +277,10 @@ mod tests {
         graph.add_dependency(id_b, id_c);
 
         let order = topological_sort(&graph).unwrap();
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
         assert_eq!(names, vec!["C", "B", "A"]);
     }
 
@@ -286,7 +293,10 @@ mod tests {
         graph.add_module("B".into(), "b.mpl".into(), false);
 
         let order = topological_sort(&graph).unwrap();
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
         assert_eq!(names, vec!["A", "B", "C"]);
     }
 
@@ -305,7 +315,10 @@ mod tests {
         graph.add_dependency(id_c, id_d);
 
         let order = topological_sort(&graph).unwrap();
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
         assert_eq!(names, vec!["D", "B", "C", "A"]);
     }
 
@@ -322,7 +335,10 @@ mod tests {
         graph.add_dependency(id_c, id_a);
 
         let err = topological_sort(&graph).unwrap_err();
-        assert!(err.cycle_path.len() >= 3, "cycle path should have at least 3 entries");
+        assert!(
+            err.cycle_path.len() >= 3,
+            "cycle path should have at least 3 entries"
+        );
         // The cycle path should contain all three module names and repeat one.
         assert!(err.cycle_path.contains(&"A".to_string()));
         assert!(err.cycle_path.contains(&"B".to_string()));
@@ -330,7 +346,9 @@ mod tests {
         // Last element should equal one of the earlier elements (cycle).
         assert_eq!(
             err.cycle_path.first(),
-            Some(&err.cycle_path.last().unwrap().clone()).as_ref().map(|s| *s)
+            Some(&err.cycle_path.last().unwrap().clone())
+                .as_ref()
+                .map(|s| *s)
         );
     }
 
@@ -359,7 +377,10 @@ mod tests {
         graph.add_dependency(id_main, id_math);
 
         let order = topological_sort(&graph).unwrap();
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
         assert_eq!(names, vec!["Math", "Utils", "Main"]);
     }
 }

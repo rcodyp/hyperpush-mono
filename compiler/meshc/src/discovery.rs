@@ -85,18 +85,19 @@ pub fn path_to_module_name(relative_path: &Path) -> Option<String> {
 /// determinism. Hidden directories (names starting with `.`) are skipped.
 pub fn discover_mesh_files(project_root: &Path) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
-    discover_recursive(project_root, project_root, &mut files)
-        .map_err(|e| format!("Failed to walk directory '{}': {}", project_root.display(), e))?;
+    discover_recursive(project_root, project_root, &mut files).map_err(|e| {
+        format!(
+            "Failed to walk directory '{}': {}",
+            project_root.display(),
+            e
+        )
+    })?;
     files.sort();
     Ok(files)
 }
 
 /// Internal recursive walker that collects `.mpl` files as relative paths.
-fn discover_recursive(
-    root: &Path,
-    dir: &Path,
-    files: &mut Vec<PathBuf>,
-) -> std::io::Result<()> {
+fn discover_recursive(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let entry_path = entry.path();
@@ -204,13 +205,12 @@ pub fn build_project(project_root: &Path) -> Result<ProjectData, String> {
         let name = if is_entry {
             "Main".to_string()
         } else {
-            path_to_module_name(relative_path)
-                .ok_or_else(|| {
-                    format!(
-                        "Cannot determine module name for '{}'",
-                        relative_path.display()
-                    )
-                })?
+            path_to_module_name(relative_path).ok_or_else(|| {
+                format!(
+                    "Cannot determine module name for '{}'",
+                    relative_path.display()
+                )
+            })?
         };
 
         let parse = mesh_parser::parse(&source);
@@ -272,9 +272,8 @@ pub fn build_project(project_root: &Path) -> Result<ProjectData, String> {
     }
 
     // Phase 3: Topological sort.
-    let compilation_order = module_graph::topological_sort(&graph).map_err(|e: CycleError| {
-        format!("Circular dependency: {}", e)
-    })?;
+    let compilation_order = module_graph::topological_sort(&graph)
+        .map_err(|e: CycleError| format!("Circular dependency: {}", e))?;
 
     Ok(ProjectData {
         graph,
@@ -387,7 +386,10 @@ from Baz.Qux import { name1, name2 }
         let (graph, order) = build_module_graph(root).unwrap();
         assert_eq!(graph.module_count(), 2);
 
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
         assert_eq!(names, vec!["Utils", "Main"]);
     }
 
@@ -403,7 +405,11 @@ from Baz.Qux import { name1, name2 }
         let result = build_module_graph(root);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("Circular dependency"), "Expected cycle error, got: {}", err);
+        assert!(
+            err.contains("Circular dependency"),
+            "Expected cycle error, got: {}",
+            err
+        );
     }
 
     #[test]
@@ -417,7 +423,10 @@ from Baz.Qux import { name1, name2 }
         fs::write(root.join("c.mpl"), "fn base() do\n  1\nend\n").unwrap();
 
         let (graph, order) = build_module_graph(root).unwrap();
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
 
         // C first (no deps), then A and B (alphabetical), then Main last.
         assert_eq!(names, vec!["C", "A", "B", "Main"]);
@@ -433,7 +442,10 @@ from Baz.Qux import { name1, name2 }
         let (graph, order) = build_module_graph(root).unwrap();
         assert_eq!(graph.module_count(), 1);
 
-        let names: Vec<&str> = order.iter().map(|id| graph.get(*id).name.as_str()).collect();
+        let names: Vec<&str> = order
+            .iter()
+            .map(|id| graph.get(*id).name.as_str())
+            .collect();
         assert_eq!(names, vec!["Main"]);
     }
 
@@ -448,7 +460,11 @@ from Baz.Qux import { name1, name2 }
         let result = build_module_graph(root);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("cannot import itself"), "Expected self-import error, got: {}", err);
+        assert!(
+            err.contains("cannot import itself"),
+            "Expected self-import error, got: {}",
+            err
+        );
     }
 
     // ── build_project tests ──────────────────────────────────────────────
@@ -458,7 +474,11 @@ from Baz.Qux import { name1, name2 }
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
 
-        fs::write(root.join("main.mpl"), "import Utils\nfn main() do\n  1\nend\n").unwrap();
+        fs::write(
+            root.join("main.mpl"),
+            "import Utils\nfn main() do\n  1\nend\n",
+        )
+        .unwrap();
         fs::write(root.join("utils.mpl"), "fn helper() do\n  1\nend\n").unwrap();
 
         let project = build_project(root).unwrap();
@@ -530,13 +550,17 @@ from Baz.Qux import { name1, name2 }
 
         // Broken module has parse errors
         assert!(
-            !project.module_parses[broken_id.0 as usize].errors().is_empty(),
+            !project.module_parses[broken_id.0 as usize]
+                .errors()
+                .is_empty(),
             "Expected parse errors in broken module"
         );
 
         // Main module has no parse errors
         assert!(
-            project.module_parses[main_id.0 as usize].errors().is_empty(),
+            project.module_parses[main_id.0 as usize]
+                .errors()
+                .is_empty(),
             "Expected no parse errors in main module"
         );
     }

@@ -103,9 +103,8 @@ fn test_generic_struct_field_access() {
 /// Test 5: Struct literal with wrong field type produces type mismatch error.
 #[test]
 fn test_struct_wrong_field_type() {
-    let result = check_source(
-        "struct Point do\n  x :: Int\n  y :: Int\nend\nPoint { x: \"bad\", y: 2 }",
-    );
+    let result =
+        check_source("struct Point do\n  x :: Int\n  y :: Int\nend\nPoint { x: \"bad\", y: 2 }");
     assert_has_error(
         &result,
         |e| matches!(e, TypeError::Mismatch { .. }),
@@ -116,9 +115,7 @@ fn test_struct_wrong_field_type() {
 /// Test 6: Struct literal with missing field produces an error.
 #[test]
 fn test_struct_missing_field() {
-    let result = check_source(
-        "struct Point do\n  x :: Int\n  y :: Int\nend\nPoint { x: 1 }",
-    );
+    let result = check_source("struct Point do\n  x :: Int\n  y :: Int\nend\nPoint { x: 1 }");
     assert_has_error(
         &result,
         |e| {
@@ -156,9 +153,7 @@ fn test_option_sugar_annotation() {
 /// Test 10: Generic propagation through Option -- wrap<T>(x: T) -> Option<T>.
 #[test]
 fn test_option_generic_propagation() {
-    let result = check_source(
-        "fn wrap(x) do\n  Some(x)\nend\nwrap(42)",
-    );
+    let result = check_source("fn wrap(x) do\n  Some(x)\nend\nwrap(42)");
     assert_result_type(&result, Ty::option(Ty::int()));
 }
 
@@ -198,15 +193,18 @@ fn test_type_alias_simple() {
     let result = check_source("type Name = String\nlet x :: Name = \"hello\"\nx");
     assert_result_type(&result, Ty::string());
     // Verify no errors -- the alias resolved and String matches String.
-    assert!(result.errors.is_empty(), "type alias should resolve without errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "type alias should resolve without errors: {:?}",
+        result.errors
+    );
 }
 
 /// Test 15: Generic type alias -- `type Pair<A, B> = (A, B)`.
 #[test]
 fn test_type_alias_generic() {
-    let result = check_source(
-        "type Pair<A, B> = (A, B)\nlet x :: Pair<Int, String> = (1, \"hello\")\nx",
-    );
+    let result =
+        check_source("type Pair<A, B> = (A, B)\nlet x :: Pair<Int, String> = (1, \"hello\")\nx");
     // After alias resolution, Pair<Int, String> is (Int, String)
     assert_result_type(&result, Ty::Tuple(vec![Ty::int(), Ty::string()]));
 }
@@ -215,7 +213,10 @@ fn test_type_alias_generic() {
 #[test]
 fn test_type_alias_undefined_target() {
     let result = check_source("type Foo = NonExistentType");
-    assert!(!result.errors.is_empty(), "expected error for undefined alias target");
+    assert!(
+        !result.errors.is_empty(),
+        "expected error for undefined alias target"
+    );
     // Verify the error mentions the undefined type name
     let err_str = format!("{:?}", result.errors);
     assert!(
@@ -229,7 +230,11 @@ fn test_type_alias_undefined_target() {
 #[test]
 fn test_type_alias_in_let_binding() {
     let result = check_source("type Name = String\nlet x :: Name = \"hello\"\nx");
-    assert!(result.errors.is_empty(), "no errors expected: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "no errors expected: {:?}",
+        result.errors
+    );
 }
 
 /// ALIAS-02: alias in function return type
@@ -238,7 +243,11 @@ fn test_type_alias_in_fn_return() {
     let result = check_source(
         "type Url = String\nfn make_url(s :: String) -> Url do\n  s\nend\nmake_url(\"http://x\")",
     );
-    assert!(result.errors.is_empty(), "no errors expected: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "no errors expected: {:?}",
+        result.errors
+    );
 }
 
 /// ALIAS-03: pub type alias is usable in function signatures (pre-registration smoke test).
@@ -249,8 +258,11 @@ fn test_type_alias_in_fn_return() {
 /// (e2e_type_alias_pub).
 #[test]
 fn test_alias_import_context_pre_registration() {
-    let result = check_source(
-        "pub type UserId = Int\nfn get(id :: UserId) -> UserId do id end\nget(1)"
+    let result =
+        check_source("pub type UserId = Int\nfn get(id :: UserId) -> UserId do id end\nget(1)");
+    assert!(
+        result.errors.is_empty(),
+        "pub type alias should work in function signatures: {:?}",
+        result.errors
     );
-    assert!(result.errors.is_empty(), "pub type alias should work in function signatures: {:?}", result.errors);
 }

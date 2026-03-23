@@ -24,14 +24,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
-use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 
 use crate::actor;
 use crate::collections::map;
 use crate::gc::mesh_gc_alloc_actor;
 use crate::string::{mesh_string_new, MeshString};
 
-use super::router::{MiddlewareEntry, MeshRouter};
+use super::router::{MeshRouter, MiddlewareEntry};
 
 // ── Stream Abstraction ──────────────────────────────────────────────────
 
@@ -75,14 +75,16 @@ impl Write for HttpStream {
 ///
 /// The certificate file may contain a chain (multiple PEM blocks). The private
 /// key file must contain exactly one PEM-encoded private key (RSA, ECDSA, or Ed25519).
-pub(crate) fn build_server_config(cert_path: &str, key_path: &str) -> Result<Arc<ServerConfig>, String> {
+pub(crate) fn build_server_config(
+    cert_path: &str,
+    key_path: &str,
+) -> Result<Arc<ServerConfig>, String> {
     let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(cert_path)
         .map_err(|e| format!("open cert file: {}", e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("parse certs: {}", e))?;
 
-    let key = PrivateKeyDer::from_pem_file(key_path)
-        .map_err(|e| format!("load key: {}", e))?;
+    let key = PrivateKeyDer::from_pem_file(key_path).map_err(|e| format!("load key: {}", e))?;
 
     let config = ServerConfig::builder()
         .with_no_client_auth()
@@ -463,7 +465,7 @@ pub extern "C" fn mesh_http_serve(router: *mut u8, port: i64) {
     // Ensure the actor scheduler is initialized (idempotent).
     crate::actor::mesh_rt_init_actor(0);
 
-    let addr = format!("[::]:{}",  port);
+    let addr = format!("[::]:{}", port);
     let listener = match std::net::TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
@@ -486,7 +488,9 @@ pub extern "C" fn mesh_http_serve(router: *mut u8, port: i64) {
         };
 
         // Set read timeout BEFORE wrapping in HttpStream.
-        tcp_stream.set_read_timeout(Some(Duration::from_secs(30))).ok();
+        tcp_stream
+            .set_read_timeout(Some(Duration::from_secs(30)))
+            .ok();
 
         let http_stream = HttpStream::Plain(tcp_stream);
         let stream_ptr = Box::into_raw(Box::new(http_stream)) as usize;
@@ -539,7 +543,7 @@ pub extern "C" fn mesh_http_serve_tls(
         }
     };
 
-    let addr = format!("[::]:{}",  port);
+    let addr = format!("[::]:{}", port);
     let listener = match std::net::TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
@@ -565,7 +569,9 @@ pub extern "C" fn mesh_http_serve_tls(
         };
 
         // Set read timeout BEFORE wrapping in TLS (Pitfall 7 from research).
-        tcp_stream.set_read_timeout(Some(Duration::from_secs(30))).ok();
+        tcp_stream
+            .set_read_timeout(Some(Duration::from_secs(30)))
+            .ok();
 
         // Reconstruct the Arc without dropping it (we leaked it intentionally).
         let tls_config = unsafe { Arc::from_raw(config_ptr as *const ServerConfig) };
@@ -684,7 +690,12 @@ fn call_handler(fn_ptr: *mut u8, env_ptr: *mut u8, request: *mut u8) -> *mut u8 
 ///
 /// If env_ptr (middleware's own env) is non-null, it's a closure middleware:
 /// `fn(env, request, next_fn_ptr, next_env_ptr) -> response`.
-fn call_middleware(fn_ptr: *mut u8, env_ptr: *mut u8, request: *mut u8, next_closure: *mut u8) -> *mut u8 {
+fn call_middleware(
+    fn_ptr: *mut u8,
+    env_ptr: *mut u8,
+    request: *mut u8,
+    next_closure: *mut u8,
+) -> *mut u8 {
     unsafe {
         // Dereference the next_closure pointer to extract fn_ptr and env_ptr fields.
         // The closure struct layout is { fn_ptr: *mut u8, env_ptr: *mut u8 } -- 16 bytes.
@@ -705,7 +716,10 @@ fn call_middleware(fn_ptr: *mut u8, env_ptr: *mut u8, request: *mut u8, next_clo
 /// and calling the appropriate handler function.
 ///
 /// Returns `(status_code, body_bytes, optional_extra_headers)` for the response.
-fn process_request(router_ptr: *mut u8, parsed: ParsedRequest) -> (u16, Vec<u8>, Option<Vec<(String, String)>>) {
+fn process_request(
+    router_ptr: *mut u8,
+    parsed: ParsedRequest,
+) -> (u16, Vec<u8>, Option<Vec<(String, String)>>) {
     unsafe {
         let router = &*(router_ptr as *const MeshRouter);
 

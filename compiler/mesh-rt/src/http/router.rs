@@ -96,7 +96,11 @@ impl MeshRouter {
     ///   2. Parameterized routes (`:param` segments) -- medium priority
     ///   3. Wildcard routes (`/*`) -- lowest priority (catch-all fallback)
     /// Within each pass, also checks method filtering.
-    pub fn match_route(&self, path: &str, method: &str) -> Option<(*mut u8, *mut u8, Vec<(String, String)>)> {
+    pub fn match_route(
+        &self,
+        path: &str,
+        method: &str,
+    ) -> Option<(*mut u8, *mut u8, Vec<(String, String)>)> {
         // First pass: exact routes only (no `:param` segments, no wildcards).
         for entry in &self.routes {
             if has_param_segments(&entry.pattern) || is_wildcard(&entry.pattern) {
@@ -257,10 +261,7 @@ pub extern "C" fn mesh_http_route_delete(
 /// The middleware function receives (request, next_closure) and returns a response.
 /// Multiple middleware compose in registration order: first added = outermost.
 #[no_mangle]
-pub extern "C" fn mesh_http_use_middleware(
-    router: *mut u8,
-    middleware_fn: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_http_use_middleware(router: *mut u8, middleware_fn: *mut u8) -> *mut u8 {
     unsafe {
         let old = &*(router as *const MeshRouter);
 
@@ -418,14 +419,12 @@ mod tests {
     #[test]
     fn test_method_agnostic_route() {
         let router = MeshRouter {
-            routes: vec![
-                RouteEntry {
-                    pattern: "/health".to_string(),
-                    method: None,
-                    handler_fn: 1 as *mut u8,
-                    handler_env: std::ptr::null_mut(),
-                },
-            ],
+            routes: vec![RouteEntry {
+                pattern: "/health".to_string(),
+                method: None,
+                handler_fn: 1 as *mut u8,
+                handler_env: std::ptr::null_mut(),
+            }],
             middlewares: vec![],
         };
         // Method-agnostic route should match any method.

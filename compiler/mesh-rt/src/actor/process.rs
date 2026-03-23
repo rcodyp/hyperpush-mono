@@ -81,9 +81,7 @@ impl ProcessId {
             local_id
         );
         ProcessId(
-            (node_id as u64) << 48
-                | (creation as u64) << 40
-                | (local_id & 0x0000_00FF_FFFF_FFFF),
+            (node_id as u64) << 48 | (creation as u64) << 40 | (local_id & 0x0000_00FF_FFFF_FFFF),
         )
     }
 }

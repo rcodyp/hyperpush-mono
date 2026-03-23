@@ -79,16 +79,19 @@ pub enum StfType {
     String,
     Unit,
     Pid,
-    List(Box<StfType>),                                                   // element type
-    Map(Box<StfType>, Box<StfType>),                                      // key type, value type
-    Set(Box<StfType>),                                                    // element type
-    Tuple(Vec<StfType>),                                                  // element types
-    Struct(std::string::String, Vec<(std::string::String, StfType)>),     // name, fields
-    SumType(std::string::String, Vec<(std::string::String, Vec<StfType>)>), // name, variants
-    OptionOf(Box<StfType>),                                               // inner type
-    ResultOf(Box<StfType>, Box<StfType>),                                 // ok type, err type
-    Closure,                                                              // always errors
-    FnPtr,                                                                // always errors
+    List(Box<StfType>),              // element type
+    Map(Box<StfType>, Box<StfType>), // key type, value type
+    Set(Box<StfType>),               // element type
+    Tuple(Vec<StfType>),             // element types
+    Struct(std::string::String, Vec<(std::string::String, StfType)>), // name, fields
+    SumType(
+        std::string::String,
+        Vec<(std::string::String, Vec<StfType>)>,
+    ), // name, variants
+    OptionOf(Box<StfType>),          // inner type
+    ResultOf(Box<StfType>, Box<StfType>), // ok type, err type
+    Closure,                         // always errors
+    FnPtr,                           // always errors
 }
 
 // ── StfError ─────────────────────────────────────────────────────────────
@@ -117,7 +120,10 @@ impl std::fmt::Display for StfError {
             StfError::InvalidTag(tag) => write!(f, "STF: invalid type tag 0x{:02X}", tag),
             StfError::InvalidVersion(v) => write!(f, "STF: unsupported version {}", v),
             StfError::ClosureNotSerializable => {
-                write!(f, "STF: closures and function pointers cannot be serialized")
+                write!(
+                    f,
+                    "STF: closures and function pointers cannot be serialized"
+                )
             }
             StfError::PayloadTooLarge(len) => {
                 write!(f, "STF: payload length {} exceeds safety limit", len)
@@ -129,7 +135,7 @@ impl std::fmt::Display for StfError {
 
 // ── Encode ───────────────────────────────────────────────────────────────
 
-use crate::string::{MeshString, mesh_string_new};
+use crate::string::{mesh_string_new, MeshString};
 
 /// Encode a single Mesh value into the buffer (without version byte).
 ///
@@ -183,7 +189,6 @@ pub fn stf_encode(value: u64, type_hint: &StfType, buf: &mut Vec<u8>) -> Result<
         StfType::Closure | StfType::FnPtr => Err(StfError::ClosureNotSerializable),
 
         // ── Container types ────────────────────────────────────────
-
         StfType::List(elem_type) => {
             buf.push(TAG_LIST);
             let ptr = value as *const u8;
@@ -253,7 +258,6 @@ pub fn stf_encode(value: u64, type_hint: &StfType, buf: &mut Vec<u8>) -> Result<
         }
 
         // ── Composite types ───────────────────────────────────────
-
         StfType::Struct(name, fields) => {
             buf.push(TAG_STRUCT);
             // Write struct name.
@@ -305,7 +309,6 @@ pub fn stf_encode(value: u64, type_hint: &StfType, buf: &mut Vec<u8>) -> Result<
         }
 
         // ── Option/Result (special-cased) ─────────────────────────
-
         StfType::OptionOf(inner_type) => {
             // MeshOption layout: { tag: u8 at offset 0, value: *mut u8 at offset 8 }
             let tag = unsafe { *(value as *const u8) };
@@ -451,7 +454,6 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
         TAG_CLOSURE => Err(StfError::ClosureNotSerializable),
 
         // ── Container tags ─────────────────────────────────────────
-
         TAG_LIST => {
             let count = read_u32(data, pos)?;
             if count > MAX_COLLECTION_LEN {
@@ -461,14 +463,16 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
             let total = 16 + (count as usize) * 8;
             let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
             unsafe {
-                *(ptr as *mut u64) = count as u64;       // len
+                *(ptr as *mut u64) = count as u64; // len
                 *((ptr as *mut u64).add(1)) = count as u64; // cap
             }
             let data_ptr = unsafe { (ptr as *mut u64).add(2) };
             let mut elem_type = StfType::Unit;
             for i in 0..count as usize {
                 let (val, et) = stf_decode(data, pos)?;
-                unsafe { *data_ptr.add(i) = val; }
+                unsafe {
+                    *data_ptr.add(i) = val;
+                }
                 if i == 0 {
                     elem_type = et;
                 }
@@ -487,7 +491,7 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
             let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
             unsafe {
                 *(ptr as *mut u64) = count as u64; // len
-                // Store cap with key_type_tag in upper 8 bits.
+                                                   // Store cap with key_type_tag in upper 8 bits.
                 *((ptr as *mut u64).add(1)) = ((key_type_tag as u64) << 56) | (count as u64);
             }
             let entries_ptr = unsafe { (ptr as *mut u64).add(2) };
@@ -517,14 +521,16 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
             let total = 16 + (count as usize) * 8;
             let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
             unsafe {
-                *(ptr as *mut u64) = count as u64;       // len
+                *(ptr as *mut u64) = count as u64; // len
                 *((ptr as *mut u64).add(1)) = count as u64; // cap
             }
             let data_ptr = unsafe { (ptr as *mut u64).add(2) };
             let mut elem_type = StfType::Unit;
             for i in 0..count as usize {
                 let (val, et) = stf_decode(data, pos)?;
-                unsafe { *data_ptr.add(i) = val; }
+                unsafe {
+                    *data_ptr.add(i) = val;
+                }
                 if i == 0 {
                     elem_type = et;
                 }
@@ -537,19 +543,22 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
             // Allocate tuple: { u64 len, u64[arity] data }
             let total = 8 + (arity as usize) * 8;
             let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
-            unsafe { *(ptr as *mut u64) = arity as u64; }
+            unsafe {
+                *(ptr as *mut u64) = arity as u64;
+            }
             let data_ptr = unsafe { (ptr as *mut u64).add(1) };
             let mut elem_types = Vec::with_capacity(arity as usize);
             for i in 0..arity as usize {
                 let (val, et) = stf_decode(data, pos)?;
-                unsafe { *data_ptr.add(i) = val; }
+                unsafe {
+                    *data_ptr.add(i) = val;
+                }
                 elem_types.push(et);
             }
             Ok((ptr as u64, StfType::Tuple(elem_types)))
         }
 
         // ── Composite tags ────────────────────────────────────────
-
         TAG_STRUCT => {
             let name = read_name(data, pos)?;
             let field_count = read_u16(data, pos)?;
@@ -565,7 +574,9 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
                 let field_name = read_name(data, pos)?;
                 let (val, ft) = stf_decode(data, pos)?;
                 if !ptr.is_null() {
-                    unsafe { *((ptr as *mut u64).add(i)) = val; }
+                    unsafe {
+                        *((ptr as *mut u64).add(i)) = val;
+                    }
                 }
                 fields.push((field_name, ft));
             }
@@ -579,12 +590,16 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
             // Allocate sum type layout: { u8 tag at offset 0, fields at offset 8 }
             let total = 8 + (field_count as usize) * 8;
             let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
-            unsafe { *(ptr as *mut u8) = variant_tag; }
+            unsafe {
+                *(ptr as *mut u8) = variant_tag;
+            }
             let fields_ptr = unsafe { (ptr as *mut u64).add(1) };
             let mut field_types = Vec::with_capacity(field_count as usize);
             for i in 0..field_count as usize {
                 let (val, ft) = stf_decode(data, pos)?;
-                unsafe { *fields_ptr.add(i) = val; }
+                unsafe {
+                    *fields_ptr.add(i) = val;
+                }
                 field_types.push(ft);
             }
             // Build a variants list with this variant's fields at the correct index.
@@ -600,7 +615,6 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
         }
 
         // ── Option/Result tags ────────────────────────────────────
-
         TAG_OPTION_SOME => {
             let (inner_val, inner_type) = stf_decode(data, pos)?;
             let opt_ptr = crate::option::alloc_option(0, inner_val as *mut u8);
@@ -615,13 +629,19 @@ pub fn stf_decode(data: &[u8], pos: &mut usize) -> Result<(u64, StfType), StfErr
         TAG_RESULT_OK => {
             let (inner_val, inner_type) = stf_decode(data, pos)?;
             let ptr = crate::option::alloc_option(0, inner_val as *mut u8);
-            Ok((ptr as u64, StfType::ResultOf(Box::new(inner_type), Box::new(StfType::Unit))))
+            Ok((
+                ptr as u64,
+                StfType::ResultOf(Box::new(inner_type), Box::new(StfType::Unit)),
+            ))
         }
 
         TAG_RESULT_ERR => {
             let (inner_val, inner_type) = stf_decode(data, pos)?;
             let ptr = crate::option::alloc_option(1, inner_val as *mut u8);
-            Ok((ptr as u64, StfType::ResultOf(Box::new(StfType::Unit), Box::new(inner_type))))
+            Ok((
+                ptr as u64,
+                StfType::ResultOf(Box::new(StfType::Unit), Box::new(inner_type)),
+            ))
         }
 
         unknown => Err(StfError::InvalidTag(unknown)),
@@ -779,8 +799,8 @@ mod tests {
         let total = 16 + (count as usize) * 8; // header + data
         let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
         unsafe {
-            *(ptr as *mut u64) = count;           // len
-            *((ptr as *mut u64).add(1)) = count;  // cap
+            *(ptr as *mut u64) = count; // len
+            *((ptr as *mut u64).add(1)) = count; // cap
             let data = (ptr as *mut u64).add(2);
             for (i, &v) in values.iter().enumerate() {
                 *data.add(i) = v as u64;
@@ -795,8 +815,8 @@ mod tests {
         let total = 16 + (count as usize) * 8;
         let ptr = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
         unsafe {
-            *(ptr as *mut u64) = count;           // len
-            *((ptr as *mut u64).add(1)) = count;  // cap
+            *(ptr as *mut u64) = count; // len
+            *((ptr as *mut u64).add(1)) = count; // cap
             let data = (ptr as *mut u64).add(2);
             for (i, &v) in values.iter().enumerate() {
                 *data.add(i) = v as u64;
@@ -832,10 +852,10 @@ mod tests {
         // Allocate list of 2 string pointers.
         let list = crate::gc::mesh_gc_alloc_actor(16 + 2 * 8, 8);
         unsafe {
-            *(list as *mut u64) = 2;                       // len
-            *((list as *mut u64).add(1)) = 2;              // cap
-            *((list as *mut u64).add(2)) = s1 as u64;      // data[0]
-            *((list as *mut u64).add(3)) = s2 as u64;      // data[1]
+            *(list as *mut u64) = 2; // len
+            *((list as *mut u64).add(1)) = 2; // cap
+            *((list as *mut u64).add(2)) = s1 as u64; // data[0]
+            *((list as *mut u64).add(3)) = s2 as u64; // data[1]
         }
         let ty = StfType::List(Box::new(StfType::String));
         let encoded = stf_encode_value(list as u64, &ty).unwrap();
@@ -861,23 +881,26 @@ mod tests {
         let total = 16 + 2 * 16; // header + 2 entries of 16 bytes
         let map = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
         unsafe {
-            *(map as *mut u64) = 2;                          // len
+            *(map as *mut u64) = 2; // len
             *((map as *mut u64).add(1)) = (0u64 << 56) | 2; // key_type=0 (int), cap=2
             let entries = (map as *mut u64).add(2);
-            *entries = 1;                          // key[0]
-            *entries.add(1) = v1 as u64;           // val[0]
-            *entries.add(2) = 2;                   // key[1]
-            *entries.add(3) = v2 as u64;           // val[1]
+            *entries = 1; // key[0]
+            *entries.add(1) = v1 as u64; // val[0]
+            *entries.add(2) = 2; // key[1]
+            *entries.add(3) = v2 as u64; // val[1]
         }
         let ty = StfType::Map(Box::new(StfType::Int), Box::new(StfType::String));
         let encoded = stf_encode_value(map as u64, &ty).unwrap();
         let (decoded_ptr, decoded_type) = stf_decode_value(&encoded).unwrap();
-        assert_eq!(decoded_type, StfType::Map(Box::new(StfType::Int), Box::new(StfType::String)));
+        assert_eq!(
+            decoded_type,
+            StfType::Map(Box::new(StfType::Int), Box::new(StfType::String))
+        );
         unsafe {
             let ptr = decoded_ptr as *const u64;
             assert_eq!(*ptr, 2); // len
             let entries = ptr.add(2);
-            assert_eq!(*entries, 1);       // key[0]
+            assert_eq!(*entries, 1); // key[0]
             assert_eq!(*entries.add(2), 2); // key[1]
             let dv0 = *entries.add(1) as *const MeshString;
             let dv1 = *entries.add(3) as *const MeshString;
@@ -912,15 +935,18 @@ mod tests {
         let total = 8 + 3 * 8;
         let tuple = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
         unsafe {
-            *(tuple as *mut u64) = 3;                      // len/arity
-            *((tuple as *mut u64).add(1)) = 42u64;         // Int
-            *((tuple as *mut u64).add(2)) = s as u64;      // String
-            *((tuple as *mut u64).add(3)) = 1u64;          // Bool (true)
+            *(tuple as *mut u64) = 3; // len/arity
+            *((tuple as *mut u64).add(1)) = 42u64; // Int
+            *((tuple as *mut u64).add(2)) = s as u64; // String
+            *((tuple as *mut u64).add(3)) = 1u64; // Bool (true)
         }
         let ty = StfType::Tuple(vec![StfType::Int, StfType::String, StfType::Bool]);
         let encoded = stf_encode_value(tuple as u64, &ty).unwrap();
         let (decoded_ptr, decoded_type) = stf_decode_value(&encoded).unwrap();
-        assert_eq!(decoded_type, StfType::Tuple(vec![StfType::Int, StfType::String, StfType::Bool]));
+        assert_eq!(
+            decoded_type,
+            StfType::Tuple(vec![StfType::Int, StfType::String, StfType::Bool])
+        );
         unsafe {
             let ptr = decoded_ptr as *const u64;
             assert_eq!(*ptr, 3); // arity
@@ -942,8 +968,8 @@ mod tests {
         let total = 2 * 8;
         let s = crate::gc::mesh_gc_alloc_actor(total as u64, 8);
         unsafe {
-            *(s as *mut u64) = name_str as u64;       // field 0: name
-            *((s as *mut u64).add(1)) = 30u64;        // field 1: age
+            *(s as *mut u64) = name_str as u64; // field 0: name
+            *((s as *mut u64).add(1)) = 30u64; // field 1: age
         }
         let ty = StfType::Struct(
             "Person".to_string(),
@@ -1077,10 +1103,10 @@ mod tests {
         // Create a map with 1 int->int entry: {10 => 20}
         let map1 = crate::gc::mesh_gc_alloc_actor(16 + 1 * 16, 8);
         unsafe {
-            *(map1 as *mut u64) = 1;                          // len
+            *(map1 as *mut u64) = 1; // len
             *((map1 as *mut u64).add(1)) = (0u64 << 56) | 1; // key_type=0, cap=1
-            *((map1 as *mut u64).add(2)) = 10;                // key
-            *((map1 as *mut u64).add(3)) = 20;                // val
+            *((map1 as *mut u64).add(2)) = 10; // key
+            *((map1 as *mut u64).add(3)) = 20; // val
         }
         // Create a map with 1 int->int entry: {30 => 40}
         let map2 = crate::gc::mesh_gc_alloc_actor(16 + 1 * 16, 8);
@@ -1098,20 +1124,21 @@ mod tests {
             *((outer as *mut u64).add(2)) = map1 as u64;
             *((outer as *mut u64).add(3)) = map2 as u64;
         }
-        let ty = StfType::List(Box::new(
-            StfType::Map(Box::new(StfType::Int), Box::new(StfType::Int)),
-        ));
+        let ty = StfType::List(Box::new(StfType::Map(
+            Box::new(StfType::Int),
+            Box::new(StfType::Int),
+        )));
         let encoded = stf_encode_value(outer as u64, &ty).unwrap();
         let (decoded_ptr, _) = stf_decode_value(&encoded).unwrap();
         unsafe {
             let ptr = decoded_ptr as *const u64;
             assert_eq!(*ptr, 2); // outer len
-            // Check first decoded map
+                                 // Check first decoded map
             let dm0 = *ptr.add(2) as *const u64;
             assert_eq!(*dm0, 1); // map0 len
-            assert_eq!(*dm0.add(2), 10);  // key
-            assert_eq!(*dm0.add(3), 20);  // val
-            // Check second decoded map
+            assert_eq!(*dm0.add(2), 10); // key
+            assert_eq!(*dm0.add(3), 20); // val
+                                         // Check second decoded map
             let dm1 = *ptr.add(3) as *const u64;
             assert_eq!(*dm1, 1); // map1 len
             assert_eq!(*dm1.add(2), 30);

@@ -5,11 +5,9 @@
 
 use insta::assert_snapshot;
 use mesh_parser::ast::expr::{BinaryExpr, ForInExpr, IfExpr, Literal};
-use mesh_parser::ast::item::{
-    FnDef, LetBinding, ServiceDef, SourceFile, StructDef, SumTypeDef,
-};
-use mesh_parser::SyntaxKind;
+use mesh_parser::ast::item::{FnDef, LetBinding, ServiceDef, SourceFile, StructDef, SumTypeDef};
 use mesh_parser::ast::pat::{AsPat, ConstructorPat, OrPat, Pattern};
+use mesh_parser::SyntaxKind;
 use mesh_parser::{debug_tree, parse, parse_block, parse_expr, AstNode};
 
 fn parse_and_debug(source: &str) -> String {
@@ -325,7 +323,9 @@ fn if_else() {
 
 #[test]
 fn if_else_if_else() {
-    assert_snapshot!(parse_and_debug("if a do\n  1\nelse if b do\n  2\nelse\n  3\nend"));
+    assert_snapshot!(parse_and_debug(
+        "if a do\n  1\nelse if b do\n  2\nelse\n  3\nend"
+    ));
 }
 
 #[test]
@@ -337,12 +337,16 @@ fn if_single_line() {
 
 #[test]
 fn case_simple() {
-    assert_snapshot!(parse_and_debug("case x do\n  1 -> \"one\"\n  2 -> \"two\"\nend"));
+    assert_snapshot!(parse_and_debug(
+        "case x do\n  1 -> \"one\"\n  2 -> \"two\"\nend"
+    ));
 }
 
 #[test]
 fn match_boolean() {
-    assert_snapshot!(parse_and_debug("match value do\n  true -> 1\n  false -> 0\nend"));
+    assert_snapshot!(parse_and_debug(
+        "match value do\n  true -> 1\n  false -> 0\nend"
+    ));
 }
 
 // ── Closures ──────────────────────────────────────────────────────────
@@ -383,7 +387,9 @@ fn closure_bare_param_pattern_matching() {
 fn closure_do_end_body() {
     // Use a let binding so the closure is parsed in expression context
     // (at statement level, `fn x do...end` is parsed as a named fn def)
-    assert_snapshot!(source_and_debug("let f = fn x do\n  let y = x * 2\n  y + 1\nend"));
+    assert_snapshot!(source_and_debug(
+        "let f = fn x do\n  let y = x * 2\n  y + 1\nend"
+    ));
 }
 
 #[test]
@@ -413,12 +419,16 @@ fn closure_multi_clause_with_guards() {
 
 #[test]
 fn closure_in_pipe_chain() {
-    assert_snapshot!(source_and_debug("fn main() do\n  let list = (1, 2, 3)\n  list |> map(fn x -> x * 2 end)\nend"));
+    assert_snapshot!(source_and_debug(
+        "fn main() do\n  let list = (1, 2, 3)\n  list |> map(fn x -> x * 2 end)\nend"
+    ));
 }
 
 #[test]
 fn closure_chained_pipes() {
-    assert_snapshot!(parse_and_debug("list |> map(fn x -> x + 1 end) |> filter(fn x -> x > 3 end)"));
+    assert_snapshot!(parse_and_debug(
+        "list |> map(fn x -> x + 1 end) |> filter(fn x -> x > 3 end)"
+    ));
 }
 
 #[test]
@@ -501,7 +511,9 @@ fn return_bare() {
 
 #[test]
 fn case_with_when_guard() {
-    assert_snapshot!(parse_and_debug("case x do\n  n when n > 0 -> n\n  _ -> 0\nend"));
+    assert_snapshot!(parse_and_debug(
+        "case x do\n  n when n > 0 -> n\n  _ -> 0\nend"
+    ));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -522,7 +534,9 @@ fn fn_def_pub() {
 
 #[test]
 fn fn_def_typed_params_and_return() {
-    assert_snapshot!(source_and_debug("fn typed(x :: Int, y :: Int) -> Int do\n  x + y\nend"));
+    assert_snapshot!(source_and_debug(
+        "fn typed(x :: Int, y :: Int) -> Int do\n  x + y\nend"
+    ));
 }
 
 #[test]
@@ -539,12 +553,16 @@ fn fn_def_no_params() {
 
 #[test]
 fn module_simple() {
-    assert_snapshot!(source_and_debug("module Math do\n  pub fn add(x, y) do\n    x + y\n  end\nend"));
+    assert_snapshot!(source_and_debug(
+        "module Math do\n  pub fn add(x, y) do\n    x + y\n  end\nend"
+    ));
 }
 
 #[test]
 fn module_nested() {
-    assert_snapshot!(source_and_debug("module Outer do\n  module Inner do\n  end\nend"));
+    assert_snapshot!(source_and_debug(
+        "module Outer do\n  module Inner do\n  end\nend"
+    ));
 }
 
 // ── Import Declarations ─────────────────────────────────────────────
@@ -568,19 +586,25 @@ fn from_import() {
 
 #[test]
 fn struct_simple() {
-    assert_snapshot!(source_and_debug("struct Point do\n  x :: Float\n  y :: Float\nend"));
+    assert_snapshot!(source_and_debug(
+        "struct Point do\n  x :: Float\n  y :: Float\nend"
+    ));
 }
 
 #[test]
 fn struct_pub_with_generics() {
-    assert_snapshot!(source_and_debug("pub struct Pair<A, B> do\n  first :: A\n  second :: B\nend"));
+    assert_snapshot!(source_and_debug(
+        "pub struct Pair<A, B> do\n  first :: A\n  second :: B\nend"
+    ));
 }
 
 // ── Pattern Matching ────────────────────────────────────────────────
 
 #[test]
 fn case_with_literal_patterns() {
-    assert_snapshot!(parse_and_debug("case x do\n  0 -> \"zero\"\n  _ -> \"other\"\nend"));
+    assert_snapshot!(parse_and_debug(
+        "case x do\n  0 -> \"zero\"\n  _ -> \"other\"\nend"
+    ));
 }
 
 #[test]
@@ -590,17 +614,23 @@ fn let_tuple_destructure() {
 
 #[test]
 fn case_with_tuple_patterns() {
-    assert_snapshot!(parse_and_debug("case point do\n  (0, 0) -> \"origin\"\n  (x, y) -> \"other\"\nend"));
+    assert_snapshot!(parse_and_debug(
+        "case point do\n  (0, 0) -> \"origin\"\n  (x, y) -> \"other\"\nend"
+    ));
 }
 
 #[test]
 fn case_with_negative_literal() {
-    assert_snapshot!(parse_and_debug("case x do\n  -1 -> \"neg\"\n  0 -> \"zero\"\n  1 -> \"pos\"\nend"));
+    assert_snapshot!(parse_and_debug(
+        "case x do\n  -1 -> \"neg\"\n  0 -> \"zero\"\n  1 -> \"pos\"\nend"
+    ));
 }
 
 #[test]
 fn case_with_string_pattern() {
-    assert_snapshot!(parse_and_debug("case s do\n  \"hello\" -> 1\n  _ -> 0\nend"));
+    assert_snapshot!(parse_and_debug(
+        "case s do\n  \"hello\" -> 1\n  _ -> 0\nend"
+    ));
 }
 
 // ── Full Programs (integration) ─────────────────────────────────────
@@ -867,7 +897,9 @@ fn ast_fn_def_with_return_type() {
     let param_list = fn_def.param_list().unwrap();
     let param = param_list.params().next().unwrap();
     assert_eq!(param.name().unwrap().text(), "x");
-    let ann = param.type_annotation().expect("should have type annotation");
+    let ann = param
+        .type_annotation()
+        .expect("should have type annotation");
     assert_eq!(ann.type_name().unwrap().text(), "Int");
 }
 
@@ -888,7 +920,9 @@ fn ast_let_binding_accessors() {
     assert_eq!(name.text().unwrap(), "x");
 
     // Type annotation
-    let ann = let_binding.type_annotation().expect("should have type annotation");
+    let ann = let_binding
+        .type_annotation()
+        .expect("should have type annotation");
     assert_eq!(ann.type_name().unwrap().text(), "Int");
 
     // Initializer
@@ -948,7 +982,12 @@ fn ast_struct_def_accessors() {
     assert_eq!(fields.len(), 2);
     assert_eq!(fields[0].name().unwrap().text().unwrap(), "x");
     assert_eq!(
-        fields[0].type_annotation().unwrap().type_name().unwrap().text(),
+        fields[0]
+            .type_annotation()
+            .unwrap()
+            .type_name()
+            .unwrap()
+            .text(),
         "Float"
     );
     assert_eq!(fields[1].name().unwrap().text().unwrap(), "y");
@@ -1030,10 +1069,7 @@ fn ast_import_accessors() {
     assert_eq!(path.segments(), vec!["Foo", "Bar"]);
 
     let import_list = from_import.import_list().expect("should have import list");
-    let names: Vec<_> = import_list
-        .names()
-        .map(|n| n.text().unwrap())
-        .collect();
+    let names: Vec<_> = import_list.names().map(|n| n.text().unwrap()).collect();
     assert_eq!(names, vec!["baz", "qux"]);
 }
 
@@ -1049,10 +1085,8 @@ end";
     assert!(p.ok(), "parse errors: {:?}", p.errors());
     let tree = p.tree();
 
-    let module: mesh_parser::ast::item::ModuleDef = tree
-        .modules()
-        .next()
-        .expect("should have module");
+    let module: mesh_parser::ast::item::ModuleDef =
+        tree.modules().next().expect("should have module");
 
     assert!(module.visibility().is_some());
     assert_eq!(module.name().unwrap().text().unwrap(), "Math");
@@ -1132,7 +1166,9 @@ fn error_if_missing_do() {
     assert!(!p.ok());
     let err = &p.errors()[0];
     assert!(
-        err.message.contains("DO_KW") || err.message.contains("do") || err.message.contains("expected"),
+        err.message.contains("DO_KW")
+            || err.message.contains("do")
+            || err.message.contains("expected"),
         "error should mention do: {}",
         err.message
     );
@@ -1259,9 +1295,14 @@ fn interface_with_generic() {
 
 #[test]
 fn interface_method_with_default_body() {
-    let source = "interface Describable do\n  fn describe(self) -> String do\n    \"unknown\"\n  end\nend";
+    let source =
+        "interface Describable do\n  fn describe(self) -> String do\n    \"unknown\"\n  end\nend";
     let parse = parse(source);
-    assert!(parse.errors().is_empty(), "Expected no parse errors, got: {:?}", parse.errors());
+    assert!(
+        parse.errors().is_empty(),
+        "Expected no parse errors, got: {:?}",
+        parse.errors()
+    );
     let root = SourceFile::cast(parse.syntax()).unwrap();
     let items: Vec<_> = root.items().collect();
     assert_eq!(items.len(), 1);
@@ -1269,7 +1310,10 @@ fn interface_method_with_default_body() {
         let methods: Vec<_> = iface.methods().collect();
         assert_eq!(methods.len(), 1);
         let method = &methods[0];
-        assert_eq!(method.name().and_then(|n| n.text()), Some("describe".to_string()));
+        assert_eq!(
+            method.name().and_then(|n| n.text()),
+            Some("describe".to_string())
+        );
         assert!(method.body().is_some(), "Expected default body to be Some");
     } else {
         panic!("Expected InterfaceDef");
@@ -1280,7 +1324,11 @@ fn interface_method_with_default_body() {
 fn interface_method_without_body() {
     let source = "interface Describable do\n  fn describe(self) -> String\nend";
     let parse = parse(source);
-    assert!(parse.errors().is_empty(), "Expected no parse errors, got: {:?}", parse.errors());
+    assert!(
+        parse.errors().is_empty(),
+        "Expected no parse errors, got: {:?}",
+        parse.errors()
+    );
     let root = SourceFile::cast(parse.syntax()).unwrap();
     let items: Vec<_> = root.items().collect();
     assert_eq!(items.len(), 1);
@@ -1288,8 +1336,14 @@ fn interface_method_without_body() {
         let methods: Vec<_> = iface.methods().collect();
         assert_eq!(methods.len(), 1);
         let method = &methods[0];
-        assert_eq!(method.name().and_then(|n| n.text()), Some("describe".to_string()));
-        assert!(method.body().is_none(), "Expected body to be None for signature-only method");
+        assert_eq!(
+            method.name().and_then(|n| n.text()),
+            Some("describe".to_string())
+        );
+        assert!(
+            method.body().is_none(),
+            "Expected body to be None for signature-only method"
+        );
     } else {
         panic!("Expected InterfaceDef");
     }
@@ -1386,9 +1440,7 @@ fn sum_type_generic() {
 
 #[test]
 fn sum_type_multiple_positional() {
-    assert_snapshot!(source_and_debug(
-        "type Pair do\n  Pair(Int, Int)\nend"
-    ));
+    assert_snapshot!(source_and_debug("type Pair do\n  Pair(Int, Int)\nend"));
 }
 
 // ── Constructor Patterns ────────────────────────────────────────────
@@ -1402,9 +1454,7 @@ fn pattern_constructor_qualified() {
 
 #[test]
 fn pattern_constructor_unqualified() {
-    assert_snapshot!(parse_and_debug(
-        "case x do\n  Some(v) -> v\n  _ -> 0\nend"
-    ));
+    assert_snapshot!(parse_and_debug("case x do\n  Some(v) -> v\n  _ -> 0\nend"));
 }
 
 #[test]
@@ -1497,7 +1547,15 @@ fn ast_sum_type_def_accessors() {
     let fields: Vec<_> = variants[1].fields().collect();
     assert_eq!(fields.len(), 2);
     assert_eq!(fields[0].name().unwrap().text().unwrap(), "width");
-    assert_eq!(fields[0].type_annotation().unwrap().type_name().unwrap().text(), "Float");
+    assert_eq!(
+        fields[0]
+            .type_annotation()
+            .unwrap()
+            .type_name()
+            .unwrap()
+            .text(),
+        "Float"
+    );
     assert_eq!(fields[1].name().unwrap().text().unwrap(), "height");
 
     // Third variant: Point - nullary
@@ -1653,7 +1711,9 @@ fn actor_def_simple() {
 
 #[test]
 fn actor_def_with_params() {
-    assert_snapshot!(source_and_debug("actor Counter(state) do\n  state + 1\nend"));
+    assert_snapshot!(source_and_debug(
+        "actor Counter(state) do\n  state + 1\nend"
+    ));
 }
 
 #[test]
@@ -1701,7 +1761,9 @@ fn receive_expr_multiple_arms() {
 
 #[test]
 fn receive_expr_with_after() {
-    assert_snapshot!(parse_and_debug("receive do\n  x -> x\nafter 5000 -> 0\nend"));
+    assert_snapshot!(parse_and_debug(
+        "receive do\n  x -> x\nafter 5000 -> 0\nend"
+    ));
 }
 
 // -- Self Expression --
@@ -1767,7 +1829,9 @@ fn ast_actor_def_with_terminate() {
         .expect("should have actor def");
 
     assert_eq!(actor.name().unwrap().text().unwrap(), "Worker");
-    let tc = actor.terminate_clause().expect("should have terminate clause");
+    let tc = actor
+        .terminate_clause()
+        .expect("should have terminate clause");
     assert!(tc.body().is_some(), "terminate clause should have body");
 }
 
@@ -2053,7 +2117,10 @@ fn fn_do_end_has_no_fn_expr_body() {
         .syntax()
         .children()
         .any(|n| n.kind() == SyntaxKind::FN_EXPR_BODY);
-    assert!(!has_expr_body, "do/end function should not have FN_EXPR_BODY");
+    assert!(
+        !has_expr_body,
+        "do/end function should not have FN_EXPR_BODY"
+    );
 }
 
 #[test]
@@ -2073,7 +2140,10 @@ fn fn_param_literal_has_pattern_child() {
         .syntax()
         .children()
         .any(|n| n.kind() == SyntaxKind::LITERAL_PAT);
-    assert!(has_literal_pat, "expected LITERAL_PAT child in param for fn fib(0)");
+    assert!(
+        has_literal_pat,
+        "expected LITERAL_PAT child in param for fn fib(0)"
+    );
 }
 
 #[test]
@@ -2092,7 +2162,10 @@ fn fn_param_wildcard_has_pattern_child() {
         .syntax()
         .children()
         .any(|n| n.kind() == SyntaxKind::WILDCARD_PAT);
-    assert!(has_wildcard_pat, "expected WILDCARD_PAT child in param for fn foo(_)");
+    assert!(
+        has_wildcard_pat,
+        "expected WILDCARD_PAT child in param for fn foo(_)"
+    );
 }
 
 #[test]
@@ -2111,7 +2184,10 @@ fn fn_param_constructor_has_pattern_child() {
         .syntax()
         .children()
         .any(|n| n.kind() == SyntaxKind::CONSTRUCTOR_PAT);
-    assert!(has_constructor_pat, "expected CONSTRUCTOR_PAT child in param for fn foo(Some(x))");
+    assert!(
+        has_constructor_pat,
+        "expected CONSTRUCTOR_PAT child in param for fn foo(Some(x))"
+    );
 }
 
 #[test]
@@ -2146,7 +2222,10 @@ fn fn_tuple_pattern_param() {
         .syntax()
         .children()
         .any(|n| n.kind() == SyntaxKind::TUPLE_PAT);
-    assert!(has_tuple_pat, "expected TUPLE_PAT child in param for fn swap((a, b))");
+    assert!(
+        has_tuple_pat,
+        "expected TUPLE_PAT child in param for fn swap((a, b))"
+    );
 }
 
 // ── AST Accessor Tests for Multi-Clause Functions ────────────────────
@@ -2162,11 +2241,17 @@ fn ast_fn_def_guard_accessor() {
 
     // guard() should return Some
     let guard = fn_def.guard();
-    assert!(guard.is_some(), "FnDef::guard() should return Some for guarded function");
+    assert!(
+        guard.is_some(),
+        "FnDef::guard() should return Some for guarded function"
+    );
 
     // guard().expr() should return the guard expression
     let guard_expr = guard.unwrap().expr();
-    assert!(guard_expr.is_some(), "GuardClause::expr() should return the guard expression");
+    assert!(
+        guard_expr.is_some(),
+        "GuardClause::expr() should return the guard expression"
+    );
 }
 
 #[test]
@@ -2179,7 +2264,10 @@ fn ast_fn_def_no_guard() {
     let fn_def: FnDef = tree.fn_defs().next().unwrap();
 
     // guard() should return None for non-guarded functions
-    assert!(fn_def.guard().is_none(), "FnDef::guard() should return None");
+    assert!(
+        fn_def.guard().is_none(),
+        "FnDef::guard() should return None"
+    );
 }
 
 #[test]
@@ -2193,13 +2281,22 @@ fn ast_fn_def_expr_body_accessor() {
 
     // expr_body() should return the body expression
     let expr_body = fn_def.expr_body();
-    assert!(expr_body.is_some(), "FnDef::expr_body() should return Some for = expr form");
+    assert!(
+        expr_body.is_some(),
+        "FnDef::expr_body() should return Some for = expr form"
+    );
 
     // has_eq_body() should be true
-    assert!(fn_def.has_eq_body(), "FnDef::has_eq_body() should be true for = expr form");
+    assert!(
+        fn_def.has_eq_body(),
+        "FnDef::has_eq_body() should be true for = expr form"
+    );
 
     // body() should return None (no do/end block)
-    assert!(fn_def.body().is_none(), "FnDef::body() should return None for = expr form");
+    assert!(
+        fn_def.body().is_none(),
+        "FnDef::body() should return None for = expr form"
+    );
 }
 
 #[test]
@@ -2212,13 +2309,22 @@ fn ast_fn_def_do_end_accessors() {
     let fn_def: FnDef = tree.fn_defs().next().unwrap();
 
     // body() should return Some for do/end form
-    assert!(fn_def.body().is_some(), "FnDef::body() should return Some for do/end form");
+    assert!(
+        fn_def.body().is_some(),
+        "FnDef::body() should return Some for do/end form"
+    );
 
     // has_eq_body() should be false
-    assert!(!fn_def.has_eq_body(), "FnDef::has_eq_body() should be false for do/end form");
+    assert!(
+        !fn_def.has_eq_body(),
+        "FnDef::has_eq_body() should be false for do/end form"
+    );
 
     // expr_body() should return None
-    assert!(fn_def.expr_body().is_none(), "FnDef::expr_body() should return None for do/end form");
+    assert!(
+        fn_def.expr_body().is_none(),
+        "FnDef::expr_body() should return None for do/end form"
+    );
 }
 
 #[test]
@@ -2233,7 +2339,10 @@ fn ast_param_pattern_accessor() {
     let param = fn_def.param_list().unwrap().params().next().unwrap();
 
     // pattern() should return Some for literal pattern
-    assert!(param.pattern().is_some(), "Param::pattern() should return Some for literal pattern");
+    assert!(
+        param.pattern().is_some(),
+        "Param::pattern() should return Some for literal pattern"
+    );
 
     // name() may return None for pattern params (no direct IDENT child in some cases)
 }
@@ -2250,10 +2359,16 @@ fn ast_param_ident_no_pattern() {
     let param = fn_def.param_list().unwrap().params().next().unwrap();
 
     // pattern() should return None for plain ident params
-    assert!(param.pattern().is_none(), "Param::pattern() should return None for ident param");
+    assert!(
+        param.pattern().is_none(),
+        "Param::pattern() should return None for ident param"
+    );
 
     // name() should return the IDENT
-    assert!(param.name().is_some(), "Param::name() should return Some for ident param");
+    assert!(
+        param.name().is_some(),
+        "Param::name() should return Some for ident param"
+    );
     assert_eq!(param.name().unwrap().text(), "x");
 }
 
@@ -2386,7 +2501,10 @@ fn for_in_when_filter_ast_accessors() {
 
     // iterable() still returns the correct expression
     let iterable = for_in.iterable();
-    assert!(iterable.is_some(), "ForInExpr::iterable() should return Some");
+    assert!(
+        iterable.is_some(),
+        "ForInExpr::iterable() should return Some"
+    );
 
     // body() returns the block
     let body = for_in.body();
@@ -2409,10 +2527,16 @@ fn for_in_without_when_filter_returns_none() {
         .syntax()
         .children_with_tokens()
         .any(|it| it.kind() == SyntaxKind::WHEN_KW);
-    assert!(!has_when, "ForInExpr without when should not have WHEN_KW token");
+    assert!(
+        !has_when,
+        "ForInExpr without when should not have WHEN_KW token"
+    );
 
     // filter() returns None
-    assert!(for_in.filter().is_none(), "ForInExpr::filter() should return None without when clause");
+    assert!(
+        for_in.filter().is_none(),
+        "ForInExpr::filter() should return None without when clause"
+    );
 
     // iterable() and body() still work
     assert!(for_in.iterable().is_some(), "iterable() should still work");
@@ -2530,7 +2654,8 @@ fn ast_impl_def_assoc_type_bindings_accessor() {
 
 #[test]
 fn interface_multiple_assoc_types() {
-    let source = "interface Numeric do\n  type Output\n  type Input\n  fn compute(self) -> Int\nend";
+    let source =
+        "interface Numeric do\n  type Output\n  type Input\n  fn compute(self) -> Int\nend";
     let p = parse(source);
     assert!(p.ok(), "parse errors: {:?}", p.errors());
 
@@ -2551,7 +2676,8 @@ fn interface_multiple_assoc_types() {
 #[test]
 fn impl_assoc_type_generic_binding() {
     // Test binding to a generic type: type Item = List<Int>
-    let source = "impl Foo for Bar do\n  type Item = List<Int>\n  fn baz(self) do\n    42\n  end\nend";
+    let source =
+        "impl Foo for Bar do\n  type Item = List<Int>\n  fn baz(self) do\n    42\n  end\nend";
     let p = parse(source);
     assert!(p.ok(), "parse errors: {:?}", p.errors());
 }

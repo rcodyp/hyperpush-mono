@@ -134,10 +134,7 @@ impl GlobalRegistry {
     pub fn cleanup_node(&self, node_name: &str) -> Vec<String> {
         let mut inner = self.inner.write();
 
-        let names_to_remove = inner
-            .node_names
-            .remove(node_name)
-            .unwrap_or_default();
+        let names_to_remove = inner.node_names.remove(node_name).unwrap_or_default();
 
         if !names_to_remove.is_empty() {
             for name in &names_to_remove {
@@ -162,10 +159,7 @@ impl GlobalRegistry {
     pub fn cleanup_process(&self, pid: ProcessId) -> Vec<String> {
         let mut inner = self.inner.write();
 
-        let names_to_remove = inner
-            .pid_names
-            .remove(&pid)
-            .unwrap_or_default();
+        let names_to_remove = inner.pid_names.remove(&pid).unwrap_or_default();
 
         if !names_to_remove.is_empty() {
             for name in &names_to_remove {
@@ -394,8 +388,12 @@ mod tests {
             .unwrap();
         reg.register("svc2".to_string(), pid2, "node_a@host".to_string())
             .unwrap();
-        reg.register("svc3".to_string(), ProcessId::next(), "node_b@host".to_string())
-            .unwrap();
+        reg.register(
+            "svc3".to_string(),
+            ProcessId::next(),
+            "node_b@host".to_string(),
+        )
+        .unwrap();
 
         let removed = reg.cleanup_node("node_a@host");
         assert_eq!(removed.len(), 2);
@@ -556,9 +554,7 @@ mod tests {
             .unwrap();
 
         // Merge a snapshot containing name "a" with a different PID.
-        reg.merge_snapshot(vec![
-            ("a".to_string(), pid2, "node2@host".to_string()),
-        ]);
+        reg.merge_snapshot(vec![("a".to_string(), pid2, "node2@host".to_string())]);
 
         // Existing registration wins -- "a" still maps to pid1.
         assert_eq!(reg.whereis("a"), Some(pid1));
@@ -655,10 +651,7 @@ mod tests {
         assert_eq!(decoded_node, node_name);
 
         // Verify total payload length matches expected.
-        assert_eq!(
-            msg.len(),
-            1 + 2 + name.len() + 8 + 2 + node_name.len()
-        );
+        assert_eq!(msg.len(), 1 + 2 + name.len() + 8 + 2 + node_name.len());
     }
 
     #[test]
@@ -721,20 +714,17 @@ mod tests {
 
         let mut pos = 5;
         for (expected_name, expected_pid, expected_node) in &entries {
-            let name_len =
-                u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap()) as usize;
+            let name_len = u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
             let decoded_name = std::str::from_utf8(&msg[pos..pos + name_len]).unwrap();
             assert_eq!(decoded_name, *expected_name);
             pos += name_len;
 
-            let decoded_pid =
-                u64::from_le_bytes(msg[pos..pos + 8].try_into().unwrap());
+            let decoded_pid = u64::from_le_bytes(msg[pos..pos + 8].try_into().unwrap());
             assert_eq!(decoded_pid, expected_pid.as_u64());
             pos += 8;
 
-            let node_len =
-                u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap()) as usize;
+            let node_len = u16::from_le_bytes(msg[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
             let decoded_node = std::str::from_utf8(&msg[pos..pos + node_len]).unwrap();
             assert_eq!(decoded_node, *expected_node);

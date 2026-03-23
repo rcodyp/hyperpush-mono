@@ -39,7 +39,7 @@
 
 ## Tasks
 
-- [ ] **T01: Deepen the Rust harness with migration, health, and DB truth assertions** `est:2h`
+- [x] **T01: Deepen the Rust harness with migration, health, and DB truth assertions** `est:2h`
   - Why: S02 cannot fix the right runtime problem until the existing `e2e_reference_backend` harness proves more than startup reachability and a coarse smoke script.
   - Files: `compiler/meshc/tests/e2e_reference_backend.rs`, `compiler/meshc/src/migrate.rs`, `reference-backend/api/health.mpl`, `reference-backend/api/jobs.mpl`, `reference-backend/migrations/20260323010000_create_jobs.mpl`
   - Do: Refactor the Rust helpers so backend ports/processes are configurable, add direct Postgres query helpers using the same native PG path `meshc migrate` uses, then add ignored `e2e_reference_backend_migration_status_and_apply` and `e2e_reference_backend_job_flow_updates_health_and_db` coverage with structured JSON assertions against `/health` and `/jobs/:id` plus direct `_mesh_migrations` and `jobs` row checks.

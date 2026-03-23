@@ -60,15 +60,11 @@ fn main() {
 
     let result = match cli.command {
         Commands::Login { token } => run_login(token, json_mode),
-        Commands::Publish { registry } => {
-            publish::run(&PathBuf::from("."), &registry, json_mode)
-        }
+        Commands::Publish { registry } => publish::run(&PathBuf::from("."), &registry, json_mode),
         Commands::Install { name, registry } => {
             install::run(&PathBuf::from("."), name.as_deref(), &registry, json_mode)
         }
-        Commands::Search { query, registry } => {
-            search::run(&query, &registry, json_mode)
-        }
+        Commands::Search { query, registry } => search::run(&query, &registry, json_mode),
     };
 
     match result {
@@ -91,7 +87,8 @@ fn run_login(token: Option<String>, json_mode: bool) -> Result<(), String> {
             // Read from stdin interactively
             eprint!("Enter registry token: ");
             let mut input = String::new();
-            std::io::stdin().read_line(&mut input)
+            std::io::stdin()
+                .read_line(&mut input)
                 .map_err(|e| format!("Failed to read token: {}", e))?;
             input.trim().to_string()
         }
@@ -106,7 +103,11 @@ fn run_login(token: Option<String>, json_mode: bool) -> Result<(), String> {
     if json_mode {
         println!("{{\"status\": \"ok\", \"message\": \"Token saved\"}}");
     } else {
-        println!("{} Token saved to {}", "✓".green().bold(), auth::credentials_path().display());
+        println!(
+            "{} Token saved to {}",
+            "✓".green().bold(),
+            auth::credentials_path().display()
+        );
     }
     Ok(())
 }

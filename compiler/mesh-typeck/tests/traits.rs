@@ -50,9 +50,7 @@ fn assert_has_error<F: Fn(&TypeError) -> bool>(result: &TypeckResult, pred: F, d
 ///    Check it registers without errors.
 #[test]
 fn test_interface_definition() {
-    let result = check_source(
-        "interface Printable do\n  fn to_string(self) -> String\nend",
-    );
+    let result = check_source("interface Printable do\n  fn to_string(self) -> String\nend");
     assert!(
         result.errors.is_empty(),
         "interface definition should register without errors, got: {:?}",
@@ -97,7 +95,12 @@ fn test_impl_wrong_method_signature() {
     );
     assert_has_error(
         &result,
-        |e| matches!(e, TypeError::TraitMethodSignatureMismatch { .. } | TypeError::Mismatch { .. }),
+        |e| {
+            matches!(
+                e,
+                TypeError::TraitMethodSignatureMismatch { .. } | TypeError::Mismatch { .. }
+            )
+        },
         "TraitMethodSignatureMismatch or Mismatch",
     );
 }
@@ -168,7 +171,12 @@ fn test_add_trait_string_fails() {
     let result = check_source("\"a\" + \"b\"");
     assert_has_error(
         &result,
-        |e| matches!(e, TypeError::TraitNotSatisfied { .. } | TypeError::Mismatch { .. }),
+        |e| {
+            matches!(
+                e,
+                TypeError::TraitNotSatisfied { .. } | TypeError::Mismatch { .. }
+            )
+        },
         "TraitNotSatisfied or Mismatch (no Add for String)",
     );
 }

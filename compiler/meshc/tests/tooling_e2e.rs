@@ -26,11 +26,7 @@ fn test_build_json_output() {
     std::fs::create_dir_all(&project).unwrap();
 
     // Write a Mesh file with a type error (assigning string to Int annotation).
-    std::fs::write(
-        project.join("main.mpl"),
-        "let x :: Int = \"hello\"\n",
-    )
-    .unwrap();
+    std::fs::write(project.join("main.mpl"), "let x :: Int = \"hello\"\n").unwrap();
 
     let output = Command::new(meshc_bin())
         .args(["build", "--json", project.to_str().unwrap()])
@@ -46,8 +42,7 @@ fn test_build_json_output() {
 
     // stderr contains concatenated JSON objects. Use a streaming deserializer
     // to extract the first one (the type error diagnostic).
-    let mut stream =
-        serde_json::Deserializer::from_str(&stderr).into_iter::<serde_json::Value>();
+    let mut stream = serde_json::Deserializer::from_str(&stderr).into_iter::<serde_json::Value>();
     let json = stream
         .next()
         .expect("no JSON object in stderr")
@@ -259,8 +254,8 @@ fn test_repl_help() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     // Help text should mention REPL or interactive.
-    let mentions_repl = stdout.to_lowercase().contains("repl")
-        || stdout.to_lowercase().contains("interactive");
+    let mentions_repl =
+        stdout.to_lowercase().contains("repl") || stdout.to_lowercase().contains("interactive");
     assert!(
         mentions_repl,
         "repl --help should mention REPL or interactive, got:\n{}",

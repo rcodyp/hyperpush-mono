@@ -119,9 +119,9 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<MarkClosed> {
         if current == SyntaxKind::DOT && POSTFIX_BP >= min_bp {
             let m = p.open_before(lhs);
             p.advance(); // .
-            // Accept IDENT or keywords that are valid as field names
-            // (e.g., Node.self, Node.monitor, Node.spawn, Process.monitor, Ws.send,
-            //  Changeset.cast).
+                         // Accept IDENT or keywords that are valid as field names
+                         // (e.g., Node.self, Node.monitor, Node.spawn, Process.monitor, Ws.send,
+                         //  Changeset.cast).
             if !p.eat(SyntaxKind::IDENT)
                 && !p.eat(SyntaxKind::SELF_KW)
                 && !p.eat(SyntaxKind::MONITOR_KW)
@@ -129,7 +129,8 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<MarkClosed> {
                 && !p.eat(SyntaxKind::LINK_KW)
                 && !p.eat(SyntaxKind::SEND_KW)
                 && !p.eat(SyntaxKind::WHERE_KW)
-                && !p.eat(SyntaxKind::CAST_KW) {
+                && !p.eat(SyntaxKind::CAST_KW)
+            {
                 p.error("expected IDENT");
             }
             lhs = p.close(m, SyntaxKind::FIELD_ACCESS);
@@ -1376,9 +1377,7 @@ pub(crate) fn parse_fn_clause_param(p: &mut Parser) {
             {
                 // Constructor pattern: Some(x), Ok(val)
                 super::patterns::parse_pattern(p);
-            } else if text.starts_with(|c: char| c.is_uppercase())
-                && p.nth(1) == SyntaxKind::DOT
-            {
+            } else if text.starts_with(|c: char| c.is_uppercase()) && p.nth(1) == SyntaxKind::DOT {
                 // Qualified constructor pattern: Shape.Circle(r)
                 super::patterns::parse_pattern(p);
             } else {
@@ -1422,7 +1421,7 @@ fn parse_trailing_closure(p: &mut Parser) {
     // The lexer emits bare `|` as BAR tokens.
     if p.at(SyntaxKind::BAR) {
         p.advance(); // opening |
-        // Parse params between pipes.
+                     // Parse params between pipes.
         let params = p.open();
         if !p.at(SyntaxKind::BAR) {
             parse_param(p);

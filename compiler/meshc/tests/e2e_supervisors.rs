@@ -187,7 +187,10 @@ fn supervisor_basic() {
                 if start.elapsed() >= timeout {
                     let _ = child.kill();
                     let _ = child.wait();
-                    panic!("supervisor binary timed out after {} seconds", timeout.as_secs());
+                    panic!(
+                        "supervisor binary timed out after {} seconds",
+                        timeout.as_secs()
+                    );
                 }
                 std::thread::sleep(poll_interval);
             }
@@ -257,7 +260,8 @@ fn supervisor_typed_error_rejected() {
     let all_output = format!("{}{}", stdout, stderr);
 
     assert!(
-        all_output.contains("E0018") || all_output.contains("must return Pid")
+        all_output.contains("E0018")
+            || all_output.contains("must return Pid")
             || all_output.contains("InvalidChildStart"),
         "Should report child start type error (E0018).\nstdout: {}\nstderr: {}",
         stdout,

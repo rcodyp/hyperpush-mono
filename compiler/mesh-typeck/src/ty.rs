@@ -46,11 +46,17 @@ impl std::hash::Hash for TyCon {
 
 impl TyCon {
     pub fn new(name: impl Into<String>) -> Self {
-        TyCon { name: name.into(), display_prefix: None }
+        TyCon {
+            name: name.into(),
+            display_prefix: None,
+        }
     }
 
     pub fn with_module(name: impl Into<String>, module: impl Into<String>) -> Self {
-        TyCon { name: name.into(), display_prefix: Some(module.into()) }
+        TyCon {
+            name: name.into(),
+            display_prefix: Some(module.into()),
+        }
     }
 }
 
@@ -271,7 +277,10 @@ impl Scheme {
         let mut seen_vars: Vec<TyVar> = Vec::new();
         collect_free_tyvars(&ty, &mut seen_vars);
         if seen_vars.is_empty() {
-            return Scheme { vars: Vec::new(), ty };
+            return Scheme {
+                vars: Vec::new(),
+                ty,
+            };
         }
         let mut mapping: HashMap<TyVar, TyVar> = HashMap::new();
         let mut next_id: u32 = 0;
@@ -281,9 +290,7 @@ impl Scheme {
                 next_id += 1;
             }
         }
-        let new_vars: Vec<TyVar> = seen_vars.iter()
-            .map(|v| mapping[v])
-            .collect();
+        let new_vars: Vec<TyVar> = seen_vars.iter().map(|v| mapping[v]).collect();
         // Deduplicate vars while preserving order.
         let mut deduped_vars: Vec<TyVar> = Vec::new();
         let mut seen_set = std::collections::HashSet::new();
@@ -293,7 +300,10 @@ impl Scheme {
             }
         }
         let new_ty = remap_tyvars(&ty, &mapping);
-        Scheme { vars: deduped_vars, ty: new_ty }
+        Scheme {
+            vars: deduped_vars,
+            ty: new_ty,
+        }
     }
 }
 

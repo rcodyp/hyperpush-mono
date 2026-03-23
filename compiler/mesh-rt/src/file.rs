@@ -81,11 +81,7 @@ pub extern "C" fn mesh_file_append(
     unsafe {
         let path_str = (*path).as_str();
         let content_str = (*content).as_str();
-        match OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(path_str)
-        {
+        match OpenOptions::new().append(true).create(true).open(path_str) {
             Ok(mut file) => match file.write_all(content_str.as_bytes()) {
                 Ok(()) => alloc_result(0, std::ptr::null_mut()),
                 Err(e) => err_result(&e.to_string()),
@@ -167,7 +163,11 @@ mod tests {
 
         let result = mesh_file_read(path_mesh);
         unsafe {
-            assert_eq!((*result).tag, 1, "reading nonexistent file should return Err");
+            assert_eq!(
+                (*result).tag,
+                1,
+                "reading nonexistent file should return Err"
+            );
             let value = (*result).value as *const MeshString;
             assert!(!value.is_null());
             let msg = (*value).as_str();
@@ -188,10 +188,14 @@ mod tests {
 
         // Append twice
         let r1 = mesh_file_append(path_mesh, content1);
-        unsafe { assert_eq!((*r1).tag, 0); }
+        unsafe {
+            assert_eq!((*r1).tag, 0);
+        }
 
         let r2 = mesh_file_append(path_mesh, content2);
-        unsafe { assert_eq!((*r2).tag, 0); }
+        unsafe {
+            assert_eq!((*r2).tag, 0);
+        }
 
         // Read back
         let read_result = mesh_file_read(path_mesh);
@@ -253,7 +257,11 @@ mod tests {
 
         let result = mesh_file_delete(path_mesh);
         unsafe {
-            assert_eq!((*result).tag, 1, "deleting nonexistent file should return Err");
+            assert_eq!(
+                (*result).tag,
+                1,
+                "deleting nonexistent file should return Err"
+            );
         }
     }
 
@@ -271,7 +279,9 @@ mod tests {
         // 2. Write
         let content = make_string("initial content");
         let r = mesh_file_write(path_mesh, content);
-        unsafe { assert_eq!((*r).tag, 0); }
+        unsafe {
+            assert_eq!((*r).tag, 0);
+        }
 
         // 3. Exists
         assert_eq!(mesh_file_exists(path_mesh), 1);
@@ -287,7 +297,9 @@ mod tests {
         // 5. Append
         let more = make_string(" + appended");
         let r = mesh_file_append(path_mesh, more);
-        unsafe { assert_eq!((*r).tag, 0); }
+        unsafe {
+            assert_eq!((*r).tag, 0);
+        }
 
         // 6. Read again
         let r = mesh_file_read(path_mesh);
@@ -299,7 +311,9 @@ mod tests {
 
         // 7. Delete
         let r = mesh_file_delete(path_mesh);
-        unsafe { assert_eq!((*r).tag, 0); }
+        unsafe {
+            assert_eq!((*r).tag, 0);
+        }
 
         // 8. No longer exists
         assert_eq!(mesh_file_exists(path_mesh), 0);

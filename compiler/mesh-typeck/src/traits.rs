@@ -203,7 +203,11 @@ impl TraitRegistry {
                     && !existing.trait_type_args.is_empty()
                 {
                     let mut args_match = true;
-                    for (a, b) in existing.trait_type_args.iter().zip(&impl_def.trait_type_args) {
+                    for (a, b) in existing
+                        .trait_type_args
+                        .iter()
+                        .zip(&impl_def.trait_type_args)
+                    {
                         let fa = freshen_type_params(a, &mut ctx);
                         let fb = freshen_type_params(b, &mut ctx);
                         if ctx.unify(fa, fb, ConstraintOrigin::Builtin).is_err() {
@@ -227,8 +231,8 @@ impl TraitRegistry {
 
         // Store the impl (even if it has errors, for method lookup).
         // Capture info needed for synthetic Into / TryInto generation before moving.
-        let maybe_synthesize_into = impl_def.trait_name == "From"
-            && !impl_def.trait_type_args.is_empty();
+        let maybe_synthesize_into =
+            impl_def.trait_name == "From" && !impl_def.trait_type_args.is_empty();
         let synth_source_ty = if maybe_synthesize_into {
             Some(impl_def.trait_type_args[0].clone())
         } else {
@@ -240,8 +244,8 @@ impl TraitRegistry {
             None
         };
 
-        let maybe_synthesize_try_into = impl_def.trait_name == "TryFrom"
-            && !impl_def.trait_type_args.is_empty();
+        let maybe_synthesize_try_into =
+            impl_def.trait_name == "TryFrom" && !impl_def.trait_type_args.is_empty();
         let synth_try_source_ty = if maybe_synthesize_try_into {
             Some(impl_def.trait_type_args[0].clone())
         } else {
@@ -255,7 +259,10 @@ impl TraitRegistry {
         // Capture the TryFrom.try_from return type before moving impl_def.
         // The synthetic TryInto.try_into has the same return type (Result<T, E>).
         let synth_try_return_ty = if maybe_synthesize_try_into {
-            impl_def.methods.get("try_from").and_then(|sig| sig.return_type.clone())
+            impl_def
+                .methods
+                .get("try_from")
+                .and_then(|sig| sig.return_type.clone())
         } else {
             None
         };
@@ -284,7 +291,10 @@ impl TraitRegistry {
                 associated_types: FxHashMap::default(),
             };
             // Insert directly to avoid infinite recursion (don't call register_impl).
-            self.impls.entry("Into".to_string()).or_default().push(into_impl);
+            self.impls
+                .entry("Into".to_string())
+                .or_default()
+                .push(into_impl);
         }
 
         // Synthetic TryInto generation (mirrors From -> Into pattern):
@@ -443,11 +453,7 @@ impl TraitRegistry {
     /// the named method and structurally matches the argument type. If the
     /// method's return type contains freshened type variables, they are
     /// resolved through the temporary InferCtx after unification.
-    pub fn resolve_trait_method(
-        &self,
-        method_name: &str,
-        arg_ty: &Ty,
-    ) -> Option<Ty> {
+    pub fn resolve_trait_method(&self, method_name: &str, arg_ty: &Ty) -> Option<Ty> {
         for impl_list in self.impls.values() {
             for impl_def in impl_list {
                 if let Some(method_sig) = impl_def.methods.get(method_name) {
@@ -750,10 +756,7 @@ mod tests {
         assert!(registry.has_impl("Display", &Ty::list(Ty::string())));
 
         // Query with List<List<Int>> -- should also match (T unifies with List<Int>).
-        assert!(registry.has_impl(
-            "Display",
-            &Ty::list(Ty::list(Ty::int()))
-        ));
+        assert!(registry.has_impl("Display", &Ty::list(Ty::list(Ty::int()))));
     }
 
     #[test]
@@ -1030,7 +1033,10 @@ mod tests {
 
         let traits = registry.find_method_traits("to_string", &Ty::int());
         // find_method_traits now returns sorted results (deterministic)
-        assert_eq!(traits, vec!["Displayable".to_string(), "Printable".to_string()]);
+        assert_eq!(
+            traits,
+            vec!["Displayable".to_string(), "Printable".to_string()]
+        );
     }
 
     // ── Unified dispatch path test (18-03) ──────────────────────────

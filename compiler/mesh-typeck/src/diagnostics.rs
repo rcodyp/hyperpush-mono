@@ -166,9 +166,7 @@ fn origin_span(origin: &ConstraintOrigin) -> Option<Range<usize>> {
             Some(text_range_to_range(*annotation_span))
         }
         ConstraintOrigin::Return { return_span, .. } => Some(text_range_to_range(*return_span)),
-        ConstraintOrigin::LetBinding { binding_span } => {
-            Some(text_range_to_range(*binding_span))
-        }
+        ConstraintOrigin::LetBinding { binding_span } => Some(text_range_to_range(*binding_span)),
         ConstraintOrigin::Assignment { lhs_span, .. } => Some(text_range_to_range(*lhs_span)),
         ConstraintOrigin::Builtin => None,
     }
@@ -289,9 +287,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
             } else {
                 1
             };
-            curr[j] = (prev[j] + 1)
-                .min(curr[j - 1] + 1)
-                .min(prev[j - 1] + cost);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -1025,9 +1021,7 @@ pub fn render_diagnostic(
                 .with_config(config)
                 .with_label(
                     Label::new((fname.clone(), range))
-                        .with_message(
-                            "only comparisons, boolean ops, literals, and names allowed",
-                        )
+                        .with_message("only comparisons, boolean ops, literals, and names allowed")
                         .with_color(Color::Red),
                 )
                 .with_help("guards must be simple boolean expressions")
@@ -1297,7 +1291,10 @@ pub fn render_diagnostic(
             found,
             span,
         } => {
-            let msg = format!("guard expression must return `{}`, found `{}`", expected, found);
+            let msg = format!(
+                "guard expression must return `{}`, found `{}`",
+                expected, found
+            );
             let range = clamp(text_range_to_range(*span));
 
             Report::build(ReportKind::Error, (fname.clone(), range.clone()))
@@ -1373,10 +1370,7 @@ pub fn render_diagnostic(
             trait_name,
             type_name,
         } => {
-            let msg = format!(
-                "cannot derive `{}` for `{}`",
-                trait_name, type_name
-            );
+            let msg = format!("cannot derive `{}` for `{}`", trait_name, type_name);
             let span = clamp(0..source_len.max(1).min(source_len));
 
             Report::build(ReportKind::Error, (fname.clone(), span.clone()))
@@ -1456,7 +1450,11 @@ pub fn render_diagnostic(
                 .finish()
         }
 
-        TypeError::ImportModuleNotFound { module_name, span, suggestion } => {
+        TypeError::ImportModuleNotFound {
+            module_name,
+            span,
+            suggestion,
+        } => {
             let msg = "module not found";
             let range = clamp(text_range_to_range(*span));
 
@@ -1477,7 +1475,12 @@ pub fn render_diagnostic(
             builder.finish()
         }
 
-        TypeError::ImportNameNotFound { module_name, name, span, available } => {
+        TypeError::ImportNameNotFound {
+            module_name,
+            name,
+            span,
+            available,
+        } => {
             let msg = "name not found in module";
             let range = clamp(text_range_to_range(*span));
 
@@ -1487,7 +1490,10 @@ pub fn render_diagnostic(
                 .with_config(config)
                 .with_label(
                     Label::new((fname.clone(), range))
-                        .with_message(format!("`{}` is not exported by module `{}`", name, module_name))
+                        .with_message(format!(
+                            "`{}` is not exported by module `{}`",
+                            name, module_name
+                        ))
                         .with_color(Color::Red),
                 );
 
@@ -1498,7 +1504,11 @@ pub fn render_diagnostic(
             builder.finish()
         }
 
-        TypeError::PrivateItem { module_name, name, span } => {
+        TypeError::PrivateItem {
+            module_name,
+            name,
+            span,
+        } => {
             let msg = "private item cannot be imported";
             let range = clamp(text_range_to_range(*span));
 
@@ -1511,11 +1521,16 @@ pub fn render_diagnostic(
                         .with_message(format!("`{}` is private in module `{}`", name, module_name))
                         .with_color(Color::Red),
                 )
-                .with_help(format!("add `pub` to `{}` in module `{}` to make it accessible", name, module_name))
+                .with_help(format!(
+                    "add `pub` to `{}` in module `{}` to make it accessible",
+                    name, module_name
+                ))
                 .finish()
         }
 
-        TypeError::TryIncompatibleReturn { fn_return_ty, span, .. } => {
+        TypeError::TryIncompatibleReturn {
+            fn_return_ty, span, ..
+        } => {
             let msg = "`?` operator requires function to return `Result` or `Option`";
             let range = clamp(text_range_to_range(*span));
 
@@ -1548,7 +1563,9 @@ pub fn render_diagnostic(
                         .with_message(format!("type `{}` is not `Result` or `Option`", operand_ty))
                         .with_color(Color::Red),
                 )
-                .with_help("the `?` operator can only be used on `Result<T, E>` or `Option<T>` values")
+                .with_help(
+                    "the `?` operator can only be used on `Result<T, E>` or `Option<T>` values",
+                )
                 .finish()
         }
 
@@ -1623,7 +1640,10 @@ pub fn render_diagnostic(
                         .with_message(format!("missing `type {} = ...`", assoc_name))
                         .with_color(Color::Red),
                 )
-                .with_help(format!("add `type {} = <ConcreteType>` to the impl block", assoc_name))
+                .with_help(format!(
+                    "add `type {} = <ConcreteType>` to the impl block",
+                    assoc_name
+                ))
                 .finish()
         }
 
@@ -1644,20 +1664,17 @@ pub fn render_diagnostic(
                 .with_config(config)
                 .with_label(
                     Label::new((fname.clone(), span))
-                        .with_message(format!("`{}` is not declared by `{}`", assoc_name, trait_name))
+                        .with_message(format!(
+                            "`{}` is not declared by `{}`",
+                            assoc_name, trait_name
+                        ))
                         .with_color(Color::Red),
                 )
                 .finish()
         }
 
-        TypeError::UnresolvedAssocType {
-            assoc_name,
-            span,
-        } => {
-            let msg = format!(
-                "cannot resolve associated type `{}`",
-                assoc_name
-            );
+        TypeError::UnresolvedAssocType { assoc_name, span } => {
+            let msg = format!("cannot resolve associated type `{}`", assoc_name);
             let span = clamp(text_range_to_range(*span));
 
             Report::build(ReportKind::Error, (fname.clone(), span.clone()))
@@ -1734,7 +1751,10 @@ pub fn render_diagnostic(
             if *arity <= 1 {
                 builder.set_help("use |> to pipe as the first argument");
             } else {
-                builder.set_help(format!("use |> to pipe as the first argument, or |2>...|{}> for other positions", arity));
+                builder.set_help(format!(
+                    "use |> to pipe as the first argument, or |2>...|{}> for other positions",
+                    arity
+                ));
             }
 
             builder.finish()

@@ -1,6 +1,6 @@
 use insta::assert_yaml_snapshot;
-use serde::Serialize;
 use mesh_lexer::Lexer;
+use serde::Serialize;
 
 /// A human-readable representation of a token for snapshot testing.
 #[derive(Serialize)]

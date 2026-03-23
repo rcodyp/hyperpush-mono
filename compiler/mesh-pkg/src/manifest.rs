@@ -34,9 +34,7 @@ pub enum Dependency {
     /// Bare string shorthand: `foo = "1.0.0"`
     RegistryShorthand(String),
     /// Table form: `foo = { version = "1.0.0" }`
-    Registry {
-        version: String,
-    },
+    Registry { version: String },
     /// Git source: `foo = { git = "https://...", ... }`
     Git {
         git: String,
@@ -48,9 +46,7 @@ pub enum Dependency {
         tag: Option<String>,
     },
     /// Local path: `foo = { path = "../foo" }`
-    Path {
-        path: String,
-    },
+    Path { path: String },
 }
 
 impl Dependency {
@@ -104,7 +100,10 @@ local-dep = { path = "../local-dep" }
         let manifest = Manifest::from_str(toml).unwrap();
         assert_eq!(manifest.package.name, "my-project");
         assert_eq!(manifest.package.version, "0.1.0");
-        assert_eq!(manifest.package.description.as_deref(), Some("A test project"));
+        assert_eq!(
+            manifest.package.description.as_deref(),
+            Some("A test project")
+        );
         assert_eq!(manifest.package.authors, vec!["Alice", "Bob"]);
         assert_eq!(manifest.dependencies.len(), 3);
 
@@ -215,7 +214,12 @@ lib = { git = "https://example.com/lib.git" }
 "#;
         let manifest = Manifest::from_str(toml).unwrap();
         match &manifest.dependencies["lib"] {
-            Dependency::Git { git, rev, branch, tag } => {
+            Dependency::Git {
+                git,
+                rev,
+                branch,
+                tag,
+            } => {
                 assert_eq!(git, "https://example.com/lib.git");
                 assert!(rev.is_none());
                 assert!(branch.is_none());
@@ -245,7 +249,10 @@ foo = "1.0.0"
             other => panic!("Expected RegistryShorthand, got: {:?}", other),
         }
         assert!(manifest.dependencies["foo"].is_registry());
-        assert_eq!(manifest.dependencies["foo"].registry_version(), Some("1.0.0"));
+        assert_eq!(
+            manifest.dependencies["foo"].registry_version(),
+            Some("1.0.0")
+        );
     }
 
     #[test]
@@ -266,7 +273,10 @@ foo = { version = "1.0.0" }
             other => panic!("Expected Registry, got: {:?}", other),
         }
         assert!(manifest.dependencies["foo"].is_registry());
-        assert_eq!(manifest.dependencies["foo"].registry_version(), Some("1.0.0"));
+        assert_eq!(
+            manifest.dependencies["foo"].registry_version(),
+            Some("1.0.0")
+        );
     }
 
     #[test]

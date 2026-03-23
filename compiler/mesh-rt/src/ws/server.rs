@@ -34,13 +34,13 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 
-use crate::actor::{global_scheduler, MessageBuffer, Message, ProcessId, ProcessState};
-use crate::actor::process::Process;
-use crate::actor::stack;
-use crate::string::MeshString;
+use super::close::{process_frame, send_close, validate_text_payload, WsCloseCode};
 use super::frame::{read_frame, write_frame, WsFrame, WsOpcode};
 use super::handshake::perform_upgrade;
-use super::close::{process_frame, send_close, validate_text_payload, WsCloseCode};
+use crate::actor::process::Process;
+use crate::actor::stack;
+use crate::actor::{global_scheduler, Message, MessageBuffer, ProcessId, ProcessState};
+use crate::string::MeshString;
 
 // ---------------------------------------------------------------------------
 // Stream abstraction for plain TCP and TLS WebSocket connections
@@ -102,8 +102,8 @@ impl Write for WsStream {
 struct HeartbeatState {
     last_ping_sent: Instant,
     last_pong_received: Instant,
-    ping_interval: Duration,       // default 30s
-    pong_timeout: Duration,        // default 10s
+    ping_interval: Duration, // default 30s
+    pong_timeout: Duration,  // default 10s
     pending_ping_payload: Option<[u8; 4]>,
 }
 
@@ -235,7 +235,7 @@ fn reassemble(frag: &mut FragmentState, frame: WsFrame) -> ReassembleResult {
             ReassembleResult::ProtocolError("unexpected continuation frame")
         }
         // Control frames should never reach reassemble (handled before this call)
-        _ => ReassembleResult::ProtocolError("unexpected opcode in reassembly")
+        _ => ReassembleResult::ProtocolError("unexpected opcode in reassembly"),
     }
 }
 
@@ -336,7 +336,10 @@ pub extern "C" fn mesh_ws_serve(
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("[mesh-rt] Failed to start WebSocket server on {}: {}", addr, e);
+            eprintln!(
+                "[mesh-rt] Failed to start WebSocket server on {}: {}",
+                addr, e
+            );
             return;
         }
     };
@@ -390,7 +393,9 @@ fn ws_accept_loop(listener: TcpListener, h: SendableHandler) {
         };
 
         // Set read timeout before wrapping in WsStream.
-        tcp_stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+        tcp_stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .ok();
 
         let ws_stream = WsStream::Plain(tcp_stream);
 
@@ -454,7 +459,10 @@ pub extern "C" fn mesh_ws_serve_tls(
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("[mesh-rt] Failed to start WebSocket TLS server on {}: {}", addr, e);
+            eprintln!(
+                "[mesh-rt] Failed to start WebSocket TLS server on {}: {}",
+                addr, e
+            );
             return;
         }
     };
@@ -473,7 +481,9 @@ pub extern "C" fn mesh_ws_serve_tls(
         };
 
         // Set read timeout BEFORE TLS wrapping (Pitfall 1 from research)
-        tcp_stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+        tcp_stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .ok();
 
         let tls_config = unsafe { Arc::from_raw(config_ptr as *const ServerConfig) };
         let conn = match ServerConnection::new(Arc::clone(&tls_config)) {
@@ -490,22 +500,23 @@ pub extern "C" fn mesh_ws_serve_tls(
         let ws_stream = WsStream::Tls(tls_stream);
 
         let handler = WsHandler {
-            on_connect_fn, on_connect_env,
-            on_message_fn, on_message_env,
-            on_close_fn, on_close_env,
+            on_connect_fn,
+            on_connect_env,
+            on_message_fn,
+            on_message_env,
+            on_close_fn,
+            on_close_env,
         };
         let stream_ptr = Box::into_raw(Box::new(ws_stream)) as usize;
-        let args = WsConnectionArgs { handler, stream_ptr };
+        let args = WsConnectionArgs {
+            handler,
+            stream_ptr,
+        };
         let args_ptr = Box::into_raw(Box::new(args)) as *const u8;
         let args_size = std::mem::size_of::<WsConnectionArgs>() as u64;
 
         let sched = global_scheduler();
-        sched.spawn(
-            ws_connection_entry as *const u8,
-            args_ptr,
-            args_size,
-            1,
-        );
+        sched.spawn(ws_connection_entry as *const u8, args_ptr, args_size, 1);
     }
 }
 
@@ -614,12 +625,7 @@ extern "C" fn ws_connection_entry(args: *const u8) {
     let reader_proc = proc_arc.clone();
     let reader_pid = my_pid;
     std::thread::spawn(move || {
-        reader_thread_loop(
-            reader_stream,
-            reader_proc,
-            reader_pid,
-            reader_shutdown,
-        );
+        reader_thread_loop(reader_stream, reader_proc, reader_pid, reader_shutdown);
     });
 
     // 8. Actor message loop with catch_unwind (ACTOR-01, ACTOR-05)
@@ -640,7 +646,12 @@ extern "C" fn ws_connection_entry(args: *const u8) {
             "internal error",
         );
         // Call on_close for crash case (best-effort -- GC may not be safe)
-        call_on_close(&handler, conn_ptr, WsCloseCode::INTERNAL_ERROR, "internal error");
+        call_on_close(
+            &handler,
+            conn_ptr,
+            WsCloseCode::INTERNAL_ERROR,
+            "internal error",
+        );
     } else {
         // Normal exit (disconnect): call on_close (LIFE-04)
         call_on_close(&handler, conn_ptr, WsCloseCode::NORMAL, "");
@@ -763,7 +774,8 @@ fn reader_thread_loop(
                         if msg.opcode == WsOpcode::Text {
                             if validate_text_payload(&msg.payload).is_err() {
                                 let mut s = stream.lock();
-                                let _ = send_close(&mut *s, WsCloseCode::INVALID_DATA, "invalid UTF-8");
+                                let _ =
+                                    send_close(&mut *s, WsCloseCode::INVALID_DATA, "invalid UTF-8");
                                 drop(s);
                                 push_disconnect(&proc_arc, actor_pid);
                                 break;
@@ -792,7 +804,8 @@ fn reader_thread_loop(
                     ReassembleResult::Accumulating => { /* waiting for more fragments */ }
                     ReassembleResult::TooLarge => {
                         let mut s = stream.lock();
-                        let _ = send_close(&mut *s, WsCloseCode::MESSAGE_TOO_BIG, "message too big");
+                        let _ =
+                            send_close(&mut *s, WsCloseCode::MESSAGE_TOO_BIG, "message too big");
                         drop(s);
                         push_disconnect(&proc_arc, actor_pid);
                         break;
@@ -813,7 +826,8 @@ fn reader_thread_loop(
                 // Check if it's a timeout (not a real error).
                 // macOS returns "Resource temporarily unavailable" (EAGAIN) for
                 // short timeouts and "timed out" (ETIMEDOUT) for longer ones.
-                if e.contains("timed out") || e.contains("WouldBlock")
+                if e.contains("timed out")
+                    || e.contains("WouldBlock")
                     || e.contains("temporarily unavailable")
                 {
                     continue; // Just a read timeout, check shutdown and loop
@@ -878,7 +892,13 @@ fn actor_message_loop(handler: &WsHandler, conn_ptr: *mut u8) {
                     (len, msg_ptr.add(16))
                 };
                 // Call on_message (LIFE-03)
-                call_on_message(handler, conn_ptr, data_ptr, data_len, type_tag == WS_TEXT_TAG);
+                call_on_message(
+                    handler,
+                    conn_ptr,
+                    data_ptr,
+                    data_len,
+                    type_tag == WS_TEXT_TAG,
+                );
             }
             WS_DISCONNECT_TAG => {
                 // Client disconnected (ACTOR-06)
@@ -917,15 +937,15 @@ fn call_on_connect(
 
     unsafe {
         // Build Mesh-level path string
-        let path_mesh =
-            crate::string::mesh_string_new(path.as_ptr(), path.len() as u64) as *mut u8;
+        let path_mesh = crate::string::mesh_string_new(path.as_ptr(), path.len() as u64) as *mut u8;
 
         // Build headers map
         let mut headers_map = crate::collections::map::mesh_map_new_typed(1);
         for (name, value) in headers {
             let key = crate::string::mesh_string_new(name.as_ptr(), name.len() as u64);
             let val = crate::string::mesh_string_new(value.as_ptr(), value.len() as u64);
-            headers_map = crate::collections::map::mesh_map_put(headers_map, key as u64, val as u64);
+            headers_map =
+                crate::collections::map::mesh_map_put(headers_map, key as u64, val as u64);
         }
 
         // Call the closure: if env is null, bare function; if non-null, closure
@@ -960,12 +980,10 @@ fn call_on_message(
 
     unsafe {
         // Build a Mesh string from the frame payload
-        let msg_mesh =
-            crate::string::mesh_string_new(data_ptr, data_len as u64) as *mut u8;
+        let msg_mesh = crate::string::mesh_string_new(data_ptr, data_len as u64) as *mut u8;
 
         if handler.on_message_env.is_null() {
-            let f: fn(*mut u8, *mut u8) -> *mut u8 =
-                std::mem::transmute(handler.on_message_fn);
+            let f: fn(*mut u8, *mut u8) -> *mut u8 = std::mem::transmute(handler.on_message_fn);
             f(conn_ptr, msg_mesh);
         } else {
             let f: fn(*mut u8, *mut u8, *mut u8) -> *mut u8 =
@@ -989,8 +1007,7 @@ fn call_on_close(handler: &WsHandler, conn_ptr: *mut u8, code: u16, reason: &str
             crate::string::mesh_string_new(reason.as_ptr(), reason.len() as u64) as *mut u8;
 
         if handler.on_close_env.is_null() {
-            let f: fn(*mut u8, i64, *mut u8) -> *mut u8 =
-                std::mem::transmute(handler.on_close_fn);
+            let f: fn(*mut u8, i64, *mut u8) -> *mut u8 = std::mem::transmute(handler.on_close_fn);
             f(conn_ptr, code_i64, reason_mesh);
         } else {
             let f: fn(*mut u8, *mut u8, i64, *mut u8) -> *mut u8 =
@@ -1003,8 +1020,8 @@ fn call_on_close(handler: &WsHandler, conn_ptr: *mut u8, code: u16, reason: &str
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ws::frame::{read_frame, apply_mask, WsOpcode};
     use crate::ws::close::parse_close_payload;
+    use crate::ws::frame::{apply_mask, read_frame, WsOpcode};
     use std::io::{Read, Write};
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -1012,18 +1029,21 @@ mod tests {
 
     /// on_connect with per-test counter via env pointer. Returns non-null (accept).
     extern "C" fn counting_on_connect(
-        env: *mut u8, _conn: *mut u8, _path: *mut u8, _headers: *mut u8,
+        env: *mut u8,
+        _conn: *mut u8,
+        _path: *mut u8,
+        _headers: *mut u8,
     ) -> *mut u8 {
         if !env.is_null() {
-            unsafe { (*(env as *const AtomicU64)).fetch_add(1, Ordering::SeqCst); }
+            unsafe {
+                (*(env as *const AtomicU64)).fetch_add(1, Ordering::SeqCst);
+            }
         }
         1 as *mut u8
     }
 
     /// on_connect: accept without counting (env=null calling convention).
-    extern "C" fn accept_on_connect(
-        _conn: *mut u8, _path: *mut u8, _headers: *mut u8,
-    ) -> *mut u8 {
+    extern "C" fn accept_on_connect(_conn: *mut u8, _path: *mut u8, _headers: *mut u8) -> *mut u8 {
         1 as *mut u8
     }
 
@@ -1042,18 +1062,21 @@ mod tests {
 
     /// on_close with per-test counter via env pointer.
     extern "C" fn counting_on_close(
-        env: *mut u8, _conn: *mut u8, _code: i64, _reason: *mut u8,
+        env: *mut u8,
+        _conn: *mut u8,
+        _code: i64,
+        _reason: *mut u8,
     ) -> *mut u8 {
         if !env.is_null() {
-            unsafe { (*(env as *const AtomicU64)).fetch_add(1, Ordering::SeqCst); }
+            unsafe {
+                (*(env as *const AtomicU64)).fetch_add(1, Ordering::SeqCst);
+            }
         }
         std::ptr::null_mut()
     }
 
     /// on_close: no-op (env=null calling convention).
-    extern "C" fn noop_on_close(
-        _conn: *mut u8, _code: i64, _reason: *mut u8,
-    ) -> *mut u8 {
+    extern "C" fn noop_on_close(_conn: *mut u8, _code: i64, _reason: *mut u8) -> *mut u8 {
         std::ptr::null_mut()
     }
 
@@ -1069,9 +1092,12 @@ mod tests {
     fn start_echo_server(port: u16) {
         std::thread::spawn(move || {
             mesh_ws_serve(
-                accept_on_connect as *mut u8, std::ptr::null_mut(),
-                echo_on_message as *mut u8, std::ptr::null_mut(),
-                noop_on_close as *mut u8, std::ptr::null_mut(),
+                accept_on_connect as *mut u8,
+                std::ptr::null_mut(),
+                echo_on_message as *mut u8,
+                std::ptr::null_mut(),
+                noop_on_close as *mut u8,
+                std::ptr::null_mut(),
                 port as i64,
             );
         });
@@ -1089,9 +1115,12 @@ mod tests {
         let close_env = close_ctr as *const AtomicU64 as usize;
         std::thread::spawn(move || {
             mesh_ws_serve(
-                counting_on_connect as *mut u8, connect_env as *mut u8,
-                echo_on_message as *mut u8, std::ptr::null_mut(),
-                counting_on_close as *mut u8, close_env as *mut u8,
+                counting_on_connect as *mut u8,
+                connect_env as *mut u8,
+                echo_on_message as *mut u8,
+                std::ptr::null_mut(),
+                counting_on_close as *mut u8,
+                close_env as *mut u8,
                 port as i64,
             );
         });
@@ -1102,9 +1131,12 @@ mod tests {
     fn start_crash_server(port: u16) {
         std::thread::spawn(move || {
             mesh_ws_serve(
-                accept_on_connect as *mut u8, std::ptr::null_mut(),
-                crash_on_message as *mut u8, std::ptr::null_mut(),
-                noop_on_close as *mut u8, std::ptr::null_mut(),
+                accept_on_connect as *mut u8,
+                std::ptr::null_mut(),
+                crash_on_message as *mut u8,
+                std::ptr::null_mut(),
+                noop_on_close as *mut u8,
+                std::ptr::null_mut(),
                 port as i64,
             );
         });
@@ -1115,7 +1147,9 @@ mod tests {
     /// Reads the HTTP response byte-by-byte to avoid consuming frame data.
     fn ws_connect(port: u16) -> TcpStream {
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).unwrap();
-        stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
 
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
         write!(
@@ -1131,10 +1165,16 @@ mod tests {
         loop {
             stream.read_exact(&mut byte).unwrap();
             resp.push(byte[0]);
-            if resp.ends_with(b"\r\n\r\n") { break; }
+            if resp.ends_with(b"\r\n\r\n") {
+                break;
+            }
         }
         let resp_str = String::from_utf8_lossy(&resp);
-        assert!(resp_str.contains("101"), "Expected 101 Switching Protocols, got: {}", resp_str);
+        assert!(
+            resp_str.contains("101"),
+            "Expected 101 Switching Protocols, got: {}",
+            resp_str
+        );
         stream
     }
 
@@ -1211,16 +1251,24 @@ mod tests {
 
         let mut stream = ws_connect(port);
         for _ in 0..50 {
-            if connect_ctr.load(Ordering::SeqCst) >= 1 { break; }
+            if connect_ctr.load(Ordering::SeqCst) >= 1 {
+                break;
+            }
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert_eq!(connect_ctr.load(Ordering::SeqCst), 1, "on_connect should fire");
+        assert_eq!(
+            connect_ctr.load(Ordering::SeqCst),
+            1,
+            "on_connect should fire"
+        );
 
         // Send close -> on_close should fire
         ws_send_close(&mut stream, 1000);
         let _ = read_frame(&mut stream); // consume close echo
         for _ in 0..100 {
-            if close_ctr.load(Ordering::SeqCst) >= 1 { break; }
+            if close_ctr.load(Ordering::SeqCst) >= 1 {
+                break;
+            }
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(close_ctr.load(Ordering::SeqCst), 1, "on_close should fire");
@@ -1283,7 +1331,7 @@ mod tests {
             let mut stream = ws_connect(port);
             ws_send_text(&mut stream, "hello");
             let _ = read_frame(&mut stream).unwrap(); // consume echo
-            // stream dropped -> TCP FIN, simulating client disconnect
+                                                      // stream dropped -> TCP FIN, simulating client disconnect
         }
 
         // Wait for reader thread to detect disconnect and on_close to fire

@@ -3,7 +3,7 @@
 //! Provides `Env.get(key)` and `Env.args()` for Mesh programs.
 
 use crate::gc::mesh_gc_alloc_actor;
-use crate::option::{MeshOption, alloc_option};
+use crate::option::{alloc_option, MeshOption};
 use crate::string::{mesh_string_new, MeshString};
 
 /// Get an environment variable by key. Returns MeshOption:
@@ -105,10 +105,7 @@ mod tests {
     #[test]
     fn test_env_get_missing() {
         mesh_rt_init();
-        let key = mesh_string_new(
-            b"MESH_NONEXISTENT_VAR_12345".as_ptr(),
-            25,
-        );
+        let key = mesh_string_new(b"MESH_NONEXISTENT_VAR_12345".as_ptr(), 25);
         let result = mesh_env_get(key);
         unsafe {
             assert_eq!((*result).tag, 1, "missing var should return None");
@@ -121,7 +118,9 @@ mod tests {
         let key = mesh_string_new(b"MESH_NONEXISTENT_VAR_99999".as_ptr(), 25);
         let default = mesh_string_new(b"fallback".as_ptr(), 8);
         let result = mesh_env_get_with_default(key, default);
-        unsafe { assert_eq!((*result).as_str(), "fallback"); }
+        unsafe {
+            assert_eq!((*result).as_str(), "fallback");
+        }
     }
 
     #[test]

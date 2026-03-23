@@ -146,10 +146,7 @@ pub enum TypeError {
         span: TextRange,
     },
     /// A variant name was used in a pattern but does not exist.
-    UnknownVariant {
-        name: String,
-        span: TextRange,
-    },
+    UnknownVariant { name: String, span: TextRange },
     /// Or-pattern alternatives bind different sets of variables.
     OrPatternBindingMismatch {
         expected_bindings: Vec<String>,
@@ -163,15 +160,9 @@ pub enum TypeError {
         span: TextRange,
     },
     /// A match arm is redundant (unreachable given prior arms).
-    RedundantArm {
-        arm_index: usize,
-        span: TextRange,
-    },
+    RedundantArm { arm_index: usize, span: TextRange },
     /// A guard expression uses disallowed constructs.
-    InvalidGuardExpression {
-        reason: String,
-        span: TextRange,
-    },
+    InvalidGuardExpression { reason: String, span: TextRange },
     /// Sending a message of wrong type to a typed Pid<M>.
     SendTypeMismatch {
         expected: Ty,
@@ -179,18 +170,11 @@ pub enum TypeError {
         span: TextRange,
     },
     /// self() called outside an actor block.
-    SelfOutsideActor {
-        span: TextRange,
-    },
+    SelfOutsideActor { span: TextRange },
     /// spawn called with a non-function argument.
-    SpawnNonFunction {
-        found: Ty,
-        span: TextRange,
-    },
+    SpawnNonFunction { found: Ty, span: TextRange },
     /// receive used outside an actor block.
-    ReceiveOutsideActor {
-        span: TextRange,
-    },
+    ReceiveOutsideActor { span: TextRange },
     /// Child spec start function does not return Pid.
     InvalidChildStart {
         child_name: String,
@@ -198,10 +182,7 @@ pub enum TypeError {
         span: TextRange,
     },
     /// Unknown supervision strategy.
-    InvalidStrategy {
-        found: String,
-        span: TextRange,
-    },
+    InvalidStrategy { found: String, span: TextRange },
     /// Invalid restart type for child spec.
     InvalidRestartType {
         found: String,
@@ -273,13 +254,9 @@ pub enum TypeError {
         type_name: String,
     },
     /// `break` used outside of a loop.
-    BreakOutsideLoop {
-        span: TextRange,
-    },
+    BreakOutsideLoop { span: TextRange },
     /// `continue` used outside of a loop.
-    ContinueOutsideLoop {
-        span: TextRange,
-    },
+    ContinueOutsideLoop { span: TextRange },
     /// Module not found during import resolution (IMPORT-06).
     ImportModuleNotFound {
         module_name: String,
@@ -340,10 +317,7 @@ pub enum TypeError {
         impl_ty: String,
     },
     /// An associated type reference (Self.Item) could not be resolved.
-    UnresolvedAssocType {
-        assoc_name: String,
-        span: TextRange,
-    },
+    UnresolvedAssocType { assoc_name: String, span: TextRange },
     /// A type alias references a type name that does not exist (ALIAS-04).
     UndefinedType {
         /// The name of the type alias.
@@ -360,14 +334,14 @@ impl fmt::Display for TypeError {
             TypeError::Mismatch {
                 expected, found, ..
             } => {
-                write!(f, "type mismatch: expected `{}`, found `{}`", expected, found)
-            }
-            TypeError::InfiniteType { var, ty, .. } => {
                 write!(
                     f,
-                    "infinite type: `?{}` occurs in `{}`",
-                    var.0, ty
+                    "type mismatch: expected `{}`, found `{}`",
+                    expected, found
                 )
+            }
+            TypeError::InfiniteType { var, ty, .. } => {
+                write!(f, "infinite type: `?{}` occurs in `{}`", var.0, ty)
             }
             TypeError::ArityMismatch {
                 expected, found, ..
@@ -378,9 +352,7 @@ impl fmt::Display for TypeError {
                     expected, found
                 )
             }
-            TypeError::SlotPositionConflict {
-                slot, fn_name, ..
-            } => {
+            TypeError::SlotPositionConflict { slot, fn_name, .. } => {
                 write!(
                     f,
                     "slot position {} conflicts with an argument already provided to `{}`",
@@ -388,7 +360,10 @@ impl fmt::Display for TypeError {
                 )
             }
             TypeError::SlotPipeOutOfRange {
-                slot, fn_name, arity, ..
+                slot,
+                fn_name,
+                arity,
+                ..
             } => {
                 if *arity <= 1 {
                     write!(
@@ -410,14 +385,8 @@ impl fmt::Display for TypeError {
             TypeError::NotAFunction { ty, .. } => {
                 write!(f, "`{}` is not a function", ty)
             }
-            TypeError::TraitNotSatisfied {
-                ty, trait_name, ..
-            } => {
-                write!(
-                    f,
-                    "type `{}` does not satisfy trait `{}`",
-                    ty, trait_name
-                )
+            TypeError::TraitNotSatisfied { ty, trait_name, .. } => {
+                write!(f, "type `{}` does not satisfy trait `{}`", ty, trait_name)
             }
             TypeError::MissingTraitMethod {
                 trait_name,
@@ -464,9 +433,7 @@ impl fmt::Display for TypeError {
                     field_name, struct_name
                 )
             }
-            TypeError::NoSuchField {
-                ty, field_name, ..
-            } => {
+            TypeError::NoSuchField { ty, field_name, .. } => {
                 write!(f, "type `{}` has no field `{}`", ty, field_name)
             }
             TypeError::NoSuchMethod {
@@ -559,18 +526,14 @@ impl fmt::Display for TypeError {
                     found, child_name
                 )
             }
-            TypeError::CatchAllNotLast {
-                fn_name, arity, ..
-            } => {
+            TypeError::CatchAllNotLast { fn_name, arity, .. } => {
                 write!(
                     f,
                     "catch-all clause must be the last clause of function `{}/{}`; clauses after a catch-all are unreachable",
                     fn_name, arity
                 )
             }
-            TypeError::NonConsecutiveClauses {
-                fn_name, arity, ..
-            } => {
+            TypeError::NonConsecutiveClauses { fn_name, arity, .. } => {
                 write!(
                     f,
                     "function `{}/{}` already defined; multi-clause functions must have consecutive clauses",
@@ -589,9 +552,7 @@ impl fmt::Display for TypeError {
                     fn_name, expected_arity, found_arity
                 )
             }
-            TypeError::NonFirstClauseAnnotation {
-                fn_name, what, ..
-            } => {
+            TypeError::NonFirstClauseAnnotation { fn_name, what, .. } => {
                 write!(
                     f,
                     "{} on non-first clause of `{}` will be ignored",
@@ -659,28 +620,61 @@ impl fmt::Display for TypeError {
             TypeError::ContinueOutsideLoop { .. } => {
                 write!(f, "`continue` outside of loop")
             }
-            TypeError::ImportModuleNotFound { module_name, suggestion, .. } => {
+            TypeError::ImportModuleNotFound {
+                module_name,
+                suggestion,
+                ..
+            } => {
                 if let Some(sug) = suggestion {
-                    write!(f, "module `{}` not found; did you mean `{}`?", module_name, sug)
+                    write!(
+                        f,
+                        "module `{}` not found; did you mean `{}`?",
+                        module_name, sug
+                    )
                 } else {
                     write!(f, "module `{}` not found", module_name)
                 }
             }
-            TypeError::ImportNameNotFound { module_name, name, available, .. } => {
+            TypeError::ImportNameNotFound {
+                module_name,
+                name,
+                available,
+                ..
+            } => {
                 if available.is_empty() {
                     write!(f, "`{}` is not exported by module `{}`", name, module_name)
                 } else {
-                    write!(f, "`{}` is not exported by module `{}`; available: {}", name, module_name, available.join(", "))
+                    write!(
+                        f,
+                        "`{}` is not exported by module `{}`; available: {}",
+                        name,
+                        module_name,
+                        available.join(", ")
+                    )
                 }
             }
-            TypeError::PrivateItem { module_name, name, .. } => {
-                write!(f, "`{}` is private in module `{}`; add `pub` to make it accessible", name, module_name)
+            TypeError::PrivateItem {
+                module_name, name, ..
+            } => {
+                write!(
+                    f,
+                    "`{}` is private in module `{}`; add `pub` to make it accessible",
+                    name, module_name
+                )
             }
             TypeError::TryIncompatibleReturn { fn_return_ty, .. } => {
-                write!(f, "`?` operator requires function to return `Result` or `Option`, found `{}`", fn_return_ty)
+                write!(
+                    f,
+                    "`?` operator requires function to return `Result` or `Option`, found `{}`",
+                    fn_return_ty
+                )
             }
             TypeError::TryOnNonResultOption { operand_ty, .. } => {
-                write!(f, "`?` operator requires `Result` or `Option`, found `{}`", operand_ty)
+                write!(
+                    f,
+                    "`?` operator requires `Result` or `Option`, found `{}`",
+                    operand_ty
+                )
             }
             TypeError::NonSerializableField {
                 field_name,
@@ -726,10 +720,7 @@ impl fmt::Display for TypeError {
                     trait_name, impl_ty, assoc_name
                 )
             }
-            TypeError::UnresolvedAssocType {
-                assoc_name,
-                ..
-            } => {
+            TypeError::UnresolvedAssocType { assoc_name, .. } => {
                 write!(
                     f,
                     "cannot resolve associated type `{}` -- Self.Item can only be used inside an impl block",

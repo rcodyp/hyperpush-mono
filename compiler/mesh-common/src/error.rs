@@ -65,10 +65,7 @@ mod tests {
 
     #[test]
     fn lex_error_display() {
-        let err = LexError::new(
-            LexErrorKind::UnexpectedCharacter('@'),
-            Span::new(0, 1),
-        );
+        let err = LexError::new(LexErrorKind::UnexpectedCharacter('@'), Span::new(0, 1));
         assert_eq!(err.to_string(), "unexpected character: '@'");
     }
 

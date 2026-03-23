@@ -248,10 +248,7 @@ pub fn compile_mir_to_llvm_ir(
 ///
 /// After merging, runs the monomorphization pass to eliminate unreachable
 /// functions (which requires the entry point from the merged module).
-pub fn merge_mir_modules(
-    modules: Vec<mir::MirModule>,
-    entry_module_idx: usize,
-) -> mir::MirModule {
+pub fn merge_mir_modules(modules: Vec<mir::MirModule>, entry_module_idx: usize) -> mir::MirModule {
     use std::collections::HashSet;
 
     let mut merged = mir::MirModule {
@@ -288,7 +285,10 @@ pub fn merge_mir_modules(
             }
         }
         for (key, value) in &module.service_dispatch {
-            merged.service_dispatch.entry(key.clone()).or_insert_with(|| value.clone());
+            merged
+                .service_dispatch
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
         }
     }
 

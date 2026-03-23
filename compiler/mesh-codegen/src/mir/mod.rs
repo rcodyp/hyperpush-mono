@@ -28,10 +28,8 @@ pub struct MirModule {
     /// Service dispatch tables for codegen.
     /// Maps service loop function name to (call_handlers, cast_handlers).
     /// Each handler entry: (type_tag, handler_fn_name, num_args).
-    pub service_dispatch: std::collections::HashMap<
-        String,
-        (Vec<(u64, String, usize)>, Vec<(u64, String, usize)>),
-    >,
+    pub service_dispatch:
+        std::collections::HashMap<String, (Vec<(u64, String, usize)>, Vec<(u64, String, usize)>)>,
 }
 
 // ── MirFunction ───────────────────────────────────────────────────────
@@ -244,7 +242,6 @@ pub enum MirExpr {
     Unit,
 
     // ── Actor primitives ──────────────────────────────────────────────
-
     /// Spawn a new actor process.
     ActorSpawn {
         /// The function to run as the actor body.
@@ -280,25 +277,15 @@ pub enum MirExpr {
         ty: MirType,
     },
     /// Get own PID.
-    ActorSelf {
-        ty: MirType,
-    },
+    ActorSelf { ty: MirType },
     /// Link to another actor for supervision.
-    ActorLink {
-        target: Box<MirExpr>,
-        ty: MirType,
-    },
+    ActorLink { target: Box<MirExpr>, ty: MirType },
 
     // ── Supervisor primitives ──────────────────────────────────────
-
     /// List literal: [e1, e2, ...]
-    ListLit {
-        elements: Vec<MirExpr>,
-        ty: MirType,
-    },
+    ListLit { elements: Vec<MirExpr>, ty: MirType },
 
     // ── Loop primitives ──────────────────────────────────────────────
-
     /// While loop: evaluates condition, if true executes body and repeats. Returns Unit.
     While {
         cond: Box<MirExpr>,
@@ -311,7 +298,6 @@ pub enum MirExpr {
     Continue,
 
     // ── TCE primitives ──────────────────────────────────────────────
-
     /// Self-recursive tail call (rewritten from Call during TCE pass).
     /// Codegen compiles this as parameter reassignment + branch to loop header.
     TailCall {

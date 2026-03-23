@@ -135,8 +135,10 @@ fn test_supervisor_invalid_restart_type() {
     );
     assert_has_error(
         &result,
-        |e| matches!(e, TypeError::InvalidRestartType { found, child_name, .. }
-                     if found == "always" && child_name == "w1"),
+        |e| {
+            matches!(e, TypeError::InvalidRestartType { found, child_name, .. }
+                     if found == "always" && child_name == "w1")
+        },
         "InvalidRestartType for 'always'",
     );
 }
@@ -160,8 +162,10 @@ fn test_supervisor_invalid_shutdown() {
     );
     assert_has_error(
         &result,
-        |e| matches!(e, TypeError::InvalidShutdownValue { found, child_name, .. }
-                     if found == "fast" && child_name == "w1"),
+        |e| {
+            matches!(e, TypeError::InvalidShutdownValue { found, child_name, .. }
+                     if found == "fast" && child_name == "w1")
+        },
         "InvalidShutdownValue for 'fast'",
     );
 }
@@ -191,7 +195,12 @@ fn test_supervisor_child_start_returns_pid() {
 
 #[test]
 fn test_supervisor_all_valid_strategies() {
-    for strategy in &["one_for_one", "one_for_all", "rest_for_one", "simple_one_for_one"] {
+    for strategy in &[
+        "one_for_one",
+        "one_for_all",
+        "rest_for_one",
+        "simple_one_for_one",
+    ] {
         let src = format!(
             "actor worker() do\nreceive do\nm -> worker()\nend\nend\n\
              supervisor MySup do\n\
@@ -208,7 +217,10 @@ fn test_supervisor_all_valid_strategies() {
         );
         let result = check_source(&src);
         assert!(
-            !result.errors.iter().any(|e| matches!(e, TypeError::InvalidStrategy { .. })),
+            !result
+                .errors
+                .iter()
+                .any(|e| matches!(e, TypeError::InvalidStrategy { .. })),
             "strategy '{}' should be valid but got InvalidStrategy error",
             strategy
         );
@@ -265,7 +277,10 @@ fn test_supervisor_all_valid_restart_types() {
         );
         let result = check_source(&src);
         assert!(
-            !result.errors.iter().any(|e| matches!(e, TypeError::InvalidRestartType { .. })),
+            !result
+                .errors
+                .iter()
+                .any(|e| matches!(e, TypeError::InvalidRestartType { .. })),
             "restart type '{}' should be valid but got InvalidRestartType error",
             restart
         );

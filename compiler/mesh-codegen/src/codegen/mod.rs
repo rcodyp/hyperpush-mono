@@ -51,7 +51,6 @@ pub struct CodeGen<'ctx> {
     pub(crate) target_machine: TargetMachine,
 
     // ── Type caches ──────────────────────────────────────────────────
-
     /// Cache of named struct types (MIR struct name -> LLVM struct type).
     pub(crate) struct_types: FxHashMap<String, StructType<'ctx>>,
     /// Cache of sum type tagged union layouts (MIR sum type name -> LLVM struct type).
@@ -60,21 +59,18 @@ pub struct CodeGen<'ctx> {
     pub(crate) sum_type_defs: FxHashMap<String, MirSumTypeDef>,
 
     // ── Function tracking ────────────────────────────────────────────
-
     /// Map from MIR function name to LLVM function value.
     pub(crate) functions: FxHashMap<String, FunctionValue<'ctx>>,
     /// The current function being compiled.
     pub(crate) current_fn: Option<FunctionValue<'ctx>>,
 
     // ── Local variable tracking ──────────────────────────────────────
-
     /// Local variable allocas in the current function (name -> alloca pointer).
     pub(crate) locals: FxHashMap<String, PointerValue<'ctx>>,
     /// Local variable types (name -> MirType) for loading with correct types.
     pub(crate) local_types: FxHashMap<String, MirType>,
 
     // ── MIR reference ────────────────────────────────────────────────
-
     /// The MIR module being compiled (borrowed for arm body lookup).
     pub(crate) mir_functions: Vec<MirFunction>,
 
@@ -83,15 +79,16 @@ pub struct CodeGen<'ctx> {
 
     /// Loop context stack for break/continue targets.
     /// Each entry is (cond_bb, merge_bb) for the innermost enclosing while loop.
-    pub(crate) loop_stack: Vec<(inkwell::basic_block::BasicBlock<'ctx>, inkwell::basic_block::BasicBlock<'ctx>)>,
+    pub(crate) loop_stack: Vec<(
+        inkwell::basic_block::BasicBlock<'ctx>,
+        inkwell::basic_block::BasicBlock<'ctx>,
+    )>,
 
     /// Service dispatch tables.
     /// Maps service loop function name -> (call_handlers, cast_handlers).
     /// Each entry: (type_tag, handler_fn_name, num_args).
-    pub(crate) service_dispatch: std::collections::HashMap<
-        String,
-        (Vec<(u64, String, usize)>, Vec<(u64, String, usize)>),
-    >,
+    pub(crate) service_dispatch:
+        std::collections::HashMap<String, (Vec<(u64, String, usize)>, Vec<(u64, String, usize)>)>,
 
     /// TCE loop header block for the current tail-recursive function.
     /// Set during compile_function when has_tail_calls is true. NOT on loop_stack
@@ -267,7 +264,9 @@ impl<'ctx> CodeGen<'ctx> {
 
     /// Emit the LLVM module as human-readable LLVM IR (.ll file).
     pub fn emit_llvm_ir(&self, path: &Path) -> Result<(), String> {
-        self.module.print_to_file(path).map_err(|e| format!("Failed to emit LLVM IR: {}", e))
+        self.module
+            .print_to_file(path)
+            .map_err(|e| format!("Failed to emit LLVM IR: {}", e))
     }
 
     /// Get the LLVM IR as a string (for testing).
@@ -290,7 +289,9 @@ impl<'ctx> CodeGen<'ctx> {
             let field_types: Vec<inkwell::types::BasicTypeEnum<'ctx>> = s
                 .fields
                 .iter()
-                .map(|(_, ty)| llvm_type(self.context, ty, &self.struct_types, &self.sum_type_layouts))
+                .map(|(_, ty)| {
+                    llvm_type(self.context, ty, &self.struct_types, &self.sum_type_layouts)
+                })
                 .collect();
             let struct_ty = self.context.opaque_struct_type(&s.name);
             struct_ty.set_body(&field_types, false);
@@ -392,16 +393,14 @@ impl<'ctx> CodeGen<'ctx> {
 
         // Alloca for each parameter and store incoming values.
         for (i, (name, ty)) in func.params.iter().enumerate() {
-            let llvm_ty = llvm_type(
-                self.context,
-                ty,
-                &self.struct_types,
-                &self.sum_type_layouts,
-            );
-            let alloca = self.builder.build_alloca(llvm_ty, name).map_err(|e| e.to_string())?;
-            let param_val = fn_val.get_nth_param(i as u32).ok_or_else(|| {
-                format!("Missing parameter {} for function '{}'", i, func.name)
-            })?;
+            let llvm_ty = llvm_type(self.context, ty, &self.struct_types, &self.sum_type_layouts);
+            let alloca = self
+                .builder
+                .build_alloca(llvm_ty, name)
+                .map_err(|e| e.to_string())?;
+            let param_val = fn_val
+                .get_nth_param(i as u32)
+                .ok_or_else(|| format!("Missing parameter {} for function '{}'", i, func.name))?;
             self.builder
                 .build_store(alloca, param_val)
                 .map_err(|e| e.to_string())?;
@@ -431,24 +430,15 @@ impl<'ctx> CodeGen<'ctx> {
                 .captures
                 .iter()
                 .map(|(_, ty)| {
-                    llvm_type(
-                        self.context,
-                        ty,
-                        &self.struct_types,
-                        &self.sum_type_layouts,
-                    )
+                    llvm_type(self.context, ty, &self.struct_types, &self.sum_type_layouts)
                 })
                 .collect();
             let env_struct_ty = self.context.struct_type(&cap_llvm_types, false);
 
             // Load each captured variable from the env struct and create a local alloca.
             for (i, (name, ty)) in func.captures.iter().enumerate() {
-                let cap_llvm_ty = llvm_type(
-                    self.context,
-                    ty,
-                    &self.struct_types,
-                    &self.sum_type_layouts,
-                );
+                let cap_llvm_ty =
+                    llvm_type(self.context, ty, &self.struct_types, &self.sum_type_layouts);
                 let field_ptr = self
                     .builder
                     .build_struct_gep(env_struct_ty, env_ptr, i as u32, &format!("cap_{}", name))
@@ -473,7 +463,9 @@ impl<'ctx> CodeGen<'ctx> {
         // Create a loop header block that the TailCall codegen will branch back to.
         if func.has_tail_calls {
             let tce_loop_bb = self.context.append_basic_block(fn_val, "tce_loop");
-            self.builder.build_unconditional_branch(tce_loop_bb).map_err(|e| e.to_string())?;
+            self.builder
+                .build_unconditional_branch(tce_loop_bb)
+                .map_err(|e| e.to_string())?;
             self.builder.position_at_end(tce_loop_bb);
             self.tce_loop_header = Some(tce_loop_bb);
             self.tce_param_names = func.params.iter().map(|(name, _)| name.clone()).collect();
@@ -563,11 +555,10 @@ impl<'ctx> CodeGen<'ctx> {
         match (result, expected_ty) {
             // ptr -> struct (e.g., ptr -> { i8, ptr } Result type):
             // Load the struct from the pointer
-            (BasicValueEnum::PointerValue(pv), expected) if expected.is_struct_type() => {
-                self.builder
-                    .build_load(expected, pv, "ret_coerce_load")
-                    .map_err(|e| e.to_string())
-            }
+            (BasicValueEnum::PointerValue(pv), expected) if expected.is_struct_type() => self
+                .builder
+                .build_load(expected, pv, "ret_coerce_load")
+                .map_err(|e| e.to_string()),
 
             // struct -> ptr: heap-alloc + store + return pointer
             (BasicValueEnum::StructValue(sv), expected) if expected.is_pointer_type() => {
@@ -575,9 +566,12 @@ impl<'ctx> CodeGen<'ctx> {
                 let i64_type = self.context.i64_type();
                 let size = sv_ty.size_of().unwrap_or(i64_type.const_int(64, false));
                 let align = i64_type.const_int(8, false);
-                let gc_alloc = self.module.get_function("mesh_gc_alloc_actor")
+                let gc_alloc = self
+                    .module
+                    .get_function("mesh_gc_alloc_actor")
                     .ok_or("mesh_gc_alloc_actor not found")?;
-                let heap_ptr = self.builder
+                let heap_ptr = self
+                    .builder
                     .build_call(gc_alloc, &[size.into(), align.into()], "ret_coerce_heap")
                     .map_err(|e| e.to_string())?
                     .try_as_basic_value()
@@ -593,7 +587,8 @@ impl<'ctx> CodeGen<'ctx> {
             // int -> ptr: inttoptr
             (BasicValueEnum::IntValue(iv), expected) if expected.is_pointer_type() => {
                 let ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
-                let cast = self.builder
+                let cast = self
+                    .builder
                     .build_int_to_ptr(iv, ptr_ty, "ret_coerce_inttoptr")
                     .map_err(|e| e.to_string())?;
                 Ok(cast.into())
@@ -601,7 +596,8 @@ impl<'ctx> CodeGen<'ctx> {
 
             // ptr -> int: ptrtoint
             (BasicValueEnum::PointerValue(pv), expected) if expected.is_int_type() => {
-                let cast = self.builder
+                let cast = self
+                    .builder
                     .build_ptr_to_int(pv, expected.into_int_type(), "ret_coerce_ptrtoint")
                     .map_err(|e| e.to_string())?;
                 Ok(cast.into())
@@ -610,7 +606,8 @@ impl<'ctx> CodeGen<'ctx> {
             // Struct -> different struct: bitcast via alloca
             // (e.g., { %ProcessorState, { i8, ptr } } vs expected struct layout)
             (BasicValueEnum::StructValue(sv), expected) if expected.is_struct_type() => {
-                let alloca = self.builder
+                let alloca = self
+                    .builder
                     .build_alloca(sv.get_type(), "ret_coerce_tmp")
                     .map_err(|e| e.to_string())?;
                 self.builder
@@ -664,26 +661,29 @@ impl<'ctx> CodeGen<'ctx> {
             }
 
             // Create a global string constant for the function name.
-            let name_global = self.builder.build_global_string_ptr(
-                &mir_fn.name,
-                &format!("fn_reg_{}", mir_fn.name),
-            ).map_err(|e| e.to_string())?;
+            let name_global = self
+                .builder
+                .build_global_string_ptr(&mir_fn.name, &format!("fn_reg_{}", mir_fn.name))
+                .map_err(|e| e.to_string())?;
 
-            let name_len = self.context.i64_type().const_int(
-                mir_fn.name.len() as u64, false,
-            );
+            let name_len = self
+                .context
+                .i64_type()
+                .const_int(mir_fn.name.len() as u64, false);
 
             // Get the LLVM function value for this MIR function.
             if let Some(fn_val) = self.functions.get(&mir_fn.name) {
-                self.builder.build_call(
-                    register_fn,
-                    &[
-                        name_global.as_pointer_value().into(),
-                        name_len.into(),
-                        fn_val.as_global_value().as_pointer_value().into(),
-                    ],
-                    "",
-                ).map_err(|e| e.to_string())?;
+                self.builder
+                    .build_call(
+                        register_fn,
+                        &[
+                            name_global.as_pointer_value().into(),
+                            name_len.into(),
+                            fn_val.as_global_value().as_pointer_value().into(),
+                        ],
+                        "",
+                    )
+                    .map_err(|e| e.to_string())?;
             }
         }
 
@@ -718,12 +718,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     /// Get the LLVM type for a MIR type, using the cached struct/sum type layouts.
     pub(crate) fn llvm_type(&self, ty: &MirType) -> inkwell::types::BasicTypeEnum<'ctx> {
-        llvm_type(
-            self.context,
-            ty,
-            &self.struct_types,
-            &self.sum_type_layouts,
-        )
+        llvm_type(self.context, ty, &self.struct_types, &self.sum_type_layouts)
     }
 
     /// Get the current function being compiled.
@@ -744,7 +739,8 @@ impl<'ctx> CodeGen<'ctx> {
         name: &str,
     ) -> Result<PointerValue<'ctx>, String> {
         let fn_val = self.current_function();
-        let entry_bb = fn_val.get_first_basic_block()
+        let entry_bb = fn_val
+            .get_first_basic_block()
             .ok_or("Function has no entry block")?;
 
         // Save the current insertion point.
@@ -759,7 +755,10 @@ impl<'ctx> CodeGen<'ctx> {
             self.builder.position_at_end(entry_bb);
         }
 
-        let alloca = self.builder.build_alloca(ty, name).map_err(|e| e.to_string())?;
+        let alloca = self
+            .builder
+            .build_alloca(ty, name)
+            .map_err(|e| e.to_string())?;
 
         // Restore the original insertion point.
         if let Some(bb) = current_bb {
@@ -774,8 +773,8 @@ impl<'ctx> CodeGen<'ctx> {
 mod tests {
     use super::*;
     use crate::mir::{
-        BinOp, MirExpr, MirLiteral, MirMatchArm, MirModule, MirPattern,
-        MirStructDef, MirSumTypeDef, MirType, MirVariantDef, UnaryOp,
+        BinOp, MirExpr, MirLiteral, MirMatchArm, MirModule, MirPattern, MirStructDef,
+        MirSumTypeDef, MirType, MirVariantDef, UnaryOp,
     };
 
     fn empty_mir_module() -> MirModule {
@@ -902,11 +901,7 @@ mod tests {
     }
 
     /// Helper: compile a function with parameters (to avoid constant folding).
-    fn compile_fn_to_ir(
-        params: Vec<(String, MirType)>,
-        body: MirExpr,
-        ret_ty: MirType,
-    ) -> String {
+    fn compile_fn_to_ir(params: Vec<(String, MirType)>, body: MirExpr, ret_ty: MirType) -> String {
         let mir = MirModule {
             functions: vec![MirFunction {
                 name: "test_fn".to_string(),
@@ -992,20 +987,17 @@ mod tests {
             operand: Box::new(MirExpr::Var("b".to_string(), MirType::Bool)),
             ty: MirType::Bool,
         };
-        let ir = compile_fn_to_ir(
-            vec![("b".to_string(), MirType::Bool)],
-            body,
-            MirType::Bool,
-        );
+        let ir = compile_fn_to_ir(vec![("b".to_string(), MirType::Bool)], body, MirType::Bool);
         assert!(ir.contains("xor i1"), "Should contain xor for not: {}", ir);
     }
 
     #[test]
     fn test_string_literal_calls_mesh_string_new() {
         let body = MirExpr::Block(
-            vec![
-                MirExpr::StringLit("hello world".to_string(), MirType::String),
-            ],
+            vec![MirExpr::StringLit(
+                "hello world".to_string(),
+                MirType::String,
+            )],
             MirType::String,
         );
         let ir = compile_expr_to_ir(body, MirType::String);
@@ -1025,7 +1017,11 @@ mod tests {
             ty: MirType::Int,
         };
         let ir = compile_expr_to_ir(body, MirType::Int);
-        assert!(ir.contains("br i1"), "Should have conditional branch: {}", ir);
+        assert!(
+            ir.contains("br i1"),
+            "Should have conditional branch: {}",
+            ir
+        );
         assert!(ir.contains("then"), "Should have then block: {}", ir);
         assert!(ir.contains("else"), "Should have else block: {}", ir);
         assert!(ir.contains("if_merge"), "Should have merge block: {}", ir);
@@ -1146,9 +1142,15 @@ mod tests {
         codegen.compile(&mir).unwrap();
 
         let ir = codegen.get_llvm_ir();
-        assert!(ir.contains("mesh_string_new"), "Should call mesh_string_new");
+        assert!(
+            ir.contains("mesh_string_new"),
+            "Should call mesh_string_new"
+        );
         assert!(ir.contains("mesh_println"), "Should call mesh_println");
-        assert!(ir.contains("Hello, world!"), "Should contain string literal");
+        assert!(
+            ir.contains("Hello, world!"),
+            "Should contain string literal"
+        );
     }
 
     #[test]
@@ -1215,10 +1217,7 @@ mod tests {
                             pattern: MirPattern::Constructor {
                                 type_name: "Option".to_string(),
                                 variant: "Some".to_string(),
-                                fields: vec![MirPattern::Var(
-                                    "x".to_string(),
-                                    MirType::Int,
-                                )],
+                                fields: vec![MirPattern::Var("x".to_string(), MirType::Int)],
                                 bindings: vec![("x".to_string(), MirType::Int)],
                             },
                             guard: None,
@@ -1266,7 +1265,11 @@ mod tests {
         codegen.compile(&mir).unwrap();
 
         let ir = codegen.get_llvm_ir();
-        assert!(ir.contains("switch i8"), "Should have switch on tag: {}", ir);
+        assert!(
+            ir.contains("switch i8"),
+            "Should have switch on tag: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1288,17 +1291,11 @@ mod tests {
                 MirFunction {
                     name: "test_fn".to_string(),
                     params: vec![],
-                    return_type: MirType::Closure(
-                        vec![MirType::Int],
-                        Box::new(MirType::Int),
-                    ),
+                    return_type: MirType::Closure(vec![MirType::Int], Box::new(MirType::Int)),
                     body: MirExpr::MakeClosure {
                         fn_name: "__closure_0".to_string(),
                         captures: vec![],
-                        ty: MirType::Closure(
-                            vec![MirType::Int],
-                            Box::new(MirType::Int),
-                        ),
+                        ty: MirType::Closure(vec![MirType::Int], Box::new(MirType::Int)),
                     },
                     is_closure_fn: false,
                     captures: vec![],
@@ -1345,7 +1342,11 @@ mod tests {
             body,
             MirType::Bool,
         );
-        assert!(ir.contains("icmp slt"), "Should contain signed less-than: {}", ir);
+        assert!(
+            ir.contains("icmp slt"),
+            "Should contain signed less-than: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1355,12 +1356,12 @@ mod tests {
             operand: Box::new(MirExpr::Var("x".to_string(), MirType::Int)),
             ty: MirType::Int,
         };
-        let ir = compile_fn_to_ir(
-            vec![("x".to_string(), MirType::Int)],
-            body,
-            MirType::Int,
+        let ir = compile_fn_to_ir(vec![("x".to_string(), MirType::Int)], body, MirType::Int);
+        assert!(
+            ir.contains("sub i64 0"),
+            "Should contain int negation: {}",
+            ir
         );
-        assert!(ir.contains("sub i64 0"), "Should contain int negation: {}", ir);
     }
 
     #[test]
@@ -1384,7 +1385,9 @@ mod tests {
                     name: "my_actor".to_string(),
                     params: vec![("n".to_string(), MirType::Int)],
                     return_type: MirType::Pid(None),
-                    body: MirExpr::ActorSelf { ty: MirType::Pid(None) },
+                    body: MirExpr::ActorSelf {
+                        ty: MirType::Pid(None),
+                    },
                     is_closure_fn: false,
                     captures: vec![],
                     has_tail_calls: false,
@@ -1547,7 +1550,9 @@ mod tests {
     #[test]
     fn test_pid_is_i64_in_ir() {
         // Verify that Pid type maps to i64 in the generated IR
-        let body = MirExpr::ActorSelf { ty: MirType::Pid(None) };
+        let body = MirExpr::ActorSelf {
+            ty: MirType::Pid(None),
+        };
         let ir = compile_expr_to_ir(body, MirType::Pid(None));
         // mesh_actor_self returns i64
         assert!(
@@ -1569,10 +1574,7 @@ mod tests {
             priority: 1,
             terminate_callback: Some(Box::new(MirExpr::Var(
                 "__terminate_my_actor".to_string(),
-                MirType::FnPtr(
-                    vec![MirType::Ptr, MirType::Ptr],
-                    Box::new(MirType::Unit),
-                ),
+                MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Unit)),
             ))),
             ty: MirType::Pid(None),
         };
@@ -1583,7 +1585,9 @@ mod tests {
                     name: "my_actor".to_string(),
                     params: vec![],
                     return_type: MirType::Pid(None),
-                    body: MirExpr::ActorSelf { ty: MirType::Pid(None) },
+                    body: MirExpr::ActorSelf {
+                        ty: MirType::Pid(None),
+                    },
                     is_closure_fn: false,
                     captures: vec![],
                     has_tail_calls: false,
@@ -1668,9 +1672,21 @@ mod tests {
             ty: MirType::Unit,
         };
         let ir = compile_expr_to_ir(body, MirType::Unit);
-        assert!(ir.contains("while_cond"), "Should have while_cond block: {}", ir);
-        assert!(ir.contains("while_body"), "Should have while_body block: {}", ir);
-        assert!(ir.contains("while_merge"), "Should have while_merge block: {}", ir);
+        assert!(
+            ir.contains("while_cond"),
+            "Should have while_cond block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("while_body"),
+            "Should have while_body block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("while_merge"),
+            "Should have while_merge block: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1698,9 +1714,17 @@ mod tests {
             ty: MirType::Unit,
         };
         let ir = compile_expr_to_ir(body, MirType::Unit);
-        assert!(ir.contains("while_merge"), "Should have while_merge block: {}", ir);
+        assert!(
+            ir.contains("while_merge"),
+            "Should have while_merge block: {}",
+            ir
+        );
         // Break should branch to while_merge
-        assert!(ir.contains("br label %while_merge"), "Break should branch to while_merge: {}", ir);
+        assert!(
+            ir.contains("br label %while_merge"),
+            "Break should branch to while_merge: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1734,10 +1758,26 @@ mod tests {
             ty: MirType::Ptr,
         };
         let ir = compile_expr_to_ir(body, MirType::Ptr);
-        assert!(ir.contains("forin_header"), "Should have forin_header block: {}", ir);
-        assert!(ir.contains("forin_body"), "Should have forin_body block: {}", ir);
-        assert!(ir.contains("forin_latch"), "Should have forin_latch block: {}", ir);
-        assert!(ir.contains("forin_merge"), "Should have forin_merge block: {}", ir);
+        assert!(
+            ir.contains("forin_header"),
+            "Should have forin_header block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("forin_body"),
+            "Should have forin_body block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("forin_latch"),
+            "Should have forin_latch block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("forin_merge"),
+            "Should have forin_merge block: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1823,10 +1863,26 @@ mod tests {
             ty: MirType::Ptr,
         };
         let ir = compile_expr_to_ir(body, MirType::Ptr);
-        assert!(ir.contains("forin_header"), "Should have forin_header block: {}", ir);
-        assert!(ir.contains("forin_body"), "Should have forin_body block: {}", ir);
-        assert!(ir.contains("forin_latch"), "Should have forin_latch block: {}", ir);
-        assert!(ir.contains("forin_merge"), "Should have forin_merge block: {}", ir);
+        assert!(
+            ir.contains("forin_header"),
+            "Should have forin_header block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("forin_body"),
+            "Should have forin_body block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("forin_latch"),
+            "Should have forin_latch block: {}",
+            ir
+        );
+        assert!(
+            ir.contains("forin_merge"),
+            "Should have forin_merge block: {}",
+            ir
+        );
         assert!(
             ir.contains("mesh_list_length"),
             "Should call mesh_list_length: {}",
@@ -2070,10 +2126,6 @@ mod tests {
         );
 
         // Should have add instruction for pair.x + pair.y.
-        assert!(
-            ir.contains("add i64"),
-            "Should add pair.x + pair.y: {}",
-            ir
-        );
+        assert!(ir.contains("add i64"), "Should add pair.x + pair.y: {}", ir);
     }
 }

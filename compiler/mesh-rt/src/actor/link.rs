@@ -187,7 +187,11 @@ pub(crate) fn decode_reason(data: &[u8]) -> Option<(ExitReason, usize)> {
 
 /// Encode a DOWN message for monitor notification.
 /// Layout: [u64 monitor_ref][u64 monitored_pid][reason bytes via encode_reason]
-pub fn encode_down_signal(monitor_ref: u64, monitored_pid: ProcessId, reason: &ExitReason) -> Vec<u8> {
+pub fn encode_down_signal(
+    monitor_ref: u64,
+    monitored_pid: ProcessId,
+    reason: &ExitReason,
+) -> Vec<u8> {
     let mut data = Vec::new();
     data.extend_from_slice(&monitor_ref.to_le_bytes());
     data.extend_from_slice(&monitored_pid.0.to_le_bytes());
@@ -242,10 +246,8 @@ where
                 }
             } else {
                 // Crash the linked process with a Linked exit reason.
-                proc.state = ProcessState::Exited(ExitReason::Linked(
-                    exiting_pid,
-                    Box::new(reason.clone()),
-                ));
+                proc.state =
+                    ProcessState::Exited(ExitReason::Linked(exiting_pid, Box::new(reason.clone())));
             }
         }
     }
@@ -515,13 +517,18 @@ mod tests {
         };
 
         let proc_b_clone = Arc::clone(&proc_b);
-        propagate_exit(pid_a, &ExitReason::Error("crash".to_string()), linked, |pid| {
-            if pid == pid_b {
-                Some(Arc::clone(&proc_b_clone))
-            } else {
-                None
-            }
-        });
+        propagate_exit(
+            pid_a,
+            &ExitReason::Error("crash".to_string()),
+            linked,
+            |pid| {
+                if pid == pid_b {
+                    Some(Arc::clone(&proc_b_clone))
+                } else {
+                    None
+                }
+            },
+        );
 
         // Should still be Normal exited, not overwritten.
         assert!(matches!(
@@ -671,7 +678,8 @@ mod tests {
     fn test_encode_decode_roundtrip_linked() {
         let pid = ProcessId(500);
         let inner_pid = ProcessId(501);
-        let reason = ExitReason::Linked(inner_pid, Box::new(ExitReason::Error("crash".to_string())));
+        let reason =
+            ExitReason::Linked(inner_pid, Box::new(ExitReason::Error("crash".to_string())));
         let data = encode_exit_signal(pid, &reason);
         let (decoded_pid, decoded_reason) = decode_exit_signal(&data).unwrap();
         assert_eq!(decoded_pid, pid);

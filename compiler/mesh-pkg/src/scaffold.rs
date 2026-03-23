@@ -98,10 +98,7 @@ mod tests {
         let main_path = tmp.path().join("hello").join("main.mpl");
         let content = std::fs::read_to_string(&main_path).unwrap();
         assert!(content.contains("fn main()"), "Should have main function");
-        assert!(
-            content.contains("IO.puts"),
-            "Should have IO.puts call"
-        );
+        assert!(content.contains("IO.puts"), "Should have IO.puts call");
     }
 
     #[test]

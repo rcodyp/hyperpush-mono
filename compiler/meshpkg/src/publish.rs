@@ -25,12 +25,21 @@ pub fn run(project_dir: &Path, registry: &str, json_mode: bool) -> Result<(), St
     let msg = format!("Publishing {}@{}...", name, version);
     let description = manifest.package.description.as_deref().unwrap_or("");
     with_spinner(&msg, json_mode, || {
-        upload_tarball(&tarball_bytes, &sha256, name, version, description, registry)
+        upload_tarball(
+            &tarball_bytes,
+            &sha256,
+            name,
+            version,
+            description,
+            registry,
+        )
     })?;
 
     if json_mode {
-        println!("{{\"status\": \"ok\", \"name\": \"{}\", \"version\": \"{}\", \"sha256\": \"{}\"}}",
-            name, version, sha256);
+        println!(
+            "{{\"status\": \"ok\", \"name\": \"{}\", \"version\": \"{}\", \"sha256\": \"{}\"}}",
+            name, version, sha256
+        );
     } else {
         println!("{} Published {}@{}", "✓".green().bold(), name, version);
         println!("  SHA-256: {}", sha256);
@@ -47,7 +56,8 @@ fn create_tarball(project_dir: &Path, _manifest: &Manifest) -> Result<(Vec<u8>, 
 
         // Add mesh.toml at archive root (no prefix directory)
         let mesh_toml = project_dir.join("mesh.toml");
-        archive.append_path_with_name(&mesh_toml, "mesh.toml")
+        archive
+            .append_path_with_name(&mesh_toml, "mesh.toml")
             .map_err(|e| format!("Failed to add mesh.toml to tarball: {}", e))?;
 
         // Add root-level .mpl files (package source — e.g. slug.mpl, main.mpl)
@@ -62,7 +72,8 @@ fn create_tarball(project_dir: &Path, _manifest: &Manifest) -> Result<(Vec<u8>, 
                     if ext == "mpl" {
                         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                         if !name.ends_with(".test.mpl") {
-                            archive.append_path_with_name(&path, name)
+                            archive
+                                .append_path_with_name(&path, name)
                                 .map_err(|e| format!("Failed to add {} to tarball: {}", name, e))?;
                         }
                     }
@@ -73,11 +84,13 @@ fn create_tarball(project_dir: &Path, _manifest: &Manifest) -> Result<(Vec<u8>, 
         // Add src/ directory at archive root
         let src_dir = project_dir.join("src");
         if src_dir.exists() {
-            archive.append_dir_all("src", &src_dir)
+            archive
+                .append_dir_all("src", &src_dir)
                 .map_err(|e| format!("Failed to add src/ to tarball: {}", e))?;
         }
 
-        archive.into_inner()
+        archive
+            .into_inner()
             .map_err(|e| format!("Failed to finalize tarball: {}", e))?
             .finish()
             .map_err(|e| format!("Failed to flush gzip stream: {}", e))?;
@@ -117,7 +130,10 @@ fn upload_tarball(
 
     match response.status().as_u16() {
         200 | 201 => Ok(()),
-        409 => Err(format!("{}@{} already exists in registry. Versions are immutable.", name, version)),
+        409 => Err(format!(
+            "{}@{} already exists in registry. Versions are immutable.",
+            name, version
+        )),
         401 => Err("Unauthorized. Run `meshpkg login` to authenticate.".to_string()),
         status => Err(format!("Registry returned HTTP {}", status)),
     }

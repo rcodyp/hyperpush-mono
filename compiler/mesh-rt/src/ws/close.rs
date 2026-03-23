@@ -162,7 +162,11 @@ mod tests {
     fn test_build_close_truncates_reason() {
         let long_reason = "x".repeat(200);
         let payload = build_close_payload(1000, &long_reason);
-        assert_eq!(payload.len(), 125, "payload should be capped at 125 bytes (2 + 123)");
+        assert_eq!(
+            payload.len(),
+            125,
+            "payload should be capped at 125 bytes (2 + 123)"
+        );
         assert_eq!(&payload[..2], &[0x03, 0xE8]);
     }
 
@@ -219,11 +223,17 @@ mod tests {
         };
         let mut writer = Vec::new();
         let result = process_frame(&mut writer, frame);
-        assert!(result.is_err(), "close frame should return Err to signal connection end");
+        assert!(
+            result.is_err(),
+            "close frame should return Err to signal connection end"
+        );
         assert_eq!(result.unwrap_err(), "close");
 
         // Verify the echoed close frame was written
-        assert!(!writer.is_empty(), "should have written an echo close frame");
+        assert!(
+            !writer.is_empty(),
+            "should have written an echo close frame"
+        );
         let mut cursor = Cursor::new(writer);
         let echo_frame = read_frame(&mut cursor).unwrap();
         assert_eq!(echo_frame.opcode, WsOpcode::Close);
@@ -241,7 +251,10 @@ mod tests {
         let mut writer = Vec::new();
         let result = process_frame(&mut writer, frame);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_none(), "ping should return None (handled internally)");
+        assert!(
+            result.unwrap().is_none(),
+            "ping should return None (handled internally)"
+        );
 
         // Verify a pong frame was written with the same payload
         assert!(!writer.is_empty(), "should have written a pong frame");
@@ -268,7 +281,11 @@ mod tests {
         let close_frame = read_frame(&mut cursor).unwrap();
         assert_eq!(close_frame.opcode, WsOpcode::Close);
         let (code, reason) = parse_close_payload(&close_frame.payload);
-        assert_eq!(code, WsCloseCode::INVALID_DATA, "should send close code 1007");
+        assert_eq!(
+            code,
+            WsCloseCode::INVALID_DATA,
+            "should send close code 1007"
+        );
         assert_eq!(reason, "invalid UTF-8");
     }
 }

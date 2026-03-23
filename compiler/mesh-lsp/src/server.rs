@@ -156,8 +156,7 @@ impl LanguageServer for MeshBackend {
             None => return Ok(None),
         };
 
-        let type_info =
-            analysis::type_at_position(&doc.source, &doc.analysis.typeck, &position);
+        let type_info = analysis::type_at_position(&doc.source, &doc.analysis.typeck, &position);
 
         match type_info {
             Some(ty_str) => Ok(Some(Hover {
@@ -206,10 +205,10 @@ impl LanguageServer for MeshBackend {
         // source byte offsets, then to LSP positions.
         let start_tree: usize = def_range.start().into();
         let end_tree: usize = def_range.end().into();
-        let start_source = crate::definition::tree_to_source_offset(&doc.source, start_tree)
-            .unwrap_or(start_tree);
-        let end_source = crate::definition::tree_to_source_offset(&doc.source, end_tree)
-            .unwrap_or(end_tree);
+        let start_source =
+            crate::definition::tree_to_source_offset(&doc.source, start_tree).unwrap_or(start_tree);
+        let end_source =
+            crate::definition::tree_to_source_offset(&doc.source, end_tree).unwrap_or(end_tree);
         let start = analysis::offset_to_position(&doc.source, start_source);
         let end = analysis::offset_to_position(&doc.source, end_source);
 
@@ -239,15 +238,8 @@ impl LanguageServer for MeshBackend {
         Ok(Some(DocumentSymbolResponse::Nested(symbols)))
     }
 
-    async fn completion(
-        &self,
-        params: CompletionParams,
-    ) -> Result<Option<CompletionResponse>> {
-        let uri_str = params
-            .text_document_position
-            .text_document
-            .uri
-            .to_string();
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri_str = params.text_document_position.text_document.uri.to_string();
         let position = params.text_document_position.position;
 
         let docs = self.documents.lock().unwrap();
@@ -256,11 +248,7 @@ impl LanguageServer for MeshBackend {
             None => return Ok(None),
         };
 
-        let items = crate::completion::compute_completions(
-            &doc.source,
-            &doc.analysis,
-            &position,
-        );
+        let items = crate::completion::compute_completions(&doc.source, &doc.analysis, &position);
 
         if items.is_empty() {
             Ok(None)
@@ -269,10 +257,7 @@ impl LanguageServer for MeshBackend {
         }
     }
 
-    async fn signature_help(
-        &self,
-        params: SignatureHelpParams,
-    ) -> Result<Option<SignatureHelp>> {
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
         let uri_str = params
             .text_document_position_params
             .text_document
@@ -293,10 +278,7 @@ impl LanguageServer for MeshBackend {
         ))
     }
 
-    async fn formatting(
-        &self,
-        params: DocumentFormattingParams,
-    ) -> Result<Option<Vec<TextEdit>>> {
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
         let uri_str = params.text_document.uri.to_string();
         let docs = self.documents.lock().unwrap();
         let doc = match docs.get(&uri_str) {
@@ -409,12 +391,13 @@ fn collect_symbols(source: &str, node: &SyntaxNode) -> Vec<DocumentSymbol> {
             SyntaxKind::IMPL_DEF => {
                 // IMPL_DEF has no NAME child; extract name from PATH child.
                 let impl_name = extract_impl_name(&child);
-                let sel_node = child
-                    .children()
-                    .find(|n| n.kind() == SyntaxKind::PATH);
-                if let Some(mut sym) =
-                    make_symbol(source, &child, SymbolKind::OBJECT, Some((&impl_name, sel_node.as_ref())))
-                {
+                let sel_node = child.children().find(|n| n.kind() == SyntaxKind::PATH);
+                if let Some(mut sym) = make_symbol(
+                    source,
+                    &child,
+                    SymbolKind::OBJECT,
+                    Some((&impl_name, sel_node.as_ref())),
+                ) {
                     let block = child.children().find(|n| n.kind() == SyntaxKind::BLOCK);
                     if let Some(block) = block {
                         let children = collect_symbols(source, &block);
@@ -512,10 +495,8 @@ fn make_symbol(
     let node_range = node.text_range();
     let range_start_tree: usize = node_range.start().into();
     let range_end_tree: usize = node_range.end().into();
-    let range_start_source =
-        crate::definition::tree_to_source_offset(source, range_start_tree)?;
-    let range_end_source =
-        crate::definition::tree_to_source_offset(source, range_end_tree)?;
+    let range_start_source = crate::definition::tree_to_source_offset(source, range_start_tree)?;
+    let range_end_source = crate::definition::tree_to_source_offset(source, range_end_tree)?;
 
     let range = Range::new(
         analysis::offset_to_position(source, range_start_source),
@@ -528,10 +509,8 @@ fn make_symbol(
         let sel_text_range = sel_node.text_range();
         let sel_start_tree: usize = sel_text_range.start().into();
         let sel_end_tree: usize = sel_text_range.end().into();
-        let sel_start_source =
-            crate::definition::tree_to_source_offset(source, sel_start_tree)?;
-        let sel_end_source =
-            crate::definition::tree_to_source_offset(source, sel_end_tree)?;
+        let sel_start_source = crate::definition::tree_to_source_offset(source, sel_start_tree)?;
+        let sel_end_source = crate::definition::tree_to_source_offset(source, sel_end_tree)?;
         Range::new(
             analysis::offset_to_position(source, sel_start_source),
             analysis::offset_to_position(source, sel_end_source),
@@ -542,10 +521,8 @@ fn make_symbol(
         let name_text_range = name_node.text_range();
         let sel_start_tree: usize = name_text_range.start().into();
         let sel_end_tree: usize = name_text_range.end().into();
-        let sel_start_source =
-            crate::definition::tree_to_source_offset(source, sel_start_tree)?;
-        let sel_end_source =
-            crate::definition::tree_to_source_offset(source, sel_end_tree)?;
+        let sel_start_source = crate::definition::tree_to_source_offset(source, sel_start_tree)?;
+        let sel_end_source = crate::definition::tree_to_source_offset(source, sel_end_tree)?;
         Range::new(
             analysis::offset_to_position(source, sel_start_source),
             analysis::offset_to_position(source, sel_end_source),

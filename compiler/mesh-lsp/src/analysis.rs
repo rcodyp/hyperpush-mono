@@ -79,10 +79,7 @@ pub fn offset_to_position(source: &str, offset: usize) -> Position {
     let line_text = &source[line_start..offset];
 
     // Count UTF-16 code units for LSP spec compliance.
-    let character: u32 = line_text
-        .chars()
-        .map(|c| c.len_utf16() as u32)
-        .sum();
+    let character: u32 = line_text.chars().map(|c| c.len_utf16() as u32).sum();
 
     Position { line, character }
 }
@@ -270,7 +267,11 @@ mod tests {
         assert!(
             result.diagnostics.is_empty(),
             "Valid source should produce no diagnostics, got: {:?}",
-            result.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+            result
+                .diagnostics
+                .iter()
+                .map(|d| &d.message)
+                .collect::<Vec<_>>()
         );
     }
 
@@ -281,7 +282,11 @@ mod tests {
         assert!(
             result.diagnostics.is_empty(),
             "Valid function should produce no diagnostics, got: {:?}",
-            result.diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+            result
+                .diagnostics
+                .iter()
+                .map(|d| &d.message)
+                .collect::<Vec<_>>()
         );
     }
 
@@ -351,7 +356,14 @@ mod tests {
         // the hover might not work correctly for all positions due to the
         // whitespace coordinate mismatch (pre-existing issue).
         // We test with line 0, character 0 which should be in the LET_BINDING range.
-        let ty = type_at_position(source, &result.typeck, &Position { line: 0, character: 0 });
+        let ty = type_at_position(
+            source,
+            &result.typeck,
+            &Position {
+                line: 0,
+                character: 0,
+            },
+        );
         // May return Some("Int") or None depending on what range the typeck stored.
         // At minimum, verify it doesn't panic.
         let _ = ty;
@@ -363,7 +375,14 @@ mod tests {
         let source = "let x = 42";
         let result = analyze_document("file:///test.mpl", source);
         // Position past end of source.
-        let ty = type_at_position(source, &result.typeck, &Position { line: 5, character: 0 });
+        let ty = type_at_position(
+            source,
+            &result.typeck,
+            &Position {
+                line: 5,
+                character: 0,
+            },
+        );
         assert!(ty.is_none(), "Hover past end should return None");
     }
 
@@ -397,7 +416,8 @@ mod tests {
         let def = crate::definition::find_definition(source, &root, second_count);
         assert!(def.is_some(), "Should find definition of count");
         let range = def.unwrap();
-        let def_source = crate::definition::tree_to_source_offset(source, range.start().into()).unwrap();
+        let def_source =
+            crate::definition::tree_to_source_offset(source, range.start().into()).unwrap();
         // "let count" -- "count" starts at offset 4.
         assert_eq!(def_source, 4);
     }
@@ -412,9 +432,13 @@ mod tests {
         let def = crate::definition::find_definition(source, &root, x_use);
         assert!(def.is_some(), "Should find inner x definition");
         let range = def.unwrap();
-        let def_source = crate::definition::tree_to_source_offset(source, range.start().into()).unwrap();
+        let def_source =
+            crate::definition::tree_to_source_offset(source, range.start().into()).unwrap();
         let inner_x = source.find("let x = 2").unwrap() + "let ".len();
-        assert_eq!(def_source, inner_x, "Should resolve to inner binding, not outer");
+        assert_eq!(
+            def_source, inner_x,
+            "Should resolve to inner binding, not outer"
+        );
     }
 
     #[test]
@@ -438,7 +462,10 @@ mod tests {
         // so it won't resolve to anything (it IS the definition).
         let def = crate::definition::find_definition(source, &root, point_offset);
         // This should return None since the user is clicking on the definition itself.
-        assert!(def.is_none(), "Clicking on definition site should return None");
+        assert!(
+            def.is_none(),
+            "Clicking on definition site should return None"
+        );
     }
 
     // ── Position Conversion Tests ─────────────────────────────────────────
@@ -447,10 +474,22 @@ mod tests {
     fn offset_to_position_first_line() {
         let source = "hello world";
         let pos = offset_to_position(source, 0);
-        assert_eq!(pos, Position { line: 0, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
 
         let pos = offset_to_position(source, 5);
-        assert_eq!(pos, Position { line: 0, character: 5 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 0,
+                character: 5
+            }
+        );
     }
 
     #[test]
@@ -458,39 +497,108 @@ mod tests {
         let source = "line1\nline2\nline3";
         // 'l' of line2 is at offset 6
         let pos = offset_to_position(source, 6);
-        assert_eq!(pos, Position { line: 1, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
 
         // 'l' of line3 is at offset 12
         let pos = offset_to_position(source, 12);
-        assert_eq!(pos, Position { line: 2, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 2,
+                character: 0
+            }
+        );
 
         // 'i' of line2 is at offset 7
         let pos = offset_to_position(source, 7);
-        assert_eq!(pos, Position { line: 1, character: 1 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 1
+            }
+        );
     }
 
     #[test]
     fn offset_to_position_at_end() {
         let source = "ab\ncd";
         let pos = offset_to_position(source, 5);
-        assert_eq!(pos, Position { line: 1, character: 2 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 2
+            }
+        );
     }
 
     #[test]
     fn position_to_offset_single_line() {
         let source = "hello";
-        assert_eq!(position_to_offset(source, &Position { line: 0, character: 0 }), Some(0));
-        assert_eq!(position_to_offset(source, &Position { line: 0, character: 3 }), Some(3));
-        assert_eq!(position_to_offset(source, &Position { line: 0, character: 5 }), Some(5));
+        assert_eq!(
+            position_to_offset(
+                source,
+                &Position {
+                    line: 0,
+                    character: 0
+                }
+            ),
+            Some(0)
+        );
+        assert_eq!(
+            position_to_offset(
+                source,
+                &Position {
+                    line: 0,
+                    character: 3
+                }
+            ),
+            Some(3)
+        );
+        assert_eq!(
+            position_to_offset(
+                source,
+                &Position {
+                    line: 0,
+                    character: 5
+                }
+            ),
+            Some(5)
+        );
     }
 
     #[test]
     fn position_to_offset_multiline() {
         let source = "abc\ndef\nghi";
         // First char of line 2 (0-indexed) at (1, 0).
-        assert_eq!(position_to_offset(source, &Position { line: 1, character: 0 }), Some(4));
+        assert_eq!(
+            position_to_offset(
+                source,
+                &Position {
+                    line: 1,
+                    character: 0
+                }
+            ),
+            Some(4)
+        );
         // First char of line 3 at (2, 0).
-        assert_eq!(position_to_offset(source, &Position { line: 2, character: 0 }), Some(8));
+        assert_eq!(
+            position_to_offset(
+                source,
+                &Position {
+                    line: 2,
+                    character: 0
+                }
+            ),
+            Some(8)
+        );
     }
 
     #[test]
@@ -512,7 +620,13 @@ mod tests {
     #[test]
     fn position_past_eof_returns_none() {
         let source = "hello";
-        let result = position_to_offset(source, &Position { line: 5, character: 0 });
+        let result = position_to_offset(
+            source,
+            &Position {
+                line: 5,
+                character: 0,
+            },
+        );
         assert!(result.is_none(), "Position past EOF should return None");
     }
 
@@ -530,9 +644,18 @@ mod tests {
             }
             let src_start = token.span.start as usize;
             let tree = crate::definition::source_to_tree_offset(source, src_start);
-            assert!(tree.is_some(), "source_to_tree_offset should succeed for offset {}", src_start);
+            assert!(
+                tree.is_some(),
+                "source_to_tree_offset should succeed for offset {}",
+                src_start
+            );
             let back = crate::definition::tree_to_source_offset(source, tree.unwrap());
-            assert_eq!(back, Some(src_start), "Roundtrip failed for source offset {}", src_start);
+            assert_eq!(
+                back,
+                Some(src_start),
+                "Roundtrip failed for source offset {}",
+                src_start
+            );
         }
     }
 }

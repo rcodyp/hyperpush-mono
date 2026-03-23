@@ -88,7 +88,9 @@ pub fn set_stack_base(base: *const u8) {
 /// is set). Panics if called outside of a coroutine context.
 pub fn yield_current() {
     CURRENT_YIELDER.with(|c| {
-        let ptr = c.get().expect("yield_current called outside of coroutine context");
+        let ptr = c
+            .get()
+            .expect("yield_current called outside of coroutine context");
         // Safety: The pointer is valid because we are inside the coroutine body
         // that set it, and the Yielder is borrowed for the duration of the body.
         let yielder: &Yielder<(), ()> = unsafe { &*(ptr as *const Yielder<(), ()>) };

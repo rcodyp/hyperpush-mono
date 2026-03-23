@@ -542,7 +542,7 @@ pub(crate) fn parse_type(p: &mut Parser) {
         let m = p.open();
         p.advance(); // Fun
         p.advance(); // (
-        // Parse comma-separated parameter types (may be empty for Fun() -> T)
+                     // Parse comma-separated parameter types (may be empty for Fun() -> T)
         if !p.at(SyntaxKind::R_PAREN) {
             parse_type(p);
             while p.eat(SyntaxKind::COMMA) {
@@ -596,19 +596,18 @@ pub(crate) fn parse_type(p: &mut Parser) {
     // Option sugar: Type? => OPTION_TYPE wrapping the base type
     if p.at(SyntaxKind::QUESTION) {
         p.advance(); // ?
-        // The QUESTION token is emitted; the type checker will interpret
-        // the preceding type + QUESTION as Option<Type>.
+                     // The QUESTION token is emitted; the type checker will interpret
+                     // the preceding type + QUESTION as Option<Type>.
     }
 
     // Result sugar: Type!ErrorType => RESULT_TYPE wrapping both types
     if p.at(SyntaxKind::BANG) {
         p.advance(); // !
         parse_type(p); // error type
-        // The BANG token followed by another type is emitted; the type checker
-        // will interpret this as Result<Type, ErrorType>.
+                       // The BANG token followed by another type is emitted; the type checker
+                       // will interpret this as Result<Type, ErrorType>.
     }
 }
-
 
 // ── Interface Definition ─────────────────────────────────────────────────
 
@@ -1405,7 +1404,9 @@ fn parse_strategy_clause(p: &mut Parser) {
     if p.at(SyntaxKind::IDENT) {
         p.advance();
     } else {
-        p.error("expected strategy name (one_for_one, one_for_all, rest_for_one, simple_one_for_one)");
+        p.error(
+            "expected strategy name (one_for_one, one_for_all, rest_for_one, simple_one_for_one)",
+        );
     }
 
     p.close(m, SyntaxKind::STRATEGY_CLAUSE);

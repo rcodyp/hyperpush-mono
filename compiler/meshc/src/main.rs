@@ -151,7 +151,11 @@ fn find_project_dir_for_test(test_path: &Path) -> Option<PathBuf> {
     } else {
         std::env::current_dir().ok()?.join(test_path)
     };
-    let mut dir = if abs.is_dir() { abs.clone() } else { abs.parent()?.to_path_buf() };
+    let mut dir = if abs.is_dir() {
+        abs.clone()
+    } else {
+        abs.parent()?.to_path_buf()
+    };
     loop {
         if dir.join("main.mpl").exists() {
             return Some(dir);
@@ -180,9 +184,14 @@ fn main() {
                 color: !no_color && !json,
                 json,
             };
-            if let Err(e) =
-                build(&dir, opt_level, emit_llvm, output.as_deref(), target.as_deref(), &diag_opts)
-            {
+            if let Err(e) = build(
+                &dir,
+                opt_level,
+                emit_llvm,
+                output.as_deref(),
+                target.as_deref(),
+                &diag_opts,
+            ) {
                 if json {
                     // In JSON mode, emit the final error as JSON too.
                     let msg = serde_json::json!({
@@ -227,10 +236,7 @@ fn main() {
                 Ok(stats) => {
                     if check {
                         if stats.unformatted > 0 {
-                            eprintln!(
-                                "{} file(s) would be reformatted",
-                                stats.unformatted
-                            );
+                            eprintln!("{} file(s) would be reformatted", stats.unformatted);
                             process::exit(1);
                         } else {
                             eprintln!("{} file(s) already formatted", stats.total);
@@ -255,13 +261,18 @@ fn main() {
             let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
             rt.block_on(mesh_lsp::run_server());
         }
-        Commands::Test { path, quiet, coverage } => {
+        Commands::Test {
+            path,
+            quiet,
+            coverage,
+        } => {
             // Derive the project root from the test file path (walk up to find main.mpl),
             // falling back to CWD. This prevents copy_project_sources_to_tmp from
             // copying the entire repo when running from a multi-project workspace.
             let project_dir = if let Some(ref p) = path {
-                find_project_dir_for_test(p)
-                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+                find_project_dir_for_test(p).unwrap_or_else(|| {
+                    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                })
             } else {
                 std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
             };
@@ -327,7 +338,9 @@ pub(crate) fn build(
     let project = discovery::build_project(dir)?;
 
     // Find the entry module
-    let entry_id = project.compilation_order.iter()
+    let entry_id = project
+        .compilation_order
+        .iter()
         .copied()
         .find(|id| project.graph.get(*id).is_entry)
         .ok_or("No entry module found in module graph")?;
@@ -386,8 +399,10 @@ pub(crate) fn build(
 
     // Type-check ALL modules in topological order (Phase 39)
     let module_count = project.graph.module_count();
-    let mut all_exports: Vec<Option<mesh_typeck::ExportedSymbols>> = (0..module_count).map(|_| None).collect();
-    let mut all_typeck: Vec<Option<mesh_typeck::TypeckResult>> = (0..module_count).map(|_| None).collect();
+    let mut all_exports: Vec<Option<mesh_typeck::ExportedSymbols>> =
+        (0..module_count).map(|_| None).collect();
+    let mut all_typeck: Vec<Option<mesh_typeck::TypeckResult>> =
+        (0..module_count).map(|_| None).collect();
     let mut has_type_errors = false;
 
     for &id in &project.compilation_order {
@@ -397,12 +412,7 @@ pub(crate) fn build(
         let module_path = dir.join(&project.graph.get(id).path);
 
         // Build ImportContext from already-checked dependencies
-        let mut import_ctx = build_import_context(
-            &project.graph,
-            &all_exports,
-            parse,
-            id,
-        );
+        let mut import_ctx = build_import_context(&project.graph, &all_exports, parse, id);
 
         // Thread current module name for display_prefix on locally-defined types.
         // Multi-module builds set this so type errors show module-qualified names
@@ -447,7 +457,8 @@ pub(crate) fn build(
     for (i, &id) in project.compilation_order.iter().enumerate() {
         let idx = id.0 as usize;
         let parse = &project.module_parses[idx];
-        let typeck = all_typeck[idx].as_ref()
+        let typeck = all_typeck[idx]
+            .as_ref()
             .ok_or("Module was not type-checked")?;
 
         // Build set of pub function names for module-qualified naming (Phase 41)
@@ -466,10 +477,7 @@ pub(crate) fn build(
     let merged_mir = mesh_codegen::merge_mir_modules(mir_modules, entry_mir_idx);
 
     // Determine output path
-    let project_name = dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("output");
+    let project_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("output");
     let output_path = match output {
         Some(p) => p.to_path_buf(),
         None => dir.join(project_name),
@@ -509,8 +517,10 @@ fn build_import_context(
     // Collect ALL trait defs and impls from ALL already-checked modules (XMOD-05)
     for exports_opt in all_exports.iter() {
         if let Some(exports) = exports_opt {
-            ctx.all_trait_defs.extend(exports.trait_defs.iter().cloned());
-            ctx.all_trait_impls.extend(exports.trait_impls.iter().cloned());
+            ctx.all_trait_defs
+                .extend(exports.trait_defs.iter().cloned());
+            ctx.all_trait_impls
+                .extend(exports.trait_impls.iter().cloned());
         }
     }
 
@@ -519,12 +529,8 @@ fn build_import_context(
     let tree = parse.tree();
     for item in tree.items() {
         let segments = match &item {
-            Item::ImportDecl(import_decl) => {
-                import_decl.module_path().map(|p| p.segments())
-            }
-            Item::FromImportDecl(from_import) => {
-                from_import.module_path().map(|p| p.segments())
-            }
+            Item::ImportDecl(import_decl) => import_decl.module_path().map(|p| p.segments()),
+            Item::FromImportDecl(from_import) => from_import.module_path().map(|p| p.segments()),
             _ => None,
         };
 
@@ -615,9 +621,8 @@ fn report_diagnostics(
     // Check for type errors
     for error in &typeck.errors {
         has_errors = true;
-        let rendered = mesh_typeck::diagnostics::render_diagnostic(
-            error, source, &file_name, diag_opts, None,
-        );
+        let rendered =
+            mesh_typeck::diagnostics::render_diagnostic(error, source, &file_name, diag_opts, None);
         eprint!("{}", rendered);
     }
 
@@ -687,10 +692,7 @@ fn fmt_command(
 ) -> Result<FmtStats, String> {
     let files = collect_mesh_files(path)?;
     if files.is_empty() {
-        return Err(format!(
-            "No .mpl files found at '{}'",
-            path.display()
-        ));
+        return Err(format!("No .mpl files found at '{}'", path.display()));
     }
 
     let mut total = 0;
@@ -728,10 +730,7 @@ fn collect_mesh_files(path: &Path) -> Result<Vec<PathBuf>, String> {
         if path.extension().and_then(|e| e.to_str()) == Some("mpl") {
             return Ok(vec![path.to_path_buf()]);
         } else {
-            return Err(format!(
-                "'{}' is not a .mpl file",
-                path.display()
-            ));
+            return Err(format!("'{}' is not a .mpl file", path.display()));
         }
     }
 

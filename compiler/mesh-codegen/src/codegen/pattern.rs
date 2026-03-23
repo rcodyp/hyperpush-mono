@@ -52,92 +52,80 @@ impl<'ctx> CodeGen<'ctx> {
             DecisionTree::Leaf {
                 arm_index,
                 bindings,
-            } => {
-                self.codegen_leaf(
-                    *arm_index,
-                    bindings,
-                    scrutinee_alloca,
-                    scrutinee_ty,
-                    arms,
-                    result_alloca,
-                    merge_bb,
-                )
-            }
+            } => self.codegen_leaf(
+                *arm_index,
+                bindings,
+                scrutinee_alloca,
+                scrutinee_ty,
+                arms,
+                result_alloca,
+                merge_bb,
+            ),
             DecisionTree::Switch {
                 scrutinee_path,
                 cases,
                 default,
-            } => {
-                self.codegen_switch(
-                    scrutinee_path,
-                    cases,
-                    default.as_deref(),
-                    scrutinee_alloca,
-                    scrutinee_ty,
-                    arms,
-                    result_alloca,
-                    merge_bb,
-                )
-            }
+            } => self.codegen_switch(
+                scrutinee_path,
+                cases,
+                default.as_deref(),
+                scrutinee_alloca,
+                scrutinee_ty,
+                arms,
+                result_alloca,
+                merge_bb,
+            ),
             DecisionTree::Test {
                 scrutinee_path,
                 value,
                 success,
                 failure,
-            } => {
-                self.codegen_test(
-                    scrutinee_path,
-                    value,
-                    success,
-                    failure,
-                    scrutinee_alloca,
-                    scrutinee_ty,
-                    arms,
-                    result_alloca,
-                    merge_bb,
-                )
-            }
+            } => self.codegen_test(
+                scrutinee_path,
+                value,
+                success,
+                failure,
+                scrutinee_alloca,
+                scrutinee_ty,
+                arms,
+                result_alloca,
+                merge_bb,
+            ),
             DecisionTree::Guard {
                 guard_expr,
                 success,
                 failure,
-            } => {
-                self.codegen_guard(
-                    guard_expr,
-                    success,
-                    failure,
-                    scrutinee_alloca,
-                    scrutinee_ty,
-                    arms,
-                    result_alloca,
-                    merge_bb,
-                )
-            }
+            } => self.codegen_guard(
+                guard_expr,
+                success,
+                failure,
+                scrutinee_alloca,
+                scrutinee_ty,
+                arms,
+                result_alloca,
+                merge_bb,
+            ),
             DecisionTree::ListDecons {
                 scrutinee_path,
                 elem_ty,
                 non_empty,
                 empty,
-            } => {
-                self.codegen_list_decons(
-                    scrutinee_path,
-                    elem_ty,
-                    non_empty,
-                    empty,
-                    scrutinee_alloca,
-                    scrutinee_ty,
-                    arms,
-                    result_alloca,
-                    merge_bb,
-                )
-            }
+            } => self.codegen_list_decons(
+                scrutinee_path,
+                elem_ty,
+                non_empty,
+                empty,
+                scrutinee_alloca,
+                scrutinee_ty,
+                arms,
+                result_alloca,
+                merge_bb,
+            ),
             DecisionTree::Fail {
                 message,
                 file,
                 line,
-            } => {
-                self.codegen_fail(message, file, *line)
-            }
+            } => self.codegen_fail(message, file, *line),
         }
     }
 
@@ -224,7 +212,13 @@ impl<'ctx> CodeGen<'ctx> {
         // return/panic). The ? operator desugaring generates match arms with
         // MirExpr::Return for early-return paths -- these emit a `ret`
         // instruction that terminates the block, so we must skip the store.
-        if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+        if self
+            .builder
+            .get_insert_block()
+            .unwrap()
+            .get_terminator()
+            .is_none()
+        {
             self.builder
                 .build_store(result_alloca, body_val)
                 .map_err(|e| e.to_string())?;
@@ -252,15 +246,15 @@ impl<'ctx> CodeGen<'ctx> {
         let fn_val = self.current_function();
 
         // Navigate to the value at the access path to get its pointer
-        let switch_ptr = self.navigate_access_path_ptr(scrutinee_alloca, scrutinee_ty, scrutinee_path)?;
+        let switch_ptr =
+            self.navigate_access_path_ptr(scrutinee_alloca, scrutinee_ty, scrutinee_path)?;
 
         // The type at the path should be a sum type -- load the tag (i8 at offset 0)
         let path_ty = self.resolve_path_type(scrutinee_ty, scrutinee_path)?;
         let sum_layout = match &path_ty {
-            MirType::SumType(name) => {
-                self.lookup_sum_type_layout(name)
-                    .ok_or_else(|| format!("Unknown sum type layout '{}'", name))?
-            }
+            MirType::SumType(name) => self
+                .lookup_sum_type_layout(name)
+                .ok_or_else(|| format!("Unknown sum type layout '{}'", name))?,
             _ => return Err(format!("Switch on non-sum type: {:?}", path_ty)),
         };
         let sum_layout = *sum_layout;
@@ -325,11 +319,7 @@ impl<'ctx> CodeGen<'ctx> {
             )?;
         } else {
             // Default: unreachable (exhaustive match guaranteed by type checker)
-            self.codegen_fail(
-                "non-exhaustive match in switch",
-                "<unknown>",
-                0,
-            )?;
+            self.codegen_fail("non-exhaustive match in switch", "<unknown>", 0)?;
         }
 
         Ok(())
@@ -359,7 +349,12 @@ impl<'ctx> CodeGen<'ctx> {
             MirLiteral::Int(n) => {
                 let lit_val = self.context.i64_type().const_int(*n as u64, true);
                 self.builder
-                    .build_int_compare(IntPredicate::EQ, test_val.into_int_value(), lit_val, "test_eq")
+                    .build_int_compare(
+                        IntPredicate::EQ,
+                        test_val.into_int_value(),
+                        lit_val,
+                        "test_eq",
+                    )
                     .map_err(|e| e.to_string())?
             }
             MirLiteral::Float(f) => {
@@ -374,9 +369,17 @@ impl<'ctx> CodeGen<'ctx> {
                     .map_err(|e| e.to_string())?
             }
             MirLiteral::Bool(b) => {
-                let lit_val = self.context.bool_type().const_int(if *b { 1 } else { 0 }, false);
+                let lit_val = self
+                    .context
+                    .bool_type()
+                    .const_int(if *b { 1 } else { 0 }, false);
                 self.builder
-                    .build_int_compare(IntPredicate::EQ, test_val.into_int_value(), lit_val, "test_beq")
+                    .build_int_compare(
+                        IntPredicate::EQ,
+                        test_val.into_int_value(),
+                        lit_val,
+                        "test_beq",
+                    )
                     .map_err(|e| e.to_string())?
             }
             MirLiteral::String(s) => {
@@ -594,12 +597,7 @@ impl<'ctx> CodeGen<'ctx> {
 
     // ── Fail node ────────────────────────────────────────────────────
 
-    fn codegen_fail(
-        &mut self,
-        message: &str,
-        file: &str,
-        line: u32,
-    ) -> Result<(), String> {
+    fn codegen_fail(&mut self, message: &str, file: &str, line: u32) -> Result<(), String> {
         // Emit panic call
         self.codegen_panic(message, file, line)?;
         // codegen_panic already emits unreachable
@@ -687,12 +685,7 @@ impl<'ctx> CodeGen<'ctx> {
                 // GEP into the variant overlay (field 0 is tag, so field N is index+1)
                 let field_ptr = self
                     .builder
-                    .build_struct_gep(
-                        variant_ty,
-                        parent_ptr,
-                        (*index + 1) as u32,
-                        "variant_field",
-                    )
+                    .build_struct_gep(variant_ty, parent_ptr, (*index + 1) as u32, "variant_field")
                     .map_err(|e| e.to_string())?;
                 Ok(field_ptr)
             }
@@ -724,7 +717,8 @@ impl<'ctx> CodeGen<'ctx> {
 
             AccessPath::ListHead(parent) => {
                 // Load the list pointer, call mesh_list_head, store result in an alloca.
-                let parent_val = self.navigate_access_path(scrutinee_alloca, scrutinee_ty, parent)?;
+                let parent_val =
+                    self.navigate_access_path(scrutinee_alloca, scrutinee_ty, parent)?;
                 let list_ptr = parent_val.into_pointer_value();
 
                 let head_fn = get_intrinsic(&self.module, "mesh_list_head");
@@ -739,7 +733,8 @@ impl<'ctx> CodeGen<'ctx> {
                     .into_int_value();
 
                 // Convert u64 -> actual element type based on resolve_path_type.
-                let path_ty = self.resolve_path_type(scrutinee_ty, &AccessPath::ListHead(parent.clone()))?;
+                let path_ty =
+                    self.resolve_path_type(scrutinee_ty, &AccessPath::ListHead(parent.clone()))?;
                 let converted = self.convert_list_elem_from_u64(head_i64, &path_ty)?;
 
                 // Store in an alloca so we can return a pointer.
@@ -756,7 +751,8 @@ impl<'ctx> CodeGen<'ctx> {
 
             AccessPath::ListTail(parent) => {
                 // Load the list pointer, call mesh_list_tail, store result in an alloca.
-                let parent_val = self.navigate_access_path(scrutinee_alloca, scrutinee_ty, parent)?;
+                let parent_val =
+                    self.navigate_access_path(scrutinee_alloca, scrutinee_ty, parent)?;
                 let list_ptr = parent_val.into_pointer_value();
 
                 let tail_fn = get_intrinsic(&self.module, "mesh_list_tail");
@@ -812,7 +808,11 @@ impl<'ctx> CodeGen<'ctx> {
                     .map_err(|e| e.to_string())?;
                 Ok(f64_val)
             }
-            MirType::String | MirType::Ptr | MirType::Struct(_) | MirType::SumType(_) | MirType::Pid(_) => {
+            MirType::String
+            | MirType::Ptr
+            | MirType::Struct(_)
+            | MirType::SumType(_)
+            | MirType::Pid(_) => {
                 let ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
                 let ptr_val = self
                     .builder
@@ -851,9 +851,9 @@ impl<'ctx> CodeGen<'ctx> {
                 let parent_ty = self.resolve_path_type(scrutinee_ty, parent)?;
                 match &parent_ty {
                     MirType::SumType(type_name) => {
-                        let sum_def = self.lookup_sum_type_def(type_name).ok_or_else(|| {
-                            format!("Unknown sum type '{}'", type_name)
-                        })?;
+                        let sum_def = self
+                            .lookup_sum_type_def(type_name)
+                            .ok_or_else(|| format!("Unknown sum type '{}'", type_name))?;
                         let variant = sum_def
                             .variants
                             .iter()
@@ -873,15 +873,19 @@ impl<'ctx> CodeGen<'ctx> {
                 let parent_ty = self.resolve_path_type(scrutinee_ty, parent)?;
                 match &parent_ty {
                     MirType::Struct(struct_name) => {
-                        let fields = self.mir_struct_defs.get(struct_name).ok_or_else(|| {
-                            format!("Unknown struct type '{}'", struct_name)
-                        })?;
+                        let fields = self
+                            .mir_struct_defs
+                            .get(struct_name)
+                            .ok_or_else(|| format!("Unknown struct type '{}'", struct_name))?;
                         fields
                             .iter()
                             .find(|(n, _)| n == field_name)
                             .map(|(_, ty)| ty.clone())
                             .ok_or_else(|| {
-                                format!("Field '{}' not found in struct '{}'", field_name, struct_name)
+                                format!(
+                                    "Field '{}' not found in struct '{}'",
+                                    field_name, struct_name
+                                )
                             })
                     }
                     _ => Err(format!("StructField on non-struct type: {:?}", parent_ty)),

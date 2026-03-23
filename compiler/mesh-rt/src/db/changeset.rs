@@ -20,7 +20,9 @@
 //! |  7   |  56    | action      | i64: 0 = insert, 1 = update   |
 
 use crate::collections::list::{mesh_list_get, mesh_list_length, mesh_list_new};
-use crate::collections::map::{mesh_map_get, mesh_map_has_key, mesh_map_new_typed, mesh_map_put, mesh_map_size};
+use crate::collections::map::{
+    mesh_map_get, mesh_map_has_key, mesh_map_new_typed, mesh_map_put, mesh_map_size,
+};
 use crate::gc::mesh_gc_alloc_actor;
 use crate::string::{mesh_string_new, MeshString};
 
@@ -91,12 +93,12 @@ unsafe fn list_to_strings(list_ptr: *mut u8) -> Vec<String> {
 unsafe fn alloc_changeset() -> *mut u8 {
     let cs = mesh_gc_alloc_actor(CS_SIZE as u64, 8);
     std::ptr::write_bytes(cs, 0, CS_SIZE);
-    cs_set(cs, SLOT_DATA, mesh_map_new_typed(1));       // string-keyed
+    cs_set(cs, SLOT_DATA, mesh_map_new_typed(1)); // string-keyed
     cs_set(cs, SLOT_CHANGES, mesh_map_new_typed(1));
     cs_set(cs, SLOT_ERRORS, mesh_map_new_typed(1));
-    cs_set_int(cs, SLOT_VALID, 1);                      // valid until proven otherwise
+    cs_set_int(cs, SLOT_VALID, 1); // valid until proven otherwise
     cs_set(cs, SLOT_FIELD_TYPES, mesh_list_new());
-    cs_set_int(cs, SLOT_ACTION, 0);                     // insert by default
+    cs_set_int(cs, SLOT_ACTION, 0); // insert by default
     cs
 }
 
@@ -112,8 +114,16 @@ unsafe fn clone_changeset(src: *mut u8) -> *mut u8 {
 fn coerce_value(val: &str, sql_type: &str) -> Result<String, ()> {
     match sql_type {
         "TEXT" => Ok(val.to_string()),
-        "BIGINT" => val.trim().parse::<i64>().map(|v| v.to_string()).map_err(|_| ()),
-        "DOUBLE PRECISION" => val.trim().parse::<f64>().map(|v| v.to_string()).map_err(|_| ()),
+        "BIGINT" => val
+            .trim()
+            .parse::<i64>()
+            .map(|v| v.to_string())
+            .map_err(|_| ()),
+        "DOUBLE PRECISION" => val
+            .trim()
+            .parse::<f64>()
+            .map(|v| v.to_string())
+            .map_err(|_| ()),
         "BOOLEAN" => match val.to_lowercase().as_str() {
             "true" | "t" | "1" | "yes" => Ok("true".to_string()),
             "false" | "f" | "0" | "no" => Ok("false".to_string()),
@@ -130,11 +140,7 @@ fn coerce_value(val: &str, sql_type: &str) -> Result<String, ()> {
 /// Filters `params` to only include keys present in `allowed` list.
 /// Creates a new changeset with the filtered params as `changes`.
 #[no_mangle]
-pub extern "C" fn mesh_changeset_cast(
-    data: *mut u8,
-    params: *mut u8,
-    allowed: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_changeset_cast(data: *mut u8, params: *mut u8, allowed: *mut u8) -> *mut u8 {
     unsafe {
         let cs = alloc_changeset();
         cs_set(cs, SLOT_DATA, data);
@@ -230,10 +236,7 @@ pub extern "C" fn mesh_changeset_cast_with_types(
 /// Checks that each field in fields_list exists and is non-empty in
 /// either `changes` or `data`. Adds "can't be blank" error for missing fields.
 #[no_mangle]
-pub extern "C" fn mesh_changeset_validate_required(
-    cs: *mut u8,
-    fields: *mut u8,
-) -> *mut u8 {
+pub extern "C" fn mesh_changeset_validate_required(cs: *mut u8, fields: *mut u8) -> *mut u8 {
     unsafe {
         let new_cs = clone_changeset(cs);
         let field_names = list_to_strings(fields);
@@ -268,7 +271,11 @@ pub extern "C" fn mesh_changeset_validate_required(
         }
 
         cs_set(new_cs, SLOT_ERRORS, errors);
-        cs_set_int(new_cs, SLOT_VALID, if mesh_map_size(errors) > 0 { 0 } else { 1 });
+        cs_set_int(
+            new_cs,
+            SLOT_VALID,
+            if mesh_map_size(errors) > 0 { 0 } else { 1 },
+        );
         new_cs
     }
 }
@@ -314,7 +321,11 @@ pub extern "C" fn mesh_changeset_validate_length(
         }
 
         cs_set(new_cs, SLOT_ERRORS, errors);
-        cs_set_int(new_cs, SLOT_VALID, if mesh_map_size(errors) > 0 { 0 } else { 1 });
+        cs_set_int(
+            new_cs,
+            SLOT_VALID,
+            if mesh_map_size(errors) > 0 { 0 } else { 1 },
+        );
         new_cs
     }
 }
@@ -354,7 +365,11 @@ pub extern "C" fn mesh_changeset_validate_format(
         }
 
         cs_set(new_cs, SLOT_ERRORS, errors);
-        cs_set_int(new_cs, SLOT_VALID, if mesh_map_size(errors) > 0 { 0 } else { 1 });
+        cs_set_int(
+            new_cs,
+            SLOT_VALID,
+            if mesh_map_size(errors) > 0 { 0 } else { 1 },
+        );
         new_cs
     }
 }
@@ -396,7 +411,11 @@ pub extern "C" fn mesh_changeset_validate_inclusion(
         }
 
         cs_set(new_cs, SLOT_ERRORS, errors);
-        cs_set_int(new_cs, SLOT_VALID, if mesh_map_size(errors) > 0 { 0 } else { 1 });
+        cs_set_int(
+            new_cs,
+            SLOT_VALID,
+            if mesh_map_size(errors) > 0 { 0 } else { 1 },
+        );
         new_cs
     }
 }
@@ -456,7 +475,11 @@ pub extern "C" fn mesh_changeset_validate_number(
         }
 
         cs_set(new_cs, SLOT_ERRORS, errors);
-        cs_set_int(new_cs, SLOT_VALID, if mesh_map_size(errors) > 0 { 0 } else { 1 });
+        cs_set_int(
+            new_cs,
+            SLOT_VALID,
+            if mesh_map_size(errors) > 0 { 0 } else { 1 },
+        );
         new_cs
     }
 }
@@ -576,7 +599,10 @@ pub(crate) fn map_constraint_error(
 /// - `{table}_{column}_check` for check constraints
 ///
 /// Returns the extracted field name, or None if the constraint name doesn't match.
-pub(crate) fn extract_field_from_constraint(constraint_name: &str, table_name: &str) -> Option<String> {
+pub(crate) fn extract_field_from_constraint(
+    constraint_name: &str,
+    table_name: &str,
+) -> Option<String> {
     // Strip the {table}_ prefix
     let prefix = format!("{}_", table_name);
     let remainder = constraint_name.strip_prefix(&prefix)?;
@@ -621,6 +647,10 @@ pub(crate) unsafe fn add_constraint_error_to_changeset(
     }
 
     cs_set(new_cs, SLOT_ERRORS, errors);
-    cs_set_int(new_cs, SLOT_VALID, if mesh_map_size(errors) > 0 { 0 } else { 1 });
+    cs_set_int(
+        new_cs,
+        SLOT_VALID,
+        if mesh_map_size(errors) > 0 { 0 } else { 1 },
+    );
     new_cs
 }

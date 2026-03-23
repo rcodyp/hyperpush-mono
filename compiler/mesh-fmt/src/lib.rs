@@ -102,10 +102,7 @@ mod idempotency_tests {
 
     #[test]
     fn idempotent_actor_block() {
-        assert_idempotent(
-            "actor block",
-            "actor Counter do\nfn init() do\n0\nend\nend",
-        );
+        assert_idempotent("actor block", "actor Counter do\nfn init() do\n0\nend\nend");
     }
 
     #[test]
@@ -118,10 +115,7 @@ mod idempotency_tests {
 
     #[test]
     fn idempotent_supervisor_block() {
-        assert_idempotent(
-            "supervisor block",
-            "supervisor MySup do\nend",
-        );
+        assert_idempotent("supervisor block", "supervisor MySup do\nend");
     }
 
     #[test]
@@ -142,25 +136,22 @@ mod idempotency_tests {
         let source = "x |> foo() |> bar()";
         let formatted = format_source(source, &config);
         // Verify it contains the pipe operators.
-        assert!(formatted.contains("|>"), "Pipe operator should be preserved");
+        assert!(
+            formatted.contains("|>"),
+            "Pipe operator should be preserved"
+        );
         assert!(formatted.contains("foo()"), "foo() should be preserved");
         assert!(formatted.contains("bar()"), "bar() should be preserved");
     }
 
     #[test]
     fn idempotent_string_interpolation() {
-        assert_idempotent(
-            "string interpolation",
-            "let msg = \"hello #{name}!\"",
-        );
+        assert_idempotent("string interpolation", "let msg = \"hello #{name}!\"");
     }
 
     #[test]
     fn idempotent_line_comment() {
-        assert_idempotent(
-            "line comment",
-            "# This is a comment\nlet x = 1",
-        );
+        assert_idempotent("line comment", "# This is a comment\nlet x = 1");
     }
 
     #[test]
@@ -218,82 +209,52 @@ mod idempotency_tests {
 
     #[test]
     fn idempotent_closure_expr() {
-        assert_idempotent(
-            "closure expression",
-            "let f = fn (x) -> x + 1 end",
-        );
+        assert_idempotent("closure expression", "let f = fn (x) -> x + 1 end");
     }
 
     #[test]
     fn idempotent_call_expression() {
-        assert_idempotent(
-            "call expression",
-            "foo(1, 2, bar(3))",
-        );
+        assert_idempotent("call expression", "foo(1, 2, bar(3))");
     }
 
     #[test]
     fn idempotent_binary_expressions() {
-        assert_idempotent(
-            "binary expressions",
-            "let r = a + b * c - d / e",
-        );
+        assert_idempotent("binary expressions", "let r = a + b * c - d / e");
     }
 
     #[test]
     fn idempotent_type_alias() {
-        assert_idempotent(
-            "type alias",
-            "type Pair = (Int, Int)",
-        );
+        assert_idempotent("type alias", "type Pair = (Int, Int)");
     }
 
     #[test]
     fn idempotent_field_access() {
-        assert_idempotent(
-            "field access",
-            "let l = String.length(s)",
-        );
+        assert_idempotent("field access", "let l = String.length(s)");
     }
 
     #[test]
     fn idempotent_return_expr() {
-        assert_idempotent(
-            "return expression",
-            "fn foo() do\nreturn 42\nend",
-        );
+        assert_idempotent("return expression", "fn foo() do\nreturn 42\nend");
     }
 
     #[test]
     fn idempotent_from_import() {
-        assert_idempotent(
-            "from import",
-            "from Math import sqrt, pow",
-        );
+        assert_idempotent("from import", "from Math import sqrt, pow");
     }
 
     #[test]
     fn idempotent_tuple_expr() {
-        assert_idempotent(
-            "tuple expression",
-            "let t = (1, 2, 3)",
-        );
+        assert_idempotent("tuple expression", "let t = (1, 2, 3)");
     }
 
     #[test]
     fn idempotent_unary_expr() {
-        assert_idempotent(
-            "unary expression",
-            "let x = -1",
-        );
+        assert_idempotent("unary expression", "let x = -1");
     }
 
     #[test]
     fn idempotent_not_expr() {
-        assert_idempotent(
-            "not expression",
-            "let b = not true",
-        );
+        assert_idempotent("not expression", "let b = not true");
     }
 
     #[test]
@@ -342,7 +303,11 @@ mod edge_case_tests {
         let src = "if a do\nif b do\nif c do\nif d do\nif e do\n1\nend\nend\nend\nend\nend";
         let result = fmt(src);
         // Should be indented 5 levels deep for the innermost body.
-        assert!(result.contains("          1"), "Expected 10 spaces indent, got:\n{}", result);
+        assert!(
+            result.contains("          1"),
+            "Expected 10 spaces indent, got:\n{}",
+            result
+        );
         // Must be idempotent.
         let second = fmt(&result);
         assert_eq!(result, second);
