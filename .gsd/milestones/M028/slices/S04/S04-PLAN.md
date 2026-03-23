@@ -53,7 +53,7 @@
   - Do: Extend the existing `e2e_reference_backend` harness with temp-dir helpers that stage the bundle, apply the deploy SQL, start the staged binary from the staged location, and run a deploy smoke flow that cross-checks HTTP truth, DB truth, `_mesh_migrations`, and log redaction while reusing the self-contained-binary proof as supporting evidence.
   - Verify: `cargo test -p meshc e2e_self_contained_binary -- --nocapture && DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} cargo test -p meshc --test e2e_reference_backend e2e_reference_backend_deploy_artifact_smoke -- --ignored --nocapture`
   - Done when: one ignored Rust e2e proves the staged bundle works outside the repo root and fails with actionable stage/apply/start/probe diagnostics instead of vague deploy breakage.
-- [ ] **T03: Document the operator-facing boring deployment workflow** `est:60m`
+- [x] **T03: Document the operator-facing boring deployment workflow** `est:60m`
   - Why: S04 only helps launchability and the “easier deployment” claim if operators can see the exact verified build/apply/run/smoke commands and the runtime-host contract in the canonical backend docs.
   - Files: `reference-backend/README.md`, `reference-backend/.env.example`, `reference-backend/scripts/stage-deploy.sh`, `reference-backend/scripts/apply-deploy-migrations.sh`, `reference-backend/scripts/deploy-smoke.sh`
   - Do: Add a package-local “Boring native deployment” runbook that distinguishes build-host vs runtime-host requirements, documents the staged bundle layout and SQL apply path, points to the deploy smoke flow, and keeps `.env.example` aligned with the verified runtime contract without overselling broader platform support that belongs to S06.

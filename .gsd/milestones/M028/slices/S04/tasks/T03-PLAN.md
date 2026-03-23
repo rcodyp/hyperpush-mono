@@ -49,3 +49,9 @@ Publish the exact boring deployment story where an evaluator will look first: th
 
 - `reference-backend/README.md` — operator-facing boring deployment runbook tied to the verified scripts and e2e
 - `reference-backend/.env.example` — env example aligned with the staged runtime contract
+
+## Observability Impact
+
+- Signals exposed to operators stay package-local and named: `stage-deploy.sh` prints bundle phases and staged paths, `apply-deploy-migrations.sh` prints the SQL artifact path plus migration version recording, and `deploy-smoke.sh` prints health/create/poll/processed phases against the running staged binary.
+- Future agents should inspect this task through `reference-backend/README.md`, `reference-backend/.env.example`, the three deploy scripts, and `compiler/meshc/tests/e2e_reference_backend.rs` so docs and deploy proof stay on the same contract.
+- Failure state becomes more visible because the README now points directly at the exact stage where deploys fail: bundle creation, missing SQL artifact, `psql` apply, runtime startup, `/health`, or job polling, without requiring `meshc` on the runtime host.
