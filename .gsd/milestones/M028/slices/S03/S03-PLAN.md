@@ -55,7 +55,7 @@
   - Do: Teach `meshc test` to accept a project/directory target without regressing specific-file mode, add at least one backend-native Mesh test under `reference-backend/tests/`, replace the green `--coverage` stub with an explicit honest contract, extend tooling e2e coverage for directory invocation + backend test execution + coverage behavior, and update the backend README to the verified workflow.
   - Verify: `cargo run -p meshc -- test --help && cargo run -p meshc -- test reference-backend && cargo test -p meshc --test tooling_e2e -- --nocapture`
   - Done when: `meshc test reference-backend` works as a real backend workflow, `reference-backend/` contains a passing Mesh test file, and coverage behavior is explicit and mechanically tested instead of silently succeeding.
-- [ ] **T03: Add backend-shaped JSON-RPC LSP integration proof** `est:2h`
+- [x] **T03: Add backend-shaped JSON-RPC LSP integration proof** `est:2h`
   - Why: Repo-level LSP proof is currently shallow; unit tests pass and `meshc lsp --help` exists, but there is no transport-level evidence that a real editor session works on backend-shaped code.
   - Files: `compiler/meshc/tests/e2e_lsp.rs`, `compiler/mesh-lsp/src/server.rs`, `compiler/mesh-lsp/src/analysis.rs`, `reference-backend/api/health.mpl`, `reference-backend/api/jobs.mpl`
   - Do: Create a Rust JSON-RPC harness that spawns `meshc lsp`, drives initialize/open/request/format flows against backend-shaped files, assert diagnostics plus hover/definition and formatting along with one assist surface such as completion or signature help, and fix any backend-shaped transport bug the harness exposes instead of narrowing the proof to toy snippets.
