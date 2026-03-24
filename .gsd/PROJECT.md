@@ -17,7 +17,7 @@ The repository ships a broad backend-oriented language platform:
 - package and registry infrastructure plus a docs/website surface
 - dogfooded backend applications: `reference-backend/` (API + DB + jobs) and `mesher/` (error monitoring platform)
 
-M028 established the backend trust baseline with recovery proof, deployment proof, tooling trust, and documentation. The current gap is DX friction: both dogfood codebases are littered with workaround patterns (`let _ =`, `== true`, full struct reconstruction, `<>` instead of interpolation, 310-char import lines) forced by parser bugs (`if fn_call() do` broken), codegen bugs (`else if` returns wrong values), and missing ergonomics (no multiline imports, broken multiline fn calls).
+M028 established the backend trust baseline with recovery proof, deployment proof, tooling trust, and documentation. M031/S01 fixed three compiler bugs that blocked idiomatic Mesh patterns: trailing-closure disambiguation in control-flow conditions (`if fn_call() do`), `else if` chain value correctness, and multiline function call type resolution. The remaining M031 gap is DX ergonomics: trailing commas, multiline imports, and dogfood cleanup across both codebases.
 
 ## Architecture / Key Patterns
 

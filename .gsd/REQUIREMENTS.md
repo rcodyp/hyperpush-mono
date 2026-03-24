@@ -70,29 +70,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: mapped
 - Notes: Launch-through-app remains desirable if Bags support proves smooth enough later.
 
-### R015 — `else if` chains produce correct values for all types (Int, String, Bool).
-- Class: core-capability
-- Status: active
-- Description: `else if` chains must produce the correct branch value. Currently they compile without error but return wrong values (garbage integers, misaligned pointer crashes for strings).
-- Why it matters: Silent wrong-value bugs in basic control flow undermine all language trust.
-- Source: execution
-- Primary owning slice: M031/S01
-- Supporting slices: none
-- Validation: unmapped
-- Notes: The MIR lowering recurses correctly; the bug is likely in `resolve_range` type resolution for chained if-expressions.
-
-### R016 — `if/while/case/for fn_call() do` parses correctly instead of being eaten by trailing-closure heuristic.
-- Class: core-capability
-- Status: active
-- Description: When a control-flow condition ends with a function call (`if is_valid(x) do`), the `do` keyword must be parsed as the block opener, not as a trailing closure on the call.
-- Why it matters: This forces every condition with a function call to use workarounds (temp variable binding, extra parens, `== true`). Nobody in the test suite uses `if fn_call() do` — everyone silently avoids it.
-- Source: execution
-- Primary owning slice: M031/S01
-- Supporting slices: none
-- Validation: unmapped
-- Notes: Must not break trailing closures used by test framework (`test("name") do ... end`, `describe("name") do ... end`).
-
-### R017 — Multiline function calls typecheck correctly.
+### R017 — Function calls with arguments on separate lines must resolve to the correct return type. Currently the parser produces correct trees (formatter round-trips them) but the typechecker resolves multiline calls as `()`.
 - Class: core-capability
 - Status: active
 - Description: Function calls with arguments on separate lines must resolve to the correct return type. Currently the parser produces correct trees (formatter round-trips them) but the typechecker resolves multiline calls as `()`.
@@ -103,7 +81,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Bug is in typechecker span resolution, not parsing. Single-line calls with same args work.
 
-### R018 — Multiline and parenthesized imports are supported.
+### R018 — `from Module import (\n  a,\n  b,\n  c\n)` must parse correctly. Currently the import parser breaks on newline after comma, forcing all imports onto single lines (up to 310 characters in mesher).
 - Class: quality-attribute
 - Status: active
 - Description: `from Module import (\n  a,\n  b,\n  c\n)` must parse correctly. Currently the import parser breaks on newline after comma, forcing all imports onto single lines (up to 310 characters in mesher).
@@ -114,7 +92,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Parser fix in `parse_from_import_decl` — need to handle parenthesized groups where newlines are insignificant.
 
-### R019 — Trailing commas accepted in function call arguments.
+### R019 — `fn_call(a, b, c,)` and multiline call formatting with trailing commas must parse correctly.
 - Class: quality-attribute
 - Status: active
 - Description: `fn_call(a, b, c,)` and multiline call formatting with trailing commas must parse correctly.
@@ -125,7 +103,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: Single-line trailing commas already work in fn args and lists. The fix is specifically for multiline trailing commas in fn args.
 
-### R023 — Reference-backend uses idiomatic Mesh patterns instead of workarounds.
+### R023 — `reference-backend/` should have zero `let _ =` for side effects, zero `== true` comparisons on booleans, struct update syntax instead of full reconstruction, and idiomatic pipe usage.
 - Class: quality-attribute
 - Status: active
 - Description: `reference-backend/` should have zero `let _ =` for side effects, zero `== true` comparisons on booleans, struct update syntax instead of full reconstruction, and idiomatic pipe usage.
@@ -136,7 +114,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: ~60 `let _ =`, ~15 `== true`, and full 18-field struct reconstruction in worker.mpl.
 
-### R024 — Mesher uses idiomatic Mesh patterns instead of workarounds.
+### R024 — `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
 - Class: quality-attribute
 - Status: active
 - Description: `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
@@ -147,7 +125,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: unmapped
 - Notes: ~72 `let _ =`, ~32 `<>` (some legitimately needed for raw SQL/JSON), 310-char import lines.
 
-### R025 — E2e test coverage for all fixed language patterns.
+### R025 — New e2e tests must cover: bare expression statements, `else if` chains (Int/String/Bool), `if fn_call() do`, `while fn_call() do`, `case fn_call() do`, `for x in fn_call() do`, `not fn_call()` in conditions, multiline fn calls, multiline imports, trailing commas, struct update in service handlers, pipe chains.
 - Class: quality-attribute
 - Status: active
 - Description: New e2e tests must cover: bare expression statements, `else if` chains (Int/String/Bool), `if fn_call() do`, `while fn_call() do`, `case fn_call() do`, `for x in fn_call() do`, `not fn_call()` in conditions, multiline fn calls, multiline imports, trailing commas, struct update in service handlers, pipe chains.
@@ -248,18 +226,29 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: Validated by M028/S07 on top of the existing S01-S06 proof surface.
 - Notes: The reference backend is now a genuinely recovery-aware end-to-end proof target.
 
-## Deferred
-
-### R012_old — Trailing closure syntax documentation/guidance
-- Class: quality-attribute
-- Status: deferred
-- Description: Document when and how to use trailing closures vs parenthesized closures, especially after the disambiguation fix changes the parsing rules.
-- Why it matters: Users need to know the idiom for passing closures to functions.
-- Source: inferred
-- Primary owning slice: none
+### R015 — `else if` chains must produce the correct branch value. Currently they compile without error but return wrong values (garbage integers, misaligned pointer crashes for strings).
+- Class: core-capability
+- Status: validated
+- Description: `else if` chains must produce the correct branch value. Currently they compile without error but return wrong values (garbage integers, misaligned pointer crashes for strings).
+- Why it matters: Silent wrong-value bugs in basic control flow undermine all language trust.
+- Source: execution
+- Primary owning slice: M031/S01
 - Supporting slices: none
-- Validation: unmapped
-- Notes: Deferred until after M031 fixes land and the pattern stabilizes.
+- Validation: Validated by M031/S01/T02: added `types.insert` in `infer_if` for both return paths. 5 e2e tests pass (Int, String, Bool, 3-level chain, let binding). String-return test serves as crash sentinel.
+- Notes: The MIR lowering recurses correctly; the bug is likely in `resolve_range` type resolution for chained if-expressions.
+
+### R016 — When a control-flow condition ends with a function call (`if is_valid(x) do`), the `do` keyword must be parsed as the block opener, not as a trailing closure on the call.
+- Class: core-capability
+- Status: validated
+- Description: When a control-flow condition ends with a function call (`if is_valid(x) do`), the `do` keyword must be parsed as the block opener, not as a trailing closure on the call.
+- Why it matters: This forces every condition with a function call to use workarounds (temp variable binding, extra parens, `== true`). Nobody in the test suite uses `if fn_call() do` — everyone silently avoids it.
+- Source: execution
+- Primary owning slice: M031/S01
+- Supporting slices: none
+- Validation: Validated by M031/S01/T01: added `suppress_trailing_closure` flag to parser with save/restore in all 4 control-flow condition sites. 5 e2e tests pass (if/while/case/for with fn-call conditions, plus trailing-closure regression).
+- Notes: Must not break trailing closures used by test framework (`test("name") do ... end`, `describe("name") do ... end`).
+
+## Deferred
 
 ### R020 — Mesh eventually offers a stronger debugger/profiler/trace surface suitable for deeper production diagnostics.
 - Class: operability
@@ -340,7 +329,7 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: n/a
 - Notes: Web is the primary surface for the planned milestones.
 
-### R034 — M031 does not add new language features — it fixes existing broken patterns and cleans up dogfood code.
+### R034 — No new keywords, control flow forms, type system features, or stdlib functions. Only fix what's broken and clean up what's workaround-heavy.
 - Class: anti-feature
 - Status: out-of-scope
 - Description: No new keywords, control flow forms, type system features, or stdlib functions. Only fix what's broken and clean up what's workaround-heavy.
@@ -355,28 +344,28 @@ This file is the explicit capability and coverage contract for the project.
 
 | ID | Class | Status | Primary owner | Supporting | Proof |
 |---|---|---|---|---|---|
-| R001 | launchability | validated | M028/S01 | M028/S06 | validated |
-| R002 | core-capability | validated | M028/S01 | M028/S02, M028/S04, M028/S05, M028/S06 | validated |
-| R003 | quality-attribute | validated | M028/S02 | M028/S06 | validated |
-| R004 | quality-attribute | validated | M028/S05 | M028/S02, M028/S06, M028/S07 | validated |
-| R005 | launchability | validated | M028/S04 | M028/S06 | validated |
-| R006 | quality-attribute | validated | M028/S03 | M030/S01, M030/S02 | validated |
-| R007 | launchability | active | M030/S01 | M030/S02 | mapped |
-| R008 | launchability | validated | M028/S06 | M028/S01, M028/S03-S05, M028/S07-S08 | validated |
-| R009 | differentiator | validated | M028/S06 | M028/S01, M028/S02, M028/S05, M028/S07 | validated |
-| R010 | differentiator | active | M029/S01 | M028/S04, M028/S06, M029/S02 | mapped |
-| R011 | differentiator | active | M029/S02 | M029/S03, M031/S01 | mapped |
-| R012 | core-capability | active | M031/S01 | M031/S02, M031/S03 | mapped |
-| R013 | constraint | active | M023/S01 | M027/S01, M031/S01 | mapped |
+| R001 | launchability | validated | M028/S01 | M028/S06 | Validated by M028/S01 through the shipped `reference-backend/` package, canonical startup contract (`DATABASE_URL`, `PORT`, `JOB_POLL_MS`), package README/.env example, compiler e2e proof (`e2e_reference_backend_builds`, `e2e_reference_backend_runtime_starts`, `e2e_reference_backend_postgres_smoke`), migration status/up commands, and the package-local smoke path proving the baseline with concrete commands instead of abstract claims. |
+| R002 | core-capability | validated | M028/S01 | M028/S02, M028/S04, M028/S05, M028/S06 | Validated by M028/S01 through live end-to-end verification of `reference-backend/`. |
+| R003 | quality-attribute | validated | M028/S02 | M028/S06 | Validated by M028/S02 through live Postgres-backed compiler e2e coverage. |
+| R004 | quality-attribute | validated | M028/S05 | M028/S02, M028/S06, M028/S07 | Validated by M028/S07 through live recovery proof on `reference-backend/`. |
+| R005 | launchability | validated | M028/S04 | M028/S06 | Validated by M028/S04 through live native-deployment proof for `reference-backend/`. |
+| R006 | quality-attribute | validated | M028/S03 | M030/S01 (provisional), M030/S02 (provisional) | S03 closure reran the full tooling trust gate on `reference-backend/`. |
+| R007 | launchability | active | M030/S01 (provisional) | M030/S02 (provisional) | mapped |
+| R008 | launchability | validated | M028/S06 | M028/S01, M028/S03, M028/S04, M028/S05, M028/S07, M028/S08 | Validated by M028/S08 through the reconciled production-proof surface. |
+| R009 | differentiator | validated | M028/S06 | M028/S01, M028/S02, M028/S05, M028/S07 | Validated by M028/S07 on top of the existing S01-S06 proof surface. |
+| R010 | differentiator | active | M029/S01 (provisional) | M028/S04, M028/S06, M029/S02 (provisional) | mapped |
+| R011 | differentiator | active | M029/S02 (provisional) | M029/S03 (provisional), M031/S01 | mapped |
+| R012 | core-capability | active | M031/S01 (provisional) | M031/S02 (provisional), M031/S03 (provisional) | mapped |
+| R013 | constraint | active | M023/S01 | M027/S01 (provisional), M031/S01 | mapped |
 | R014 | constraint | active | M023/S02 | M023/S06 | mapped |
-| R015 | core-capability | active | M031/S01 | none | unmapped |
-| R016 | core-capability | active | M031/S01 | none | unmapped |
+| R015 | core-capability | validated | M031/S01 | none | Validated by M031/S01/T02: added `types.insert` in `infer_if` for both return paths. 5 e2e tests pass (Int, String, Bool, 3-level chain, let binding). String-return test serves as crash sentinel. |
+| R016 | core-capability | validated | M031/S01 | none | Validated by M031/S01/T01: added `suppress_trailing_closure` flag to parser with save/restore in all 4 control-flow condition sites. 5 e2e tests pass (if/while/case/for with fn-call conditions, plus trailing-closure regression). |
 | R017 | core-capability | active | M031/S01 | none | unmapped |
 | R018 | quality-attribute | active | M031/S02 | none | unmapped |
 | R019 | quality-attribute | active | M031/S02 | none | unmapped |
 | R020 | operability | deferred | none | none | unmapped |
 | R021 | admin/support | deferred | none | none | unmapped |
-| R022 | operability | deferred | M027/S02 | none | unmapped |
+| R022 | operability | deferred | M027/S02 (provisional) | none | unmapped |
 | R023 | quality-attribute | active | M031/S03 | none | unmapped |
 | R024 | quality-attribute | active | M031/S04 | none | unmapped |
 | R025 | quality-attribute | active | M031/S05 | M031/S01, M031/S02 | unmapped |
@@ -388,7 +377,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 13
-- Mapped to slices: 13
-- Validated: 8 (R001, R002, R003, R004, R005, R006, R008, R009)
+- Active requirements: 12
+- Mapped to slices: 12
+- Validated: 10 (R001, R002, R003, R004, R005, R006, R008, R009, R015, R016)
 - Unmapped active requirements: 0

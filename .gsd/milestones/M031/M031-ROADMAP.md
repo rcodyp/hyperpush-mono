@@ -54,7 +54,7 @@ This milestone is complete only when all are true:
 
 ## Slices
 
-- [ ] **S01: Parser & Codegen Fixes** `risk:high` `depends:[]`
+- [x] **S01: Parser & Codegen Fixes** `risk:high` `depends:[]`
   > After this: `if is_big(15) do ... end` compiles; `else if` chains return correct values; multiline fn calls typecheck; proven by new e2e tests.
 
 - [ ] **S02: Trailing Commas & Multiline Imports** `risk:medium` `depends:[S01]`
