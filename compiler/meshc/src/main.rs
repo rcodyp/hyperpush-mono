@@ -214,8 +214,6 @@ fn main() {
                         if stats.unformatted > 0 {
                             eprintln!("{} file(s) would be reformatted", stats.unformatted);
                             process::exit(1);
-                        } else {
-                            eprintln!("{} file(s) already formatted", stats.total);
                         }
                     } else {
                         eprintln!("Formatted {} file(s)", stats.total);

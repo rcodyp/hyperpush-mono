@@ -6,7 +6,11 @@ end
 
 service RuntimeRegistry do
   fn init(pool :: PoolHandle, database_url :: String, poll_ms :: Int) -> RegistryState do
-    RegistryState { pool : pool, database_url : database_url, poll_ms : poll_ms }
+    RegistryState {
+      pool : pool,
+      database_url : database_url,
+      poll_ms : poll_ms
+    }
   end
   
   call GetPool() :: PoolHandle do|state|

@@ -135,6 +135,12 @@ fn fmt_check_exits_0_on_formatted() {
         "Expected exit 0 for formatted file, got: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    assert!(
+        output.stdout.is_empty() && output.stderr.is_empty(),
+        "fmt --check should be silent on success, got stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
@@ -163,6 +169,26 @@ fn fmt_preserves_dotted_paths_exactly() {
 }
 
 #[test]
+fn fmt_preserves_visibility_and_schema_option_spacing_exactly() {
+    let cases = [
+        (
+            "public sum type keeps visibility spacing",
+            "pub type Severity do\nFatal\nend",
+            "pub type Severity do\n  Fatal\nend\n",
+        ),
+        (
+            "schema table option keeps space before string literal",
+            "pub struct Person do\ntable \"people\"\nend deriving(Schema)",
+            "pub struct Person do\n  table \"people\"\nend deriving(Schema)\n",
+        ),
+    ];
+
+    for (case, source, expected) in cases {
+        assert_fmt_exact(case, source, expected);
+    }
+}
+
+#[test]
 fn fmt_check_reference_backend_directory_succeeds() {
     let repo_root = repo_root();
     let backend_dir = repo_root.join("reference-backend");
@@ -178,6 +204,12 @@ fn fmt_check_reference_backend_directory_succeeds() {
     assert!(
         output.status.success(),
         "meshc fmt --check reference-backend failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        output.stdout.is_empty() && output.stderr.is_empty(),
+        "fmt --check reference-backend should be silent on success, got stdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );

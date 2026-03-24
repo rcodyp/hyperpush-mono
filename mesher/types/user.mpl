@@ -1,7 +1,7 @@
 # User and authentication data types for Mesher monitoring platform.
 # NO password_hash field in the User struct -- never expose to application code.
-
 # User account -- password_hash lives only in the database.
+
 pub struct User do
   table "users"
   id :: String
@@ -13,6 +13,7 @@ pub struct User do
 end deriving(Schema, Json, Row)
 
 # Organization membership -- many-to-many with role (owner/admin/member).
+
 pub struct OrgMembership do
   table "org_memberships"
   id :: String
@@ -25,6 +26,7 @@ pub struct OrgMembership do
 end deriving(Schema, Json, Row)
 
 # Session token -- opaque 64-char hex, not JWT.
+
 pub struct Session do
   table "sessions"
   primary_key :token

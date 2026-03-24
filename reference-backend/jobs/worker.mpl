@@ -1,5 +1,4 @@
 from Types.Job import Job
-
 from Storage.Jobs import RecoveryResult, claim_next_pending_job, reclaim_processing_jobs, mark_job_failed, mark_job_processed
 
 struct WorkerState do
@@ -22,7 +21,23 @@ end
 
 service JobWorkerState do
   fn init(poll_ms :: Int) -> WorkerState do
-    WorkerState { poll_ms : poll_ms, boot_id : "", started_at : "", last_tick_at : "", last_status : "starting", last_job_id : "", last_error : "", processed_jobs : 0, failed_jobs : 0, restart_count : 0, last_exit_reason : "", recovered_jobs : 0, last_recovery_at : "", last_recovery_job_id : "", last_recovery_count : 0 }
+    WorkerState {
+      poll_ms : poll_ms,
+      boot_id : "",
+      started_at : "",
+      last_tick_at : "",
+      last_status : "starting",
+      last_job_id : "",
+      last_error : "",
+      processed_jobs : 0,
+      failed_jobs : 0,
+      restart_count : 0,
+      last_exit_reason : "",
+      recovered_jobs : 0,
+      last_recovery_at : "",
+      last_recovery_job_id : "",
+      last_recovery_count : 0
+    }
   end
   
   call GetPollMs() :: Int do|state|

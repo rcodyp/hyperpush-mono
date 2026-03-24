@@ -1,5 +1,4 @@
 # Migration: create_jobs
-
 # Canonical durable job lifecycle for the reference backend.
 
 pub fn up(pool :: PoolHandle) -> Int ! String do

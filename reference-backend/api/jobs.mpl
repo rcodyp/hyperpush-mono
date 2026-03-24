@@ -1,7 +1,5 @@
 from Types.Job import Job
-
 from Storage.Jobs import create_job, get_job
-
 from Runtime.Registry import get_pool
 
 fn require_param(request, name :: String) -> String do

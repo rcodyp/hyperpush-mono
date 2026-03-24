@@ -10,10 +10,16 @@ fn jobs_table() -> String do
 end
 
 fn job_from_row(row) -> Job do
-  Job { id : Map.get(row, "id"), status : Map.get(row, "status"), attempts : Map.get(row,
-  "attempts"), last_error : Map.get(row, "last_error"), payload : Map.get(row, "payload"), created_at : Map.get(row,
-  "created_at"), updated_at : Map.get(row, "updated_at"), processed_at : Map.get(row,
-  "processed_at") }
+  Job {
+    id : Map.get(row, "id"),
+    status : Map.get(row, "status"),
+    attempts : Map.get(row, "attempts"),
+    last_error : Map.get(row, "last_error"),
+    payload : Map.get(row, "payload"),
+    created_at : Map.get(row, "created_at"),
+    updated_at : Map.get(row, "updated_at"),
+    processed_at : Map.get(row, "processed_at")
+  }
 end
 
 fn job_select_query() do
@@ -81,7 +87,10 @@ error_message :: String,
 stale_before_unix_ms :: Int) -> RecoveryResult ! String do
   let params = [error_message, String.from(stale_before_unix_ms)]
   let rows = Repo.query_raw(pool, reclaim_processing_jobs_sql(), params) ?
-  Ok(RecoveryResult { count : List.length(rows), last_job_id : recovery_last_job_id(rows) })
+  Ok(RecoveryResult {
+    count : List.length(rows),
+    last_job_id : recovery_last_job_id(rows)
+  })
 end
 
 pub fn mark_job_processed(pool :: PoolHandle, job_id :: String) -> Job ! String do

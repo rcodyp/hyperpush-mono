@@ -86,6 +86,7 @@ pub fn walk_node(node: &SyntaxNode) -> FormatIR {
         SyntaxKind::MAP_ENTRY => walk_map_entry(node),
         SyntaxKind::LIST_LITERAL => walk_list_literal(node),
         SyntaxKind::ASSOC_TYPE_BINDING => walk_assoc_type_binding(node),
+        SyntaxKind::SCHEMA_OPTION => walk_schema_option(node),
         SyntaxKind::TRY_EXPR => walk_tokens_inline(node),
         SyntaxKind::PATH => walk_path(node),
         // Simple leaf-like nodes: just emit their tokens inline.
@@ -911,6 +912,10 @@ fn walk_block_def(node: &SyntaxNode) -> FormatIR {
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(tok) => match tok.kind() {
+                SyntaxKind::VISIBILITY => {
+                    parts.push(ir::text(tok.text()));
+                    parts.push(sp());
+                }
                 SyntaxKind::MODULE_KW
                 | SyntaxKind::ACTOR_KW
                 | SyntaxKind::SERVICE_KW
@@ -948,6 +953,10 @@ fn walk_block_def(node: &SyntaxNode) -> FormatIR {
                     // Handled after "end" is emitted
                 } else if !past_do {
                     match n.kind() {
+                        SyntaxKind::VISIBILITY => {
+                            parts.push(walk_node(&n));
+                            parts.push(sp());
+                        }
                         SyntaxKind::NAME | SyntaxKind::GENERIC_PARAM_LIST => {
                             parts.push(walk_node(&n));
                         }
@@ -1071,6 +1080,45 @@ fn walk_child_spec_def(node: &SyntaxNode) -> FormatIR {
     }
     parts.push(ir::hardline());
     parts.push(ir::text(&end_line));
+    ir::concat(parts)
+}
+
+fn walk_schema_option(node: &SyntaxNode) -> FormatIR {
+    let mut parts = Vec::new();
+
+    for child in node.children_with_tokens() {
+        match child {
+            NodeOrToken::Token(tok) => {
+                let kind = tok.kind();
+                if kind == SyntaxKind::EOF || kind == SyntaxKind::NEWLINE {
+                    continue;
+                }
+                if kind == SyntaxKind::COMMENT
+                    || kind == SyntaxKind::DOC_COMMENT
+                    || kind == SyntaxKind::MODULE_DOC_COMMENT
+                {
+                    if !parts.is_empty() {
+                        parts.push(sp());
+                    }
+                    parts.push(ir::text(tok.text()));
+                    continue;
+                }
+                if !parts.is_empty()
+                    && (kind == SyntaxKind::STRING_START || needs_space_before(kind))
+                {
+                    parts.push(sp());
+                }
+                parts.push(ir::text(tok.text()));
+            }
+            NodeOrToken::Node(n) => {
+                if !parts.is_empty() && needs_space_before_node(n.kind()) {
+                    parts.push(sp());
+                }
+                parts.push(walk_node(&n));
+            }
+        }
+    }
+
     ir::concat(parts)
 }
 
@@ -2459,6 +2507,18 @@ mod tests {
     fn pub_type_alias() {
         let result = fmt("pub type UserId = Int");
         assert_eq!(result, "pub type UserId = Int\n");
+    }
+
+    #[test]
+    fn pub_sum_type_keeps_visibility_spacing() {
+        let result = fmt("pub type Severity do\nFatal\nend");
+        assert_eq!(result, "pub type Severity do\n  Fatal\nend\n");
+    }
+
+    #[test]
+    fn schema_option_table_keeps_space_before_string_literal() {
+        let result = fmt("pub struct Person do\ntable \"people\"\nend deriving(Schema)");
+        assert_eq!(result, "pub struct Person do\n  table \"people\"\nend deriving(Schema)\n");
     }
 
     #[test]

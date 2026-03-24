@@ -59,7 +59,7 @@
   - Do: Run the fixed formatter over `mesher/services/`, accept the canonicalization rewrite for those eight files, and confirm the long imports in `project.mpl` and `user.mpl` are still parenthesized multiline after formatting.
   - Verify: `cargo run -q -p meshc -- fmt mesher/services && cargo run -q -p meshc -- fmt --check mesher/services && ! rg -n '^from .{121,}' mesher/services/project.mpl mesher/services/user.mpl && ! rg -n '^from .*\. ' mesher/services -g '*.mpl'`
   - Done when: All service files are formatter-clean, both rewritten service imports stay multiline, and no spaced dotted imports appear anywhere in `mesher/services/`.
-- [ ] **T06: Canonicalize remaining Mesher files and record final slice proof** `est:45m`
+- [x] **T06: Canonicalize remaining Mesher files and record final slice proof** `est:45m`
   - Why: The remaining types/tests/migrations files finish the red `fmt --check` surface, and this last task owns the truthful closeout gate across Mesher plus regression-proof `reference-backend/`.
   - Files: `mesher/migrations/20260216120000_create_initial_schema.mpl`, `mesher/migrations/20260226000000_seed_default_org.mpl`, `mesher/tests/fingerprint.test.mpl`, `mesher/tests/validation.test.mpl`, `mesher/types/alert.mpl`, `mesher/types/event.mpl`, `mesher/types/issue.mpl`, `mesher/types/project.mpl`, `mesher/types/retention.mpl`, `mesher/types/user.mpl`, `.gsd/milestones/M029/slices/S03/S03-UAT.md`
   - Do: Run the fixed formatter over the remaining Mesher files, execute the full slice closeout gate on `mesher/` and `reference-backend/`, and write `S03-UAT.md` with the passed command set and any residual watchouts for future milestone closure.

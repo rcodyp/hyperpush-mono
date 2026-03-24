@@ -61,3 +61,9 @@ Finish the last formatter-red Mesher files, then run the full slice closeout gat
 - `mesher/types/retention.mpl` — canonical formatter output for the type file
 - `mesher/types/user.mpl` — canonical formatter output for the type file
 - `.gsd/milestones/M029/slices/S03/S03-UAT.md` — final closeout proof artifact for S03
+
+## Observability Impact
+
+- Runtime signals: none added; this task is formatter/build compliance work plus the slice UAT artifact.
+- Inspection surfaces: `cargo run -q -p meshc -- fmt mesher/types`, `cargo run -q -p meshc -- fmt mesher/tests`, `cargo run -q -p meshc -- fmt mesher/migrations`, `cargo run -q -p meshc -- fmt --check mesher`, `cargo run -q -p meshc -- fmt --check reference-backend`, `cargo run -q -p meshc -- build mesher`, `cargo run -q -p meshc -- build reference-backend`, `! rg -n '^from .{121,}' mesher -g '*.mpl'`, `! rg -n '^from .*\. ' mesher reference-backend -g '*.mpl'`, `/tmp/m029-s03-fmt-mesher.log`, and `.gsd/milestones/M029/slices/S03/S03-UAT.md`.
+- Failure visibility: the formatter commands expose any remaining non-canonical Mesher or `reference-backend` files, the build commands expose syntax/type drift introduced by the cleanup wave, the two `rg` checks expose long single-line or spaced dotted imports, `/tmp/m029-s03-fmt-mesher.log` preserves the first Mesher formatter failure for post-mortem inspection, and `S03-UAT.md` records the exact green closeout proof a future agent should compare against.

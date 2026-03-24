@@ -1,7 +1,7 @@
 # Alert data types for Mesher monitoring platform.
 # Alert rules define conditions and actions for automated notifications.
-
 # Alert rule -- condition_json and action_json are JSONB stored as String in Row struct.
+
 pub struct AlertRule do
   table "alert_rules"
   id :: String
@@ -16,6 +16,7 @@ pub struct AlertRule do
 end deriving(Schema, Json, Row)
 
 # Typed alert condition for JSON parsing -- not a Row struct.
+
 pub struct AlertCondition do
   condition_type :: String
   threshold :: Int
@@ -24,6 +25,7 @@ end deriving(Json)
 
 # Fired alert record -- all-String fields per Row struct convention (decision [87-01]).
 # JSONB condition_snapshot stored as String. Nullable timestamps COALESCE'd to empty string in queries.
+
 pub struct Alert do
   table "alerts"
   id :: String
