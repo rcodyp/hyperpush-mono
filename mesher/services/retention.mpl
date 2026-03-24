@@ -8,17 +8,17 @@ from Storage.Queries import delete_expired_events, get_all_project_retention, ge
 # Log helpers (extracted for single-expression case arms, decision [88-02]).
 
 fn log_cleanup_result(deleted :: Int) do
-  let _ = println("[Mesher] Retention cleanup: deleted #{deleted} expired events")
+  println("[Mesher] Retention cleanup: deleted #{deleted} expired events")
   0
 end
 
 fn log_cleanup_error(e :: String) do
-  let _ = println("[Mesher] Retention cleanup error: #{e}")
+  println("[Mesher] Retention cleanup error: #{e}")
   0
 end
 
 fn log_partition_drop(name :: String) do
-  let _ = println("[Mesher] Dropped expired partition: #{name}")
+  println("[Mesher] Dropped expired partition: #{name}")
   0
 end
 
@@ -41,8 +41,8 @@ fn drop_partitions_loop(pool :: PoolHandle, partitions, i :: Int, total :: Int) 
   if i < total do
     let row = List.get(partitions, i)
     let partition_name = Map.get(row, "partition_name")
-    let _ = drop_partition(pool, partition_name)?
-    let _ = log_partition_drop(partition_name)
+    drop_partition(pool, partition_name)?
+    log_partition_drop(partition_name)
     drop_partitions_loop(pool, partitions, i + 1, total)
   else
     Ok(total)
@@ -54,7 +54,7 @@ fn run_retention_cleanup(pool :: PoolHandle) -> Int!String do
   let projects = get_all_project_retention(pool)?
   let deleted = cleanup_projects_loop(pool, projects, 0, List.length(projects), 0)?
   let partitions = get_expired_partitions(pool, "90")?
-  let _ = drop_partitions_loop(pool, partitions, 0, List.length(partitions))?
+  drop_partitions_loop(pool, partitions, 0, List.length(partitions))?
   Ok(deleted)
 end
 

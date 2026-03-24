@@ -13,12 +13,10 @@ from Api.Helpers import query_or_default, to_json_array, require_param, get_regi
 fn cap_limit(n :: Int) -> String do
   if n > 100 do
     "25"
+  else if n < 1 do
+    "25"
   else
-    if n < 1 do
-      "25"
-    else
-      String.from(n)
-    end
+    String.from(n)
   end
 end
 
@@ -234,13 +232,11 @@ fn check_tag_params(pool, project_id :: String, key :: String, value :: String, 
   let val_empty = String.length(value) == 0
   if key_empty do
     missing_tag_response()
+  else if val_empty do
+    missing_tag_response()
   else
-    if val_empty do
-      missing_tag_response()
-    else
-      let tag_json = "{\"" <> key <> "\":\"" <> value <> "\"}"
-      do_tag_filter(pool, project_id, tag_json, limit_str)
-    end
+    let tag_json = "{\"" <> key <> "\":\"" <> value <> "\"}"
+    do_tag_filter(pool, project_id, tag_json, limit_str)
   end
 end
 

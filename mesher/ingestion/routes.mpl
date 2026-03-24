@@ -41,7 +41,7 @@ fn broadcast_count_from_rows(project_id :: String, rows) do
   if List.length(rows) > 0 do
     let count = Map.get(List.head(rows), "cnt")
     let room = "project:#{project_id}"
-    let _ = Ws.broadcast(room, """{"type":"issue_count","project_id":"#{project_id}","count":#{count}}""")
+    Ws.broadcast(room, """{"type":"issue_count","project_id":"#{project_id}","count":#{count}}""")
     0
   else
     0
@@ -66,7 +66,7 @@ end
 fn broadcast_alert_notification(project_id :: String, alert_id :: String, rule_name :: String, condition_type :: String, message :: String) do
   let room = "project:#{project_id}"
   let msg = """{"type":"alert","alert_id":"#{alert_id}","rule_name":"#{rule_name}","condition":"#{condition_type}","message":"#{message}"}"""
-  let _ = Ws.broadcast(room, msg)
+  Ws.broadcast(room, msg)
   0
 end
 
@@ -100,7 +100,7 @@ fn fire_event_alerts_loop(pool :: PoolHandle, rules, project_id :: String, condi
     let rule_id = Map.get(rule, "id")
     let rule_name = Map.get(rule, "name")
     let cooldown_str = Map.get(rule, "cooldown_minutes")
-    let _ = fire_event_alert(pool, rule_id, project_id, rule_name, condition_type, cooldown_str, issue_id)
+    fire_event_alert(pool, rule_id, project_id, rule_name, condition_type, cooldown_str, issue_id)
     fire_event_alerts_loop(pool, rules, project_id, condition_type, issue_id, i + 1, total)
   else
     0
@@ -119,7 +119,7 @@ end
 # Fire new_issue alerts if issue is new.
 fn handle_new_issue_alert(pool :: PoolHandle, project_id :: String, issue_id :: String, is_new :: Bool) do
   if is_new do
-    let _ = fire_matching_event_alerts(pool, project_id, "new_issue", issue_id)
+    fire_matching_event_alerts(pool, project_id, "new_issue", issue_id)
     0
   else
     0
@@ -139,11 +139,11 @@ end
 fn broadcast_event(project_id :: String, issue_id :: String, body :: String) do
   let room = "project:#{project_id}"
   let notification = """{"type":"event","issue_id":"#{issue_id}","data":#{body}}"""
-  let _ = Ws.broadcast(room, notification)
-  let _ = broadcast_issue_count(project_id)
+  Ws.broadcast(room, notification)
+  broadcast_issue_count(project_id)
   let reg_pid = get_registry()
   let pool = PipelineRegistry.get_pool(reg_pid)
-  let _ = check_event_alerts(pool, project_id, issue_id)
+  check_event_alerts(pool, project_id, issue_id)
   accepted_response()
 end
 
@@ -194,7 +194,7 @@ end
 # Flow: get registry -> get pool+pids -> auth -> rate limit -> validate -> process -> 202
 pub fn handle_event(request) do
   let reg_pid = get_registry()
-  let _ = PipelineRegistry.increment_event_count(reg_pid)
+  PipelineRegistry.increment_event_count(reg_pid)
   let pool = PipelineRegistry.get_pool(reg_pid)
   let auth_result = authenticate_request(pool, request)
   case auth_result do
@@ -243,7 +243,7 @@ end
 # Handle POST /api/v1/events/bulk
 pub fn handle_bulk(request) do
   let reg_pid = get_registry()
-  let _ = PipelineRegistry.increment_event_count(reg_pid)
+  PipelineRegistry.increment_event_count(reg_pid)
   let pool = PipelineRegistry.get_pool(reg_pid)
   let rate_limiter_pid = PipelineRegistry.get_rate_limiter(reg_pid)
   let processor_pid = PipelineRegistry.get_processor(reg_pid)
@@ -264,7 +264,7 @@ fn broadcast_update_from_rows(rows, issue_id :: String, action :: String) do
     let project_id = Map.get(List.head(rows), "project_id")
     let room = "project:#{project_id}"
     let msg = """{"type":"issue","action":"#{action}","issue_id":"#{issue_id}"}"""
-    let _ = Ws.broadcast(room, msg)
+    Ws.broadcast(room, msg)
     0
   else
     0
@@ -282,25 +282,25 @@ end
 
 # Helper: broadcast resolve notification then return success response
 fn resolve_success(pool, issue_id :: String, n :: Int) do
-  let _ = broadcast_issue_update(pool, issue_id, "resolved")
+  broadcast_issue_update(pool, issue_id, "resolved")
   HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # Helper: broadcast archive notification then return success response
 fn archive_success(pool, issue_id :: String, n :: Int) do
-  let _ = broadcast_issue_update(pool, issue_id, "archived")
+  broadcast_issue_update(pool, issue_id, "archived")
   HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # Helper: broadcast unresolve notification then return success response
 fn unresolve_success(pool, issue_id :: String, n :: Int) do
-  let _ = broadcast_issue_update(pool, issue_id, "unresolved")
+  broadcast_issue_update(pool, issue_id, "unresolved")
   HTTP.response(200, json { status: "ok", affected: n })
 end
 
 # Helper: broadcast discard notification then return success response
 fn discard_success(pool, issue_id :: String, n :: Int) do
-  let _ = broadcast_issue_update(pool, issue_id, "discarded")
+  broadcast_issue_update(pool, issue_id, "discarded")
   HTTP.response(200, json { status: "ok", affected: n })
 end
 

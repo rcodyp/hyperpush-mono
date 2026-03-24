@@ -21,7 +21,7 @@
 
 ## Tasks
 
-- [ ] **T01: Remove `let _ =` and flatten `else if` across mesher** `est:45m`
+- [x] **T01: Remove `let _ =` and flatten `else if` across mesher** `est:45m`
   - Why: 72 `let _ =` bindings suppress side-effect return values unnecessarily; 3 nested else/if blocks should be `else if` chains. This is the high-count mechanical half of the cleanup.
   - Files: `mesher/ingestion/pipeline.mpl`, `mesher/ingestion/routes.mpl`, `mesher/storage/queries.mpl`, `mesher/services/retention.mpl`, `mesher/services/writer.mpl`, `mesher/ingestion/ws_handler.mpl`, `mesher/api/search.mpl`
   - Do: Remove all `let _ =` prefixes from side-effect calls (println, Ws.broadcast, spawn, Repo.insert, etc.) leaving bare expression statements. Flatten 3 nested `else`+newline+`if` to `else if` in `pipeline.mpl:315` and `search.mpl:16,237`. Build-verify after each file batch.

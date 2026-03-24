@@ -99,7 +99,7 @@ pub fn create_api_key(pool :: PoolHandle, project_id :: String, label :: String)
   # Generate API key using Crypto stdlib -- no DB round-trip needed
   let key_value = "mshr_" <> Crypto.uuid4()
   let fields = %{"project_id" => project_id, "key_value" => key_value, "label" => label}
-  let _ = Repo.insert(pool, ApiKey.__table__(), fields)?
+  Repo.insert(pool, ApiKey.__table__(), fields)?
   Ok(key_value)
 end
 
@@ -130,7 +130,7 @@ pub fn revoke_api_key(pool :: PoolHandle, key_id :: String) -> Int!String do
     # Step 2: Update with ORM
     let q = Query.from(ApiKey.__table__())
       |> Query.where_raw("id = ?::uuid", [key_id])
-    let _ = Repo.update_where(pool, ApiKey.__table__(), %{"revoked_at" => ts}, q)?
+    Repo.update_where(pool, ApiKey.__table__(), %{"revoked_at" => ts}, q)?
     Ok(1)
   else
     Err("revoke_api_key: timestamp generation failed")
@@ -190,7 +190,7 @@ pub fn create_session(pool :: PoolHandle, user_id :: String) -> String!String do
   let uuid2 = Crypto.uuid4() |> String.replace("-", "")
   let token = uuid1 <> uuid2
   let fields = %{"token" => token, "user_id" => user_id}
-  let _ = Repo.insert(pool, Session.__table__(), fields)?
+  Repo.insert(pool, Session.__table__(), fields)?
   Ok(token)
 end
 
@@ -280,7 +280,7 @@ pub fn resolve_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
     |> Query.where_raw("status != 'resolved'", [])
-  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "resolved"}, q)?
+  Repo.update_where(pool, Issue.__table__(), %{"status" => "resolved"}, q)?
   Ok(1)
 end
 
@@ -289,7 +289,7 @@ end
 pub fn archive_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
-  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "archived"}, q)?
+  Repo.update_where(pool, Issue.__table__(), %{"status" => "archived"}, q)?
   Ok(1)
 end
 
@@ -298,7 +298,7 @@ end
 pub fn unresolve_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
-  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "unresolved"}, q)?
+  Repo.update_where(pool, Issue.__table__(), %{"status" => "unresolved"}, q)?
   Ok(1)
 end
 
@@ -309,7 +309,7 @@ pub fn assign_issue(pool :: PoolHandle, issue_id :: String, user_id :: String) -
   if String.length(user_id) > 0 do
     let q = Query.from(Issue.__table__())
       |> Query.where_raw("id = ?::uuid", [issue_id])
-    let _ = Repo.update_where(pool, Issue.__table__(), %{"assigned_to" => user_id}, q)?
+    Repo.update_where(pool, Issue.__table__(), %{"assigned_to" => user_id}, q)?
     Ok(1)
   else
     Repo.execute_raw(pool, "UPDATE issues SET assigned_to = NULL WHERE id = $1::uuid", [issue_id])
@@ -321,7 +321,7 @@ end
 pub fn discard_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
   let q = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
-  let _ = Repo.update_where(pool, Issue.__table__(), %{"status" => "discarded"}, q)?
+  Repo.update_where(pool, Issue.__table__(), %{"status" => "discarded"}, q)?
   Ok(1)
 end
 
@@ -331,7 +331,7 @@ end
 pub fn delete_issue(pool :: PoolHandle, issue_id :: String) -> Int!String do
   let q_events = Query.from(Event.__table__())
     |> Query.where_raw("issue_id = ?::uuid", [issue_id])
-  let _ = Repo.delete_where(pool, Event.__table__(), q_events)?
+  Repo.delete_where(pool, Event.__table__(), q_events)?
   let q_issue = Query.from(Issue.__table__())
     |> Query.where_raw("id = ?::uuid", [issue_id])
   Repo.delete_where(pool, Issue.__table__(), q_issue)
@@ -585,14 +585,14 @@ end
 pub fn update_member_role(pool :: PoolHandle, membership_id :: String, new_role :: String) -> Int!String do
   let q = Query.from(OrgMembership.__table__())
     |> Query.where_raw("id = ?::uuid AND ? IN ('owner', 'admin', 'member')", [membership_id, new_role])
-  let _ = Repo.update_where(pool, OrgMembership.__table__(), %{"role" => new_role}, q)?
+  Repo.update_where(pool, OrgMembership.__table__(), %{"role" => new_role}, q)?
   Ok(1)
 end
 
 # Remove a member from an organization.
 # Returns affected row count (0 if membership not found).
 pub fn remove_member(pool :: PoolHandle, membership_id :: String) -> Int!String do
-  let _ = Repo.delete(pool, OrgMembership.__table__(), membership_id)?
+  Repo.delete(pool, OrgMembership.__table__(), membership_id)?
   Ok(1)
 end
 
@@ -653,13 +653,13 @@ end
 pub fn toggle_alert_rule(pool :: PoolHandle, rule_id :: String, enabled_str :: String) -> Int!String do
   let q = Query.from(AlertRule.__table__())
     |> Query.where_raw("id = ?::uuid", [rule_id])
-  let _ = Repo.update_where(pool, AlertRule.__table__(), %{"enabled" => enabled_str}, q)?
+  Repo.update_where(pool, AlertRule.__table__(), %{"enabled" => enabled_str}, q)?
   Ok(1)
 end
 
 # Delete an alert rule.
 pub fn delete_alert_rule(pool :: PoolHandle, rule_id :: String) -> Int!String do
-  let _ = Repo.delete(pool, AlertRule.__table__(), rule_id)?
+  Repo.delete(pool, AlertRule.__table__(), rule_id)?
   Ok(1)
 end
 
@@ -687,7 +687,7 @@ pub fn fire_alert(pool :: PoolHandle, rule_id :: String, project_id :: String, m
   let rows = Repo.query_raw(pool, sql, [rule_id, project_id, message, condition_type, rule_name])?
   if List.length(rows) > 0 do
     let alert_id = Map.get(List.head(rows), "id")
-    let _ = Repo.execute_raw(pool, "UPDATE alert_rules SET last_fired_at = now() WHERE id = $1::uuid", [rule_id])
+    Repo.execute_raw(pool, "UPDATE alert_rules SET last_fired_at = now() WHERE id = $1::uuid", [rule_id])
     Ok(alert_id)
   else
     Err("fire_alert: no id returned")

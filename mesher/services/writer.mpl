@@ -87,7 +87,7 @@ fn writer_store(state :: WriterState, event_json :: String) -> WriterState do
   let blen = if new_len > state.max_buffer do state.max_buffer else new_len end
   # Flush if batch size reached (LOCKED: size trigger)
   if blen >= state.batch_size do
-    let _ = flush_with_retry(state.pool, state.project_id, buf)
+    flush_with_retry(state.pool, state.project_id, buf)
     WriterState { pool: state.pool, project_id: state.project_id, buffer: List.new(), buffer_len: 0, batch_size: state.batch_size, max_buffer: state.max_buffer }
   else
     WriterState { pool: state.pool, project_id: state.project_id, buffer: buf, buffer_len: blen, batch_size: state.batch_size, max_buffer: state.max_buffer }
@@ -96,7 +96,7 @@ end
 
 fn writer_flush(state :: WriterState) -> WriterState do
   if state.buffer_len > 0 do
-    let _ = flush_with_retry(state.pool, state.project_id, state.buffer)
+    flush_with_retry(state.pool, state.project_id, state.buffer)
     WriterState { pool: state.pool, project_id: state.project_id, buffer: List.new(), buffer_len: 0, batch_size: state.batch_size, max_buffer: state.max_buffer }
   else
     state

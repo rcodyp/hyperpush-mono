@@ -51,7 +51,7 @@ fn handle_stream_connect(conn, path :: String) do
     List.get(parts, 3)
   end
   let room = "project:" <> project_id
-  let _ = Ws.join(conn, room)
+  Ws.join(conn, room)
   let stream_mgr_pid = Process.whereis("stream_manager")
   StreamManager.register_client(stream_mgr_pid, conn, project_id, "", "")
   conn
