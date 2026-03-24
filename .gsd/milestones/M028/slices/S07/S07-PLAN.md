@@ -50,7 +50,7 @@ The final task adds the missing end-to-end closure that S06 prematurely advertis
 
 ## Tasks
 
-- [ ] **T01: Move recovery onto the real supervisor restart boundary** `est:3h`
+- [x] **T01: Move recovery onto the real supervisor restart boundary** `est:3h`
   - Why: The current recovery contract is untrustworthy because `crash_after_claim(...)` simulates reboot/recovery inside the crashing worker and `reclaim_processing_jobs(...)` still requeues every `processing` row with no concurrency guard.
   - Files: `reference-backend/jobs/worker.mpl`, `reference-backend/storage/jobs.mpl`, `reference-backend/migrations/20260323010000_create_jobs.mpl`, `reference-backend/deploy/reference-backend.up.sql`, `compiler/meshc/tests/e2e_reference_backend.rs`
   - Do: Remove fake in-actor boot bookkeeping from the crash path, make the worker record exit intent then actually exit, move all boot/reclaim work behind the restarted child path, and replace blanket `processing` reclaim with a stale/lease-style contract derived from real timing so shared-DB recovery cannot steal live work; keep canonical migration and staged deploy SQL aligned with any recovery query/index changes.

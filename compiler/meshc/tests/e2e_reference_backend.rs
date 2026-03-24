@@ -1663,6 +1663,8 @@ fn e2e_reference_backend_worker_crash_recovers_job() {
 
         let degraded_health =
             wait_for_worker_recovery_health(&config, "worker_crash_after_claim", 1, 1);
+        let degraded_job = get_json(&config, &format!("/jobs/{job_id}"), 200);
+        let degraded_db_row = wait_for_job_row(&database_url, &job_id, "pending", "1");
         assert_eq!(degraded_health["status"].as_str(), Some("degraded"));
         assert_eq!(degraded_health["worker"]["liveness"].as_str(), Some("recovering"));
         assert!(
@@ -1672,6 +1674,19 @@ fn e2e_reference_backend_worker_crash_recovers_job() {
                 .unwrap_or(false),
             "recovery health should expose last_tick_at: {}",
             degraded_health
+        );
+        assert_eq!(degraded_job["id"].as_str(), Some(job_id.as_str()));
+        assert_eq!(degraded_job["status"].as_str(), Some("pending"));
+        assert_eq!(degraded_job["attempts"].as_i64(), Some(1));
+        assert_eq!(
+            degraded_job["last_error"].as_str(),
+            Some("requeued after worker restart")
+        );
+        assert_eq!(degraded_db_row.get("status").map(String::as_str), Some("pending"));
+        assert_eq!(degraded_db_row.get("attempts").map(String::as_str), Some("1"));
+        assert_eq!(
+            degraded_db_row.get("last_error").map(String::as_str),
+            Some("requeued after worker restart")
         );
 
         let (job_json, health_json) = wait_for_processed_job_and_health(&config, &job_id);

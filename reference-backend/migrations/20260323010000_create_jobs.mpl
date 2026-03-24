@@ -10,6 +10,9 @@ pub fn up(pool :: PoolHandle) -> Int ! String do
   Pool.execute(pool,
   "CREATE INDEX IF NOT EXISTS idx_jobs_pending_scan ON jobs (created_at, id) WHERE status = 'pending'",
   []) ?
+  Pool.execute(pool,
+  "CREATE INDEX IF NOT EXISTS idx_jobs_processing_reclaim_scan ON jobs (updated_at, id) WHERE status = 'processing'",
+  []) ?
   Ok(0)
 end
 

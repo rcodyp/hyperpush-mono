@@ -26,6 +26,10 @@ CREATE INDEX IF NOT EXISTS idx_jobs_pending_scan
   ON jobs (created_at, id)
   WHERE status = 'pending';
 
+CREATE INDEX IF NOT EXISTS idx_jobs_processing_reclaim_scan
+  ON jobs (updated_at, id)
+  WHERE status = 'processing';
+
 INSERT INTO _mesh_migrations (version, name)
 VALUES (20260323010000, 'create_jobs')
 ON CONFLICT (version) DO NOTHING;

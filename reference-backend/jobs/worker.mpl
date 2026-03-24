@@ -191,6 +191,39 @@ fn current_timestamp() -> String do
   DateTime.to_iso8601(DateTime.utc_now())
 end
 
+fn current_unix_ms() -> Int do
+  DateTime.to_unix_ms(DateTime.utc_now())
+end
+
+fn recovery_reclaim_grace_ms(poll_ms :: Int) -> Int do
+  let doubled_poll_ms = poll_ms * 2
+  if doubled_poll_ms < 500 do
+    500
+  else
+    doubled_poll_ms
+  end
+end
+
+fn recovery_stale_cutoff_unix_ms(worker_state) -> Int do
+  let poll_ms = JobWorkerState.get_poll_ms(worker_state)
+  current_unix_ms() - recovery_reclaim_grace_ms(poll_ms)
+end
+
+fn wait_for_reclaim_window(worker_state) do
+  let poll_ms = JobWorkerState.get_poll_ms(worker_state)
+  Timer.sleep(recovery_reclaim_grace_ms(poll_ms))
+end
+
+fn pause_after_recovery(worker_state, recovered_jobs :: Int) do
+  if recovered_jobs > 0 do
+    let poll_ms = JobWorkerState.get_poll_ms(worker_state)
+    Timer.sleep(poll_ms)
+    0
+  else
+    0
+  end
+end
+
 fn parse_attempts(value :: String) -> Int do
   let parsed = String.to_int(value)
   case parsed do
@@ -311,30 +344,13 @@ fn should_crash_after_claim(job :: Job) -> Bool do
   end
 end
 
-fn finish_crash_recovery_success(worker_state, result :: RecoveryResult) -> Bool do
-  let _ = record_recovery_result(worker_state, result)
-  true
-end
-
-fn finish_crash_recovery_failure(worker_state, job :: Job, error_message :: String) -> Bool do
-  let _ = record_failure(worker_state, job.id, error_message)
-  true
-end
-
-fn crash_after_claim(pool :: PoolHandle, worker_state, job :: Job) -> Bool do
+fn crash_after_claim(worker_state, job :: Job) -> Bool do
   let crash_ts = current_timestamp()
   let reason = "worker_crash_after_claim"
   let _ = JobWorkerState.note_crash_soon(worker_state, crash_ts, job.id, reason)
   let _ = println("[reference-backend] Job worker crash injected id=#{job.id} attempts=#{job.attempts}")
-  let reboot_ts = current_timestamp()
-  let _ = JobWorkerState.note_boot(worker_state, reboot_ts, reboot_ts)
-  let restart_count = JobWorkerState.get_restart_count(worker_state)
-  let _ = log_worker_boot(reboot_ts, restart_count)
-  let recovery_result = reclaim_processing_jobs(pool, recovery_hint(restart_count))
-  case recovery_result do
-    Ok( result) -> finish_crash_recovery_success(worker_state, result)
-    Err( error_message) -> finish_crash_recovery_failure(worker_state, job, error_message)
-  end
+  let _ = crash_worker(1)
+  true
 end
 
 fn finish_processed_job(worker_state, processed_job :: Job) -> Bool do
@@ -360,7 +376,7 @@ fn handle_claimed_job(pool :: PoolHandle, worker_state, job :: Job) -> Bool do
   let _ = JobWorkerState.note_claimed(worker_state, claim_ts, job.id)
   let _ = log_worker_claimed(job)
   if should_crash_after_claim(job) == true do
-    crash_after_claim(pool, worker_state, job)
+    crash_after_claim(worker_state, job)
   else
     process_claimed_job(pool, worker_state, job)
   end
@@ -407,6 +423,7 @@ end
 
 fn handle_worker_recovery_success(pool :: PoolHandle, worker_state, result :: RecoveryResult) do
   let _ = record_recovery_result(worker_state, result)
+  let _ = pause_after_recovery(worker_state, result.count)
   job_worker_loop(pool, worker_state)
 end
 
@@ -416,7 +433,9 @@ fn handle_worker_recovery_failure(pool :: PoolHandle, worker_state, error_messag
 end
 
 fn handle_worker_pool_open(worker_state, restart_count :: Int, pool :: PoolHandle) do
-  let recovery_result = reclaim_processing_jobs(pool, recovery_hint(restart_count))
+  let _ = wait_for_reclaim_window(worker_state)
+  let stale_cutoff_unix_ms = recovery_stale_cutoff_unix_ms(worker_state)
+  let recovery_result = reclaim_processing_jobs(pool, recovery_hint(restart_count), stale_cutoff_unix_ms)
   case recovery_result do
     Ok( result) -> handle_worker_recovery_success(pool, worker_state, result)
     Err( error_message) -> handle_worker_recovery_failure(pool, worker_state, error_message)
@@ -515,4 +534,6 @@ end
 
 pub fn get_worker_last_recovery_count() -> Int do
   JobWorkerState.get_last_recovery_count(worker_state_pid())
+end
+))
 end
