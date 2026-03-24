@@ -6870,13 +6870,30 @@ fn e2e_m032_supported_cast_if_else() {
     assert_eq!(output, "1\n2\n");
 }
 
-// ── M032/S01: retained-limit proofs ────────────────────────────────────
+// ── M032/S02: inferred-export regression coverage ─────────────────────
 
-/// Freezes the real inferred-polymorphic export blocker behind
-/// `mesher/storage/writer.mpl` on the actual CLI build path.
+/// Local inferred identity must keep its concrete call-site ABI through MIR lowering.
 #[test]
-fn e2e_m032_limit_xmod_identity() {
-    let error = compile_multifile_expect_error(&[
+fn m032_inferred_local_identity() {
+    let output = compile_and_run(
+        r##"
+pub fn identity(x) do
+  x
+end
+
+fn main() do
+  println("#{identity(7)}")
+  println(identity("poly"))
+end
+"##,
+    );
+    assert_eq!(output, "7\npoly\n");
+}
+
+/// Imported inferred identity must keep its concrete call-site ABI through export + MIR lowering.
+#[test]
+fn m032_inferred_cross_module_identity() {
+    let output = compile_multifile_and_run(&[
         (
             "main.mpl",
             include_str!("../../../.tmp/m032-s01/xmod_identity/main.mpl"),
@@ -6886,13 +6903,10 @@ fn e2e_m032_limit_xmod_identity() {
             include_str!("../../../.tmp/m032-s01/xmod_identity/utils.mpl"),
         ),
     ]);
-    assert!(
-        error.contains("Call parameter type does not match function signature!")
-            && error.contains("@identity"),
-        "Expected imported polymorphic export LLVM call-signature mismatch, got: {}",
-        error
-    );
+    assert_eq!(output, "7\npoly\n");
 }
+
+// ── M032/S01: retained-limit proofs ────────────────────────────────────
 
 /// Freezes the nested-`&&` codegen blocker still masked by
 /// `mesher/services/stream_manager.mpl`.

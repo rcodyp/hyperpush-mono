@@ -19,6 +19,7 @@
 ## Verification
 
 - `cargo test -p meshc --test e2e m032_inferred -- --nocapture`
+- `cargo test -p meshc --test e2e m032_inferred_cross_module_identity -- --nocapture`
 - `cargo test -p meshc --test e2e e2e_cross_module_polymorphic -- --nocapture`
 - `cargo test -p meshc --test e2e e2e_cross_module_service -- --nocapture`
 - `bash scripts/verify-m032-s01.sh`
