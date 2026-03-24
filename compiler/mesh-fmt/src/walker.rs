@@ -79,7 +79,7 @@ pub fn walk_node(node: &SyntaxNode) -> FormatIR {
         SyntaxKind::CALL_HANDLER => walk_call_handler(node),
         SyntaxKind::CAST_HANDLER => walk_cast_handler(node),
         SyntaxKind::TERMINATE_CLAUSE => walk_terminate_clause(node),
-        SyntaxKind::CHILD_SPEC_DEF => walk_block_def(node),
+        SyntaxKind::CHILD_SPEC_DEF => walk_child_spec_def(node),
         SyntaxKind::STRUCT_LITERAL => walk_struct_literal(node),
         SyntaxKind::MAP_LITERAL => walk_map_literal(node),
         SyntaxKind::MAP_ENTRY => walk_map_entry(node),
@@ -938,6 +938,46 @@ fn walk_block_def(node: &SyntaxNode) -> FormatIR {
         parts.push(ir::text(")"));
     }
 
+    ir::concat(parts)
+}
+
+fn walk_child_spec_def(node: &SyntaxNode) -> FormatIR {
+    let raw = node.text().to_string();
+    let lines: Vec<String> = raw
+        .lines()
+        .map(|line| line.trim().to_string())
+        .filter(|line| !line.is_empty())
+        .collect();
+
+    if lines.is_empty() {
+        return FormatIR::Empty;
+    }
+
+    let header = ir::text(&lines[0]);
+    let end_line = lines
+        .last()
+        .cloned()
+        .unwrap_or_else(|| "end".to_string());
+    let body_lines = if lines.len() > 2 {
+        lines[1..lines.len() - 1].to_vec()
+    } else {
+        Vec::new()
+    };
+
+    let mut parts = vec![header];
+    if !body_lines.is_empty() {
+        let mut body_parts = Vec::new();
+        for (i, line) in body_lines.into_iter().enumerate() {
+            if i > 0 {
+                body_parts.push(ir::hardline());
+            }
+            body_parts.push(ir::hardline());
+            body_parts.push(ir::text(&line));
+        }
+        parts.push(ir::indent(ir::concat(body_parts)));
+    }
+    parts.push(ir::hardline());
+    parts.push(ir::text(&end_line));
     ir::concat(parts)
 }
 

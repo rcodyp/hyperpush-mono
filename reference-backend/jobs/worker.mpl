@@ -304,15 +304,25 @@ fn should_crash_after_claim(job :: Job) -> Bool do
   end
 end
 
-fn force_worker_crash(0) = 0
-fn force_worker_crash(n) when n == 0 = n
-
 fn crash_after_claim(worker_state, job :: Job) -> Bool do
   let ts = current_timestamp()
   let reason = "worker_crash_after_claim"
   let _ = JobWorkerState.note_crash_soon(worker_state, ts, job.id, reason)
   let _ = println("[reference-backend] Job worker crash injected id=#{job.id} attempts=#{job.attempts}")
   false
+end
+
+fn process_claimed_job_success(worker_state, processed_job :: Job) -> Bool do
+  let _ = record_processed(worker_state, processed_job)
+  true
+end
+
+fn process_claimed_job_failure(pool :: PoolHandle,
+worker_state,
+job :: Job,
+error_message :: String) -> Bool do
+  let _ = handle_process_claim_error(pool, worker_state, job, error_message)
+  true
 end
 
 fn process_claimed_job(pool :: PoolHandle, worker_state, job :: Job) -> Bool do
@@ -324,12 +334,8 @@ fn process_claimed_job(pool :: PoolHandle, worker_state, job :: Job) -> Bool do
   else
     let processed_result = mark_job_processed(pool, job.id)
     case processed_result do
-      Ok( processed_job) ->
-        let _ = record_processed(worker_state, processed_job)
-        true
-      Err( error_message) ->
-        let _ = handle_process_claim_error(pool, worker_state, job, error_message)
-        true
+      Ok( processed_job) -> process_claimed_job_success(worker_state, processed_job)
+      Err( error_message) -> process_claimed_job_failure(pool, worker_state, job, error_message)
     end
   end
 end
@@ -376,8 +382,12 @@ end
 
 fn job_worker_loop(pool :: PoolHandle, worker_state, poll_ms :: Int) do
   Timer.sleep(poll_ms)
-  process_next_job(pool, worker_state)
-  job_worker_loop(pool, worker_state, poll_ms)
+  let should_continue = process_next_job(pool, worker_state)
+  if should_continue == true do
+    job_worker_loop(pool, worker_state, poll_ms)
+  else
+    0
+  end
 end
 
 fn run_supervised_job_worker(pool :: PoolHandle, worker_state, poll_ms :: Int) do
@@ -387,18 +397,26 @@ end
 
 fn handle_worker_pool_open_error(worker_state, error_message :: String) do
   record_failure(worker_state, "", error_message)
-  force_worker_crash(1)
+  0
 end
 
 actor supervised_job_worker() do
   let worker_state = worker_state_pid()
+  
   let boot_ts = current_timestamp()
+  
   JobWorkerState.note_boot(worker_state, boot_ts, boot_ts)
+  
   let restart_count = JobWorkerState.get_restart_count(worker_state)
+  
   log_worker_boot(boot_ts, restart_count)
+  
   let database_url = Env.get("DATABASE_URL", "")
+  
   let poll_ms = get_poll_ms()
+  
   let pool_result = Pool.open(database_url, 1, 1, 5000)
+  
   case pool_result do
     Ok( pool) -> run_supervised_job_worker(pool, worker_state, poll_ms)
     Err( error_message) -> handle_worker_pool_open_error(worker_state, error_message)

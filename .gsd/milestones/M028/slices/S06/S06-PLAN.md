@@ -52,7 +52,7 @@ The final task is intentionally small but important: generic docs need cross-lin
 
 ## Tasks
 
-- [ ] **T01: Re-green the `reference-backend` proof baseline and recovery gates** `est:3h`
+- [x] **T01: Re-green the `reference-backend` proof baseline and recovery gates** `est:3h`
   - Why: S06 cannot honestly promote the backend proof surface while the real `reference-backend` build/test/recovery path is still broken from the S05 carry-forward gap.
   - Files: `reference-backend/jobs/worker.mpl`, `reference-backend/storage/jobs.mpl`, `reference-backend/api/health.mpl`, `reference-backend/main.mpl`, `reference-backend/runtime/registry.mpl`, `compiler/meshc/tests/e2e_reference_backend.rs`
   - Do: Finish the cooperative supervised worker exit/restart path, keep abandoned-job recovery visible in `/health`, and rerun the named build/fmt/test plus ignored recovery proofs until the reference backend is green again at the same surfaces S06 will document publicly.
