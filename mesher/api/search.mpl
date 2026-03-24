@@ -1,19 +1,13 @@
 # Search, filter, and pagination HTTP handlers for Mesher REST API.
-
 # Provides filtered issue listing, full-text event search, tag-based
-
 # event filtering, and per-issue event listing with keyset pagination.
-
 # All handlers follow the PipelineRegistry pattern for pool lookup.
 
 from Ingestion.Pipeline import PipelineRegistry
-
 from Storage.Queries import list_issues_filtered, search_events_fulltext, filter_events_by_tag, list_events_for_issue
-
 from Api.Helpers import query_or_default, to_json_array, require_param, get_registry, resolve_project_id
 
 # --- Shared helpers (leaf functions first, per define-before-use requirement) ---
-
 # Helper: cap a parsed limit value at 100, minimum 1, default 25.
 
 fn cap_limit(n :: Int) -> String do
@@ -47,7 +41,6 @@ fn get_limit(request) -> String do
 end
 
 # Convert an issue row (Map<String, String>) to a JSON string.
-
 # All fields are strings from SQL; event_count is numeric so parse to Int.
 
 fn row_to_issue_json(row) -> String do
@@ -78,7 +71,6 @@ fn row_to_event_json(row) -> String do
 end
 
 # Convert a tag filter result row to JSON.
-
 # tags field is raw JSONB -- embed directly without quoting.
 
 fn row_to_tag_event_json(row) -> String do
@@ -112,7 +104,6 @@ fn extract_cursor_from_last(rows, last_seen_key :: String, id_key :: String) -> 
 end
 
 # Build paginated response JSON with cursor metadata.
-
 # has_more is true when result count equals the limit.
 
 fn build_paginated_response(json_array :: String, rows, limit :: Int) -> String do
@@ -136,7 +127,6 @@ fn build_event_paginated_response(json_array :: String, rows, limit :: Int) -> S
 end
 
 # --- Handler functions (pub, defined after all helpers) ---
-
 # Helper: convert limit string to int for comparison.
 
 fn limit_to_int(limit_str :: String) -> Int do
@@ -151,7 +141,7 @@ end
 
 fn serialize_issue_rows(rows, limit_str :: String) -> String do
   let json_array = rows
-      |> List.map(fn (row) do row_to_issue_json(row) end)
+    |> List.map(fn (row) do row_to_issue_json(row) end)
     |> to_json_array()
   let limit = limit_to_int(limit_str)
   build_paginated_response(json_array, rows, limit)
@@ -170,9 +160,7 @@ fn handle_issue_result_err(e :: String) do
 end
 
 # Handle GET /api/v1/projects/:project_id/issues
-
 # Supports optional filters: status, level, assigned_to
-
 # Supports keyset pagination: cursor, cursor_id
 
 pub fn handle_search_issues(request) do
@@ -204,7 +192,7 @@ end
 
 fn serialize_event_search(rows) -> String do
   rows
-      |> List.map(fn (row) do row_to_event_json(row) end)
+    |> List.map(fn (row) do row_to_event_json(row) end)
     |> to_json_array()
 end
 
@@ -235,7 +223,6 @@ fn dispatch_event_search(pool, project_id :: String, q :: String, limit_str :: S
 end
 
 # Handle GET /api/v1/projects/:project_id/events/search?q=...
-
 # Full-text search on event messages using PostgreSQL tsvector.
 
 pub fn handle_search_events(request) do
@@ -252,7 +239,7 @@ end
 
 fn serialize_tag_events(rows) -> String do
   rows
-      |> List.map(fn (row) do row_to_tag_event_json(row) end)
+    |> List.map(fn (row) do row_to_tag_event_json(row) end)
     |> to_json_array()
 end
 
@@ -288,7 +275,6 @@ fn check_tag_params(pool, project_id :: String, key :: String, value :: String, 
 end
 
 # Handle GET /api/v1/projects/:project_id/events/tags?key=...&value=...
-
 # Filter events by tag key-value pair using JSONB containment.
 
 pub fn handle_filter_by_tag(request) do
@@ -306,7 +292,7 @@ end
 
 fn serialize_issue_event_rows(rows, limit_str :: String) -> String do
   let json_array = rows
-      |> List.map(fn (row) do row_to_issue_event_json(row) end)
+    |> List.map(fn (row) do row_to_issue_event_json(row) end)
     |> to_json_array()
   let limit = limit_to_int(limit_str)
   build_event_paginated_response(json_array, rows, limit)
@@ -319,7 +305,6 @@ fn handle_issue_events_ok(rows, limit_str :: String) do
 end
 
 # Handle GET /api/v1/issues/:issue_id/events
-
 # List events for a specific issue with keyset pagination.
 
 pub fn handle_list_issue_events(request) do

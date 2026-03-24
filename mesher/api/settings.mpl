@@ -1,17 +1,12 @@
 # HTTP route handlers for project settings and storage visibility.
-
 # Provides CRUD for retention_days and sample_rate, plus storage usage.
-
 # Wires RETAIN-01 (retention settings), RETAIN-03 (storage visibility).
 
 from Ingestion.Pipeline import PipelineRegistry
-
 from Storage.Queries import get_project_settings, update_project_settings, get_project_storage
-
 from Api.Helpers import require_param, get_registry, resolve_project_id
 
 # --- Helper functions (defined before handlers) ---
-
 # Helper: format settings row to JSON response.
 
 fn settings_row_to_json(rows) do
@@ -55,9 +50,7 @@ fn storage_row_to_json(rows) do
 end
 
 # --- Handler functions (pub, defined after all helpers) ---
-
 # Handle GET /api/v1/projects/:project_id/settings (RETAIN-01)
-
 # Returns retention_days and sample_rate for a project.
 
 pub fn handle_get_project_settings(request) do
@@ -73,7 +66,6 @@ pub fn handle_get_project_settings(request) do
 end
 
 # Handle POST /api/v1/projects/:project_id/settings (RETAIN-01)
-
 # Updates retention_days and/or sample_rate from JSON body.
 
 pub fn handle_update_project_settings(request) do
@@ -90,7 +82,6 @@ pub fn handle_update_project_settings(request) do
 end
 
 # Handle GET /api/v1/projects/:project_id/storage (RETAIN-03)
-
 # Returns event_count and estimated_bytes for a project.
 
 pub fn handle_get_project_storage(request) do

@@ -56,3 +56,9 @@ Run the second bounded formatter wave across Mesher's ingestion and storage modu
 - `mesher/storage/queries.mpl` — canonical formatter output for the storage module
 - `mesher/storage/schema.mpl` — canonical formatter output for the storage module
 - `mesher/storage/writer.mpl` — canonical formatter output for the storage module
+
+## Observability Impact
+
+- Runtime signals changed: none. This task is limited to Mesher source-shape canonicalization.
+- How to inspect later: rerun the scoped formatter round-trip on `mesher/ingestion` and `mesher/storage`, then use the targeted greps on `mesher/ingestion/routes.mpl` and the two directories to confirm the multiline import and dotted module paths stayed clean.
+- Failure state made visible: `cargo run -q -p meshc -- fmt --check mesher/ingestion`, `cargo run -q -p meshc -- fmt --check mesher/storage`, `! rg -n '^from .{121,}' mesher/ingestion/routes.mpl`, and `! rg -n '^from .*\. ' mesher/ingestion mesher/storage -g '*.mpl'` distinguish a task-local formatter regression from downstream Mesher backlog outside this wave.

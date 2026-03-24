@@ -131,9 +131,42 @@ pub fn walk_node(node: &SyntaxNode) -> FormatIR {
 
 // ── Source file (top-level) ────────────────────────────────────────────
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SourceFileItemKind {
+    CommentBlock,
+    Import,
+    Other,
+}
+
+fn classify_source_file_node(node: &SyntaxNode) -> SourceFileItemKind {
+    match node.kind() {
+        SyntaxKind::IMPORT_DECL | SyntaxKind::FROM_IMPORT_DECL => SourceFileItemKind::Import,
+        _ => SourceFileItemKind::Other,
+    }
+}
+
+fn flush_pending_source_comments(
+    pending_comments: &mut Vec<FormatIR>,
+    items: &mut Vec<(SourceFileItemKind, FormatIR)>,
+) {
+    if pending_comments.is_empty() {
+        return;
+    }
+
+    let mut parts = Vec::new();
+    for (i, comment) in pending_comments.drain(..).enumerate() {
+        if i > 0 {
+            parts.push(ir::hardline());
+        }
+        parts.push(comment);
+    }
+
+    items.push((SourceFileItemKind::CommentBlock, ir::concat(parts)));
+}
+
 fn walk_source_file(node: &SyntaxNode) -> FormatIR {
-    let mut items: Vec<FormatIR> = Vec::new();
-    let mut pending_comment: Option<FormatIR> = None;
+    let mut items: Vec<(SourceFileItemKind, FormatIR)> = Vec::new();
+    let mut pending_comments: Vec<FormatIR> = Vec::new();
 
     for child in node.children_with_tokens() {
         match child {
@@ -145,38 +178,36 @@ fn walk_source_file(node: &SyntaxNode) -> FormatIR {
                     SyntaxKind::COMMENT
                     | SyntaxKind::DOC_COMMENT
                     | SyntaxKind::MODULE_DOC_COMMENT => {
-                        if let Some(pc) = pending_comment.take() {
-                            items.push(pc);
-                        }
-                        pending_comment = Some(ir::text(tok.text()));
+                        pending_comments.push(ir::text(tok.text()));
                     }
                     _ => {}
                 }
             }
             NodeOrToken::Node(n) => {
-                if let Some(pc) = pending_comment.take() {
-                    items.push(pc);
-                }
-                items.push(walk_node(&n));
+                flush_pending_source_comments(&mut pending_comments, &mut items);
+                items.push((classify_source_file_node(&n), walk_node(&n)));
             }
         }
     }
 
-    if let Some(pc) = pending_comment.take() {
-        items.push(pc);
-    }
+    flush_pending_source_comments(&mut pending_comments, &mut items);
 
-    // Separate top-level items with blank lines (hardline + hardline).
     if items.is_empty() {
         FormatIR::Empty
     } else {
         let mut parts = Vec::new();
-        for (i, item) in items.into_iter().enumerate() {
-            if i > 0 {
+        let mut prev_kind: Option<SourceFileItemKind> = None;
+
+        for (kind, item) in items {
+            if let Some(prev) = prev_kind {
                 parts.push(ir::hardline());
-                parts.push(ir::hardline());
+                if !(prev == SourceFileItemKind::Import && kind == SourceFileItemKind::Import)
+                {
+                    parts.push(ir::hardline());
+                }
             }
             parts.push(item);
+            prev_kind = Some(kind);
         }
         ir::concat(parts)
     }
@@ -709,29 +740,48 @@ fn walk_unary_expr(node: &SyntaxNode) -> FormatIR {
 
 // ── Pipe expression ────────────────────────────────────────────────
 
-fn walk_pipe_expr(node: &SyntaxNode) -> FormatIR {
-    let mut parts = Vec::new();
-
+fn collect_pipe_segments(node: &SyntaxNode, segments: &mut Vec<FormatIR>) {
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(tok) => match tok.kind() {
-                SyntaxKind::PIPE => {
-                    parts.push(ir::hardline());
-                    parts.push(ir::text("|>"));
-                    parts.push(sp());
-                }
-                SyntaxKind::NEWLINE => {}
-                _ => {
-                    add_token_with_context(&tok, &mut parts);
-                }
+                SyntaxKind::PIPE | SyntaxKind::NEWLINE => {}
+                _ => {}
             },
             NodeOrToken::Node(n) => {
-                parts.push(walk_node(&n));
+                if n.kind() == SyntaxKind::PIPE_EXPR {
+                    collect_pipe_segments(&n, segments);
+                } else {
+                    segments.push(walk_node(&n));
+                }
             }
         }
     }
+}
 
-    ir::indent(ir::concat(parts))
+fn walk_pipe_expr(node: &SyntaxNode) -> FormatIR {
+    let mut segments = Vec::new();
+    collect_pipe_segments(node, &mut segments);
+
+    if segments.is_empty() {
+        return FormatIR::Empty;
+    }
+
+    let mut parts = Vec::new();
+    let first = segments.remove(0);
+    parts.push(first);
+
+    if !segments.is_empty() {
+        let mut tail_parts = Vec::new();
+        for segment in segments {
+            tail_parts.push(ir::hardline());
+            tail_parts.push(ir::text("|>"));
+            tail_parts.push(sp());
+            tail_parts.push(segment);
+        }
+        parts.push(ir::indent(ir::concat(tail_parts)));
+    }
+
+    ir::concat(parts)
 }
 
 // ── Call expression ──────────────────────────────────────────────────
@@ -1192,7 +1242,18 @@ fn walk_closure_expr(node: &SyntaxNode) -> FormatIR {
                     SyntaxKind::BLOCK if has_do => {
                         // do/end body: indent multi-statement blocks.
                         let stmt_count = count_block_stmts(&n);
-                        if stmt_count > 1 {
+                        let single_expr_kind = n.children().next().map(|child| child.kind());
+                        let force_multiline = stmt_count > 1
+                            || matches!(
+                                single_expr_kind,
+                                Some(
+                                    SyntaxKind::STRUCT_LITERAL
+                                        | SyntaxKind::MAP_LITERAL
+                                        | SyntaxKind::PIPE_EXPR
+                                )
+                            );
+
+                        if force_multiline {
                             let body = walk_block_body(&n);
                             parts.push(ir::indent(ir::concat(vec![ir::hardline(), body])));
                             parts.push(ir::hardline());
@@ -1854,35 +1915,68 @@ fn walk_terminate_clause(node: &SyntaxNode) -> FormatIR {
 // ── Struct literal ──────────────────────────────────────────────────
 
 fn walk_struct_literal(node: &SyntaxNode) -> FormatIR {
-    let mut parts = Vec::new();
+    let mut prefix_parts = Vec::new();
+    let mut fields = Vec::new();
+    let mut saw_l_brace = false;
 
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(tok) => match tok.kind() {
                 SyntaxKind::L_BRACE => {
-                    parts.push(ir::text(" {"));
-                    parts.push(sp());
+                    saw_l_brace = true;
                 }
-                SyntaxKind::R_BRACE => {
-                    parts.push(sp());
-                    parts.push(ir::text("}"));
-                }
-                SyntaxKind::COMMA => {
-                    parts.push(ir::text(","));
-                    parts.push(sp());
-                }
-                SyntaxKind::NEWLINE => {}
+                SyntaxKind::R_BRACE | SyntaxKind::COMMA | SyntaxKind::NEWLINE => {}
                 _ => {
-                    parts.push(ir::text(tok.text()));
+                    if !saw_l_brace {
+                        prefix_parts.push(ir::text(tok.text()));
+                    }
                 }
             },
             NodeOrToken::Node(n) => {
-                parts.push(walk_node(&n));
+                if n.kind() == SyntaxKind::STRUCT_LITERAL_FIELD {
+                    fields.push(walk_node(&n));
+                } else {
+                    prefix_parts.push(walk_node(&n));
+                }
             }
         }
     }
 
-    ir::group(ir::concat(parts))
+    if fields.is_empty() {
+        prefix_parts.push(ir::text(" {"));
+        prefix_parts.push(sp());
+        prefix_parts.push(ir::text("}"));
+        return ir::concat(prefix_parts);
+    }
+
+    if fields.len() == 1 {
+        prefix_parts.push(ir::text(" {"));
+        prefix_parts.push(sp());
+        prefix_parts.push(fields.remove(0));
+        prefix_parts.push(sp());
+        prefix_parts.push(ir::text("}"));
+        return ir::group(ir::concat(prefix_parts));
+    }
+
+    let mut parts = prefix_parts;
+    parts.push(ir::text(" {"));
+
+    let mut inner_parts = Vec::new();
+    let field_count = fields.len();
+    inner_parts.push(ir::hardline());
+    for (i, field) in fields.into_iter().enumerate() {
+        inner_parts.push(field);
+        if i + 1 < field_count {
+            inner_parts.push(ir::text(","));
+            inner_parts.push(ir::hardline());
+        }
+    }
+
+    parts.push(ir::indent(ir::concat(inner_parts)));
+    parts.push(ir::hardline());
+    parts.push(ir::text("}"));
+
+    ir::concat(parts)
 }
 
 // ── Map literal ─────────────────────────────────────────────────────
@@ -2283,11 +2377,38 @@ mod tests {
     }
 
     #[test]
+    fn top_level_imports_stay_compact() {
+        let result = fmt("from Foo import bar\nfrom Baz import qux\nfn main() do\n1\nend");
+        assert_eq!(
+            result,
+            "from Foo import bar\nfrom Baz import qux\n\nfn main() do\n  1\nend\n"
+        );
+    }
+
+    #[test]
+    fn top_level_comment_block_stays_compact_before_imports() {
+        let result = fmt("# one\n# two\nfrom Foo import bar\nfrom Baz import qux");
+        assert_eq!(result, "# one\n# two\n\nfrom Foo import bar\nfrom Baz import qux\n");
+    }
+
+    #[test]
     fn pipe_expression() {
-        let result = fmt("x |> foo() |> bar()");
-        assert!(result.contains("|>"));
-        assert!(result.contains("foo()"));
-        assert!(result.contains("bar()"));
+        let result = fmt("fn foo() do\nlet q = source() |> step_one() |> step_two()\nq\nend");
+        assert_eq!(
+            result,
+            "fn foo() do\n  let q = source()\n    |> step_one()\n    |> step_two()\n  q\nend\n"
+        );
+    }
+
+    #[test]
+    fn pipe_with_closure_and_struct_literal_breaks_cleanly() {
+        let result = fmt(
+            "fn foo() do\nOk(rows |> List.map(fn (row) do Organization { id : Map.get(row, \"id\"), name : Map.get(row, \"name\"), slug : Map.get(row, \"slug\"), created_at : Map.get(row, \"created_at\") } end))\nend",
+        );
+        assert_eq!(
+            result,
+            "fn foo() do\n  Ok(rows\n    |> List.map(fn (row) do\n      Organization {\n        id : Map.get(row, \"id\"),\n        name : Map.get(row, \"name\"),\n        slug : Map.get(row, \"slug\"),\n        created_at : Map.get(row, \"created_at\")\n      }\n    end))\nend\n"
+        );
     }
 
     #[test]

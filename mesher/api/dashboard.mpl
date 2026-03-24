@@ -1,13 +1,9 @@
 # Dashboard aggregation HTTP handlers for Mesher REST API.
-
 # Provides event volume, error breakdown, top issues, tag analysis,
-
 # issue timeline, and project health summary endpoints.
-
 # All handlers follow the PipelineRegistry pattern for pool lookup.
 
 from Ingestion.Pipeline import PipelineRegistry
-
 from Storage.Queries import (
   event_volume_hourly,
   error_breakdown_by_level,
@@ -16,11 +12,9 @@ from Storage.Queries import (
   issue_event_timeline,
   project_health_summary
 )
-
 from Api.Helpers import query_or_default, to_json_array, require_param, get_registry, resolve_project_id
 
 # --- Shared helpers (leaf functions first, per define-before-use requirement) ---
-
 # Serialize {bucket, count} row to JSON. count is numeric (no quotes).
 
 fn bucket_to_json(row) -> String do
@@ -62,7 +56,6 @@ fn top_issue_to_json(row) -> String do
 end
 
 # Serialize {tag_value, count} row to JSON. count is numeric.
-
 # tag_value may be empty if COALESCE returns empty string for null tags.
 
 fn tag_entry_to_json(row) -> String do
@@ -91,18 +84,16 @@ fn timeline_event_to_json(row) -> String do
 end
 
 # --- Handler functions (pub, defined after all helpers) ---
-
 # Helper: serialize volume rows and respond.
 
 fn respond_volume(rows) do
   let body = rows
-      |> List.map(fn (row) do bucket_to_json(row) end)
+    |> List.map(fn (row) do bucket_to_json(row) end)
     |> to_json_array()
   HTTP.response(200, body)
 end
 
 # Handle GET /api/v1/projects/:project_id/dashboard/volume
-
 # Returns event volume bucketed by hour or day.
 
 pub fn handle_event_volume(request) do
@@ -122,13 +113,12 @@ end
 
 fn respond_levels(rows) do
   let body = rows
-      |> List.map(fn (row) do level_to_json(row) end)
+    |> List.map(fn (row) do level_to_json(row) end)
     |> to_json_array()
   HTTP.response(200, body)
 end
 
 # Handle GET /api/v1/projects/:project_id/dashboard/levels
-
 # Returns error breakdown by severity level.
 
 pub fn handle_error_breakdown(request) do
@@ -147,13 +137,12 @@ end
 
 fn respond_top_issues(rows) do
   let body = rows
-      |> List.map(fn (row) do top_issue_to_json(row) end)
+    |> List.map(fn (row) do top_issue_to_json(row) end)
     |> to_json_array()
   HTTP.response(200, body)
 end
 
 # Handle GET /api/v1/projects/:project_id/dashboard/top-issues
-
 # Returns top issues ranked by frequency.
 
 pub fn handle_top_issues(request) do
@@ -173,7 +162,7 @@ end
 
 fn respond_tag_breakdown(rows) do
   let body = rows
-      |> List.map(fn (row) do tag_entry_to_json(row) end)
+    |> List.map(fn (row) do tag_entry_to_json(row) end)
     |> to_json_array()
   HTTP.response(200, body)
 end
@@ -189,7 +178,6 @@ fn do_tag_breakdown(pool, project_id :: String, key :: String) do
 end
 
 # Handle GET /api/v1/projects/:project_id/dashboard/tags?key=...
-
 # Returns event breakdown by tag value for the specified tag key.
 
 pub fn handle_tag_breakdown(request) do
@@ -209,13 +197,12 @@ end
 
 fn respond_timeline(rows) do
   let body = rows
-      |> List.map(fn (row) do timeline_event_to_json(row) end)
+    |> List.map(fn (row) do timeline_event_to_json(row) end)
     |> to_json_array()
   HTTP.response(200, body)
 end
 
 # Handle GET /api/v1/issues/:issue_id/timeline
-
 # Returns per-issue event timeline.
 
 pub fn handle_issue_timeline(request) do
@@ -261,7 +248,6 @@ fn respond_health(rows) do
 end
 
 # Handle GET /api/v1/projects/:project_id/dashboard/health
-
 # Returns project health summary: unresolved count, 24h events, new today.
 
 pub fn handle_project_health(request) do

@@ -1,15 +1,10 @@
 # Team membership management and API token lifecycle HTTP handlers.
-
 # Provides ORG-04 (list/add/update-role/remove members) and ORG-05
-
 # (list/create/revoke API keys) endpoints.
-
 # All handlers follow the PipelineRegistry pattern for pool lookup.
-
 # POST used for all mutation operations per decision [89-02].
 
 from Ingestion.Pipeline import PipelineRegistry
-
 from Storage.Queries import (
   get_members_with_users,
   add_member,
@@ -19,13 +14,10 @@ from Storage.Queries import (
   create_api_key,
   revoke_api_key
 )
-
 from Api.Helpers import query_or_default, to_json_array, require_param, get_registry, resolve_project_id
 
 # --- Shared helpers (leaf functions first, per define-before-use requirement) ---
-
 # Serialize a member row (with user info) to JSON.
-
 # Fields: id, user_id, email, display_name, role, joined_at
 
 fn member_to_json(row) -> String do
@@ -39,9 +31,7 @@ fn member_to_json(row) -> String do
 end
 
 # Serialize an API key row to JSON.
-
 # Fields: id, project_id, key_value, label, created_at, revoked_at
-
 # If revoked_at is empty string, emit null instead of quoted empty string.
 
 fn api_key_to_json(row) -> String do
@@ -60,7 +50,6 @@ fn api_key_to_json(row) -> String do
 end
 
 # Extract a field from a JSON body using Mesh-native Json.get (no DB roundtrip).
-
 # Returns the value or empty string if field is missing/null.
 
 fn extract_json_field(pool :: PoolHandle, body :: String, field :: String) -> String ! String do
@@ -68,7 +57,6 @@ fn extract_json_field(pool :: PoolHandle, body :: String, field :: String) -> St
 end
 
 # --- Team membership helper functions for case arm extraction (ORG-04) ---
-
 # Helper: handle successful add_member result.
 
 fn add_member_success(membership_id :: String) do
@@ -88,7 +76,6 @@ fn remove_success(n :: Int) do
 end
 
 # --- API token helper functions for case arm extraction (ORG-05) ---
-
 # Helper: handle successful create_api_key result.
 
 fn create_key_success(key_value :: String) do
@@ -102,7 +89,6 @@ fn revoke_key_success(n :: Int) do
 end
 
 # --- Add member helper chain ---
-
 # Helper: perform add_member after extracting user_id and role from body.
 
 fn do_add_member(pool :: PoolHandle, org_id :: String, user_id :: String, role :: String) do
@@ -151,7 +137,6 @@ fn validate_add_member(pool :: PoolHandle, org_id :: String, body :: String) do
 end
 
 # --- Update member role helper chain ---
-
 # Helper: perform the actual role update.
 
 fn perform_role_update(pool :: PoolHandle, membership_id :: String, role :: String) do
@@ -173,7 +158,6 @@ fn do_update_role(pool :: PoolHandle, membership_id :: String, body :: String) d
 end
 
 # --- Create API key helper chain ---
-
 # Helper: perform the actual key creation.
 
 fn perform_create_key(pool :: PoolHandle, project_id :: String, label :: String) do
@@ -201,9 +185,7 @@ fn do_create_key(pool :: PoolHandle, project_id :: String, body :: String) do
 end
 
 # --- Handler functions (pub, defined after all helpers) ---
-
 # Handle GET /api/v1/orgs/:org_id/members
-
 # Lists all members of an organization with user info (email, display_name).
 
 pub fn handle_list_members(request) do
@@ -214,16 +196,14 @@ pub fn handle_list_members(request) do
   case result do
     Ok( rows) -> HTTP.response(200,
     rows
-        |> List.map(fn (row) do member_to_json(row) end)
+      |> List.map(fn (row) do member_to_json(row) end)
       |> to_json_array())
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
 
 # Handle POST /api/v1/orgs/:org_id/members
-
 # Adds a member to an organization. Body: {"user_id":"...","role":"member"}
-
 # role defaults to "member" if omitted.
 
 pub fn handle_add_member(request) do
@@ -235,7 +215,6 @@ pub fn handle_add_member(request) do
 end
 
 # Handle POST /api/v1/orgs/:org_id/members/:membership_id/role
-
 # Updates a member's role. Body: {"role":"admin"}
 
 pub fn handle_update_member_role(request) do
@@ -247,7 +226,6 @@ pub fn handle_update_member_role(request) do
 end
 
 # Handle POST /api/v1/orgs/:org_id/members/:membership_id/remove
-
 # Removes a member from an organization.
 
 pub fn handle_remove_member(request) do
@@ -262,7 +240,6 @@ pub fn handle_remove_member(request) do
 end
 
 # Handle GET /api/v1/projects/:project_id/api-keys
-
 # Lists all API keys for a project with revocation status.
 
 pub fn handle_list_api_keys(request) do
@@ -274,16 +251,14 @@ pub fn handle_list_api_keys(request) do
   case result do
     Ok( rows) -> HTTP.response(200,
     rows
-        |> List.map(fn (row) do api_key_to_json(row) end)
+      |> List.map(fn (row) do api_key_to_json(row) end)
       |> to_json_array())
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
 
 # Handle POST /api/v1/projects/:project_id/api-keys
-
 # Creates a new API key for a project. Body: {"label":"my-key"}
-
 # label defaults to "default" if omitted.
 
 pub fn handle_create_api_key(request) do
@@ -296,7 +271,6 @@ pub fn handle_create_api_key(request) do
 end
 
 # Handle POST /api/v1/api-keys/:key_id/revoke
-
 # Revokes an API key by setting revoked_at to now().
 
 pub fn handle_revoke_api_key(request) do

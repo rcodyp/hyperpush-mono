@@ -1,25 +1,16 @@
 # Event detail and navigation HTTP handlers for Mesher REST API.
-
 # Provides full event payload including all JSONB fields (exception,
-
 # stacktrace, breadcrumbs, tags, extra, user_context) and next/previous
-
 # event navigation within an issue.
-
 # JSONB fields are embedded RAW in JSON response (not double-quoted).
 
 from Ingestion.Pipeline import PipelineRegistry
-
 from Storage.Queries import get_event_detail, get_event_neighbors
-
 from Api.Helpers import require_param, get_registry
 
 # --- Helper functions (leaf first, per define-before-use requirement) ---
-
 # Serialize complete event detail row to JSON.
-
 # String fields get \" quoting. JSONB fields embedded raw (no quoting).
-
 # JSONB: exception, stacktrace, breadcrumbs, tags, extra, user_context
 
 fn event_detail_to_json(row) -> String do
@@ -42,7 +33,6 @@ fn event_detail_to_json(row) -> String do
 end
 
 # Format a nullable neighbor ID for JSON output.
-
 # Empty string -> null (no quotes), non-empty -> quoted string.
 
 fn format_neighbor_id(val :: String) -> String do
@@ -86,9 +76,7 @@ fn build_nav_response(detail_json :: String, nav_rows) do
 end
 
 # Helper: add navigation data to event detail and build final response.
-
 # Makes the second query (get_event_neighbors) using issue_id and received_at
-
 # from the detail row, then combines both into the response.
 
 fn add_navigation(pool,
@@ -104,7 +92,6 @@ detail_json :: String) do
 end
 
 # Helper: process event detail rows into response with navigation.
-
 # Extracts the single row, serializes it, then fetches navigation data.
 
 fn build_event_response_from_rows(pool, event_id :: String, rows) do
@@ -120,11 +107,8 @@ fn build_event_response_from_rows(pool, event_id :: String, rows) do
 end
 
 # --- Handler functions (pub, defined after all helpers) ---
-
 # Handle GET /api/v1/events/:event_id
-
 # Returns full event payload with all JSONB fields and next/prev navigation.
-
 # Makes two sequential queries: event detail, then event neighbors.
 
 pub fn handle_event_detail(request) do

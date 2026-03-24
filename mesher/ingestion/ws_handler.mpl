@@ -12,6 +12,7 @@ from Ingestion.Pipeline import PipelineRegistry
 from Api.Helpers import get_registry
 
 # Helper: check authorization header as fallback
+
 fn check_authorization_header(conn, headers) do
   let has_auth = Map.has_key(headers, "authorization")
   if has_auth do
@@ -22,24 +23,28 @@ fn check_authorization_header(conn, headers) do
 end
 
 # Helper: send a text frame to a WS connection (discards send result).
+
 fn ws_write(conn, msg :: String) do
   let _result = Ws.send(conn, msg)
   nil
 end
 
 # Helper: send accepted response over WS
+
 fn ws_send_accepted(conn) do
-  ws_write(conn, json { status: "accepted" })
+  ws_write(conn, json { status : "accepted" })
 end
 
 # Helper: send error response over WS
+
 fn ws_send_error(conn, reason :: String) do
-  let msg = json { error: reason }
+  let msg = json { error : reason }
   ws_write(conn, msg)
 end
 
 # Helper: handle a /stream/projects/:id or /ws/stream/projects/:id connection
 # Join room and register in StreamManager.
+
 fn handle_stream_connect(conn, path :: String) do
   let parts = String.split(path, "/")
   # /stream/projects/:id  -> ["", "stream", "projects", ":id"]  -> index 3
@@ -58,6 +63,7 @@ fn handle_stream_connect(conn, path :: String) do
 end
 
 # Helper: handle an /ingest (or other) connection -- auth check
+
 fn handle_ingest_connect(conn, headers) do
   let has_key = Map.has_key(headers, "x-sentry-auth")
   if has_key do
@@ -68,6 +74,7 @@ fn handle_ingest_connect(conn, headers) do
 end
 
 # Helper: check if path contains /stream/projects/ (handles /ws prefix from proxy)
+
 fn is_stream_path(path :: String) -> Bool do
   String.contains(path, "/stream/projects/")
 end
@@ -75,6 +82,7 @@ end
 # WebSocket on_connect callback.
 # Receives (conn, path, headers) where headers is a Map<String, String>.
 # Routes /stream/projects/:id to room subscription, /ingest to event ingestion auth.
+
 pub fn ws_on_connect(conn, path, headers) do
   let is_stream = is_stream_path(path)
   if is_stream do
@@ -86,6 +94,7 @@ end
 
 # Helper: update subscription filters from a JSON subscribe message.
 # Uses Mesh-native Json.get_nested for nested field extraction (no DB roundtrip).
+
 fn handle_subscribe_update(conn, message :: String) do
   let level = Json.get_nested(message, "filters", "level")
   let env = Json.get_nested(message, "filters", "environment")
@@ -96,20 +105,22 @@ fn handle_subscribe_update(conn, message :: String) do
 end
 
 # Helper: handle message from an ingestion client (existing behavior)
+
 fn handle_ingest_message(conn, message :: String) do
   let reg_pid = get_registry()
   let processor_pid = PipelineRegistry.get_processor(reg_pid)
   let writer_pid = PipelineRegistry.get_writer(reg_pid)
   let result = EventProcessor.process_event(processor_pid, "ws-project", writer_pid, message)
   case result do
-    Ok(_) -> ws_send_accepted(conn)
-    Err(reason) -> ws_send_error(conn, reason)
+    Ok( _) -> ws_send_accepted(conn)
+    Err( reason) -> ws_send_error(conn, reason)
   end
 end
 
 # WebSocket on_message callback.
 # Receives (conn, message) where message is the raw text frame content.
 # Routes streaming clients to subscription updates, ingestion clients to EventProcessor.
+
 pub fn ws_on_message(conn, message) do
   let stream_mgr_pid = Process.whereis("stream_manager")
   let is_stream = StreamManager.is_stream_client(stream_mgr_pid, conn)
@@ -122,6 +133,7 @@ end
 
 # WebSocket on_close callback.
 # Cleans up StreamManager state; Ws.join auto-cleanup handles room removal.
+
 pub fn ws_on_close(conn, code :: Int, reason :: String) do
   let stream_mgr_pid = Process.whereis("stream_manager")
   StreamManager.remove_client(stream_mgr_pid, conn)

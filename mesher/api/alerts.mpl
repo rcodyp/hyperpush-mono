@@ -1,11 +1,8 @@
 # HTTP route handlers for alert rule management and alert state management.
-
 # Alert rules define conditions for automated notifications (ALERT-01).
-
 # Fired alerts have a lifecycle: active -> acknowledged -> resolved (ALERT-06).
 
 from Ingestion.Pipeline import PipelineRegistry
-
 from Storage.Queries import (
   create_alert_rule,
   list_alert_rules,
@@ -15,11 +12,9 @@ from Storage.Queries import (
   acknowledge_alert,
   resolve_fired_alert
 )
-
 from Api.Helpers import require_param, query_or_default, to_json_array, get_registry, resolve_project_id
 
 # --- Helper functions (defined before handlers) ---
-
 # Format nullable timestamp: empty string -> JSON null, otherwise quoted string.
 
 fn format_nullable_ts(ts :: String) -> String do
@@ -72,9 +67,7 @@ fn do_toggle(pool :: PoolHandle, rule_id :: String, enabled_str :: String) do
 end
 
 # --- Handler functions (pub, defined after all helpers) ---
-
 # Handle POST /api/v1/projects/:project_id/alert-rules (ALERT-01)
-
 # Creates a new alert rule from JSON body.
 
 pub fn handle_create_alert_rule(request) do
@@ -91,7 +84,6 @@ pub fn handle_create_alert_rule(request) do
 end
 
 # Handle GET /api/v1/projects/:project_id/alert-rules (ALERT-01)
-
 # Lists all alert rules for a project.
 
 pub fn handle_list_alert_rules(request) do
@@ -103,16 +95,14 @@ pub fn handle_list_alert_rules(request) do
   case result do
     Ok( rows) -> HTTP.response(200,
     rows
-        |> List.map(fn (row) do rule_row_to_json(row) end)
+      |> List.map(fn (row) do rule_row_to_json(row) end)
       |> to_json_array())
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
 
 # Handle POST /api/v1/alert-rules/:rule_id/toggle (ALERT-01)
-
 # Toggles an alert rule enabled/disabled.
-
 # Uses Mesh-native Json.get for field extraction (no DB roundtrip).
 
 pub fn handle_toggle_alert_rule(request) do
@@ -130,7 +120,6 @@ pub fn handle_toggle_alert_rule(request) do
 end
 
 # Handle POST /api/v1/alert-rules/:rule_id/delete (ALERT-01)
-
 # Deletes an alert rule.
 
 pub fn handle_delete_alert_rule(request) do
@@ -145,7 +134,6 @@ pub fn handle_delete_alert_rule(request) do
 end
 
 # Handle GET /api/v1/projects/:project_id/alerts (ALERT-06)
-
 # Lists alerts for a project with optional status filter.
 
 pub fn handle_list_alerts(request) do
@@ -158,14 +146,13 @@ pub fn handle_list_alerts(request) do
   case result do
     Ok( rows) -> HTTP.response(200,
     rows
-        |> List.map(fn (row) do alert_row_to_json(row) end)
+      |> List.map(fn (row) do alert_row_to_json(row) end)
       |> to_json_array())
     Err( e) -> HTTP.response(500, json { error : e })
   end
 end
 
 # Handle POST /api/v1/alerts/:id/acknowledge (ALERT-06)
-
 # Transitions an active alert to acknowledged.
 
 pub fn handle_acknowledge_alert(request) do
@@ -180,7 +167,6 @@ pub fn handle_acknowledge_alert(request) do
 end
 
 # Handle POST /api/v1/alerts/:id/resolve (ALERT-06)
-
 # Transitions an active or acknowledged alert to resolved.
 
 pub fn handle_resolve_alert(request) do
