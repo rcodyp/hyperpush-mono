@@ -76,10 +76,32 @@ This file is the explicit capability and coverage contract for the project.
 - Description: `mesher/` should have zero `let _ =` for side effects, string interpolation replacing `<>` concatenation where appropriate, multiline imports for long lines, and pipe operators used idiomatically.
 - Why it matters: Mesher is the larger dogfood app — its code quality reflects language usability.
 - Source: user
-- Primary owning slice: M031/S04
+- Primary owning slice: M029/S02
+- Supporting slices: M029/S03
+- Validation: Partially validated by M031/S04: zero `let _ =` (72 removed). Remaining: `<>` JSON serialization → `json {}` macro + interpolation, pipe operator adoption, multiline imports.
+- Notes: M031/S04 completed `let _ =` removal and 11 clear-win interpolation swaps. M029 picks up: json macro adoption for JSON serializers (alerts, search, detail), remaining `<>` → interpolation, `List.map(rows, fn)` → pipe style, multiline imports (blocked on M029/S01 formatter fix).
+
+### R026 — `meshc fmt` must preserve module dot-paths and parenthesized multiline imports.
+- Class: quality-attribute
+- Status: active
+- Description: `meshc fmt` must not insert spaces into module dot-paths (`Api.Router` not `Api. Router`) and must preserve parenthesized multiline imports instead of collapsing them to single-line.
+- Why it matters: The formatter bug (D032) corrupts valid source code and blocks multiline import adoption across both dogfood codebases.
+- Source: execution
+- Primary owning slice: M029/S01
 - Supporting slices: none
-- Validation: Partially validated by M031/S04: zero `let _ =` (72 removed across 6 files), 11 clear-win `<>` sites replaced with interpolation (D029-designated SQL/JSONB/crypto sites preserved), 3 nested else/if flattened to `else if`. Multiline imports deferred — meshc fmt collapses them back to single-line (formatter bug, not parser). Build succeeds; 313 e2e tests pass.
-- Notes: 72 `let _ =` removed, 11 `<>` → interpolation, 3 else if flattened. Multiline imports blocked on formatter fix (see KNOWLEDGE.md entry). Pipe operators were not in scope for S04 tasks — mesher already uses pipes where natural. The requirement's multiline-import criterion cannot be fully validated until the formatter walker handles FROM_IMPORT_DECL with IMPORT_LIST inside parens.
+- Validation: unmapped
+- Notes: Root cause is in `walk_tokens_inline` — `needs_space_before` doesn't exclude IDENT-after-DOT. Multiline import collapse may be a second bug in `walk_from_import_decl` routing.
+
+### R027 — `reference-backend/` source files must have correct module dot-paths after formatter fix.
+- Class: quality-attribute
+- Status: active
+- Description: `reference-backend/` source files must have correct module dot-paths (`Api.Router` not `Api. Router`), verified by `meshc fmt --check reference-backend` passing after the formatter fix.
+- Why it matters: The reference-backend is the primary proof target — formatter-induced corruption in its imports undermines tooling trust.
+- Source: execution
+- Primary owning slice: M029/S03
+- Supporting slices: none
+- Validation: unmapped
+- Notes: Currently has `Api. Router`, `Runtime. Registry`, `Jobs. Worker`, `Storage. Jobs`, `Types. Job` corruption across 7 files. Will be fixed by reformatting with the corrected formatter.
 
 ## Validated
 
@@ -367,8 +389,10 @@ This file is the explicit capability and coverage contract for the project.
 | R021 | admin/support | deferred | none | none | unmapped |
 | R022 | operability | deferred | M027/S02 (provisional) | none | unmapped |
 | R023 | quality-attribute | validated | M031/S03 | none | Validated by M031/S03: `rg 'let _ =' reference-backend/ -g '*.mpl'` returns 0 matches, `rg '== true' reference-backend/ -g '*.mpl'` returns 0 matches, all 8 WorkerState full reconstructions replaced with struct update syntax, all nested if/else chains flattened to else if, long import converted to multiline. Build, formatter, project tests, and 313 e2e tests pass clean. |
-| R024 | quality-attribute | active | M031/S04 | none | Partially validated by M031/S04: zero `let _ =` (72 removed across 6 files), 11 clear-win `<>` sites replaced with interpolation (D029-designated SQL/JSONB/crypto sites preserved), 3 nested else/if flattened to `else if`. Multiline imports deferred — meshc fmt collapses them back to single-line (formatter bug, not parser). Build succeeds; 313 e2e tests pass. |
+| R024 | quality-attribute | active | M029/S02 | M029/S03 | Partially validated by M031/S04: zero `let _ =` (72 removed). Remaining: json macro, interpolation, pipes, multiline imports. |
 | R025 | quality-attribute | validated | M031/S05 | M031/S01, M031/S02 | Validated by M031/S05 — all 12 listed pattern categories have dedicated e2e tests: bare expression statements (2 tests), else-if chains (S01 tests), if/while/case/for fn_call() do (S01 tests), not fn_call() in conditions (2 tests), multiline fn calls (S01 tests), multiline imports (S02 tests), trailing commas (S02 tests), struct update in service handlers (1 test), pipe chains (S03/S04 dogfood). Full suite: 328 tests, 318 pass, 10 pre-existing try_* failures. |
+| R026 | quality-attribute | active | M029/S01 | none | unmapped |
+| R027 | quality-attribute | active | M029/S03 | none | unmapped |
 | R030 | anti-feature | out-of-scope | none | none | n/a |
 | R031 | anti-feature | out-of-scope | none | none | n/a |
 | R032 | constraint | out-of-scope | none | none | n/a |
@@ -377,7 +401,7 @@ This file is the explicit capability and coverage contract for the project.
 
 ## Coverage Summary
 
-- Active requirements: 7
-- Mapped to slices: 7
+- Active requirements: 9
+- Mapped to slices: 9
 - Validated: 15 (R001, R002, R003, R004, R005, R006, R008, R009, R015, R016, R017, R018, R019, R023, R025)
 - Unmapped active requirements: 0

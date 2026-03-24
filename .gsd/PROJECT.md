@@ -34,6 +34,6 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 ## Milestone Sequence
 
 - [x] M028: Language Baseline Audit & Hardening — backend trust baseline established; serial recovery-proof has residual flake
-- [ ] M029: Backend Ergonomics — improve the language/runtime/DX where real backend pressure exposes friction
+- [ ] M029: Mesher & Reference-Backend Dogfood Completion — formatter dot-path/multiline-import fix, json macro + interpolation + pipe cleanup, formatter compliance on both codebases
 - [ ] M030: Tooling & Package Trust — make fmt/LSP/tests/coverage/dependency flow credible for daily backend work
 - [x] M031: Language DX Audit & Rough Edge Fixes — 3 compiler bugs fixed, multiline imports/trailing commas added, both dogfood codebases cleaned, 328 e2e tests
