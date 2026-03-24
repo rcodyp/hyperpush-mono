@@ -1,4 +1,20 @@
-from Jobs. Worker import get_worker_boot_id, get_worker_failed_jobs, get_worker_last_error, get_worker_last_exit_reason, get_worker_last_job_id, get_worker_last_recovery_at, get_worker_last_recovery_count, get_worker_last_recovery_job_id, get_worker_last_status, get_worker_last_tick_at, get_worker_poll_ms, get_worker_processed_jobs, get_worker_recovered_jobs, get_worker_restart_count, get_worker_started_at
+from Jobs. Worker import (
+  get_worker_boot_id,
+  get_worker_failed_jobs,
+  get_worker_last_error,
+  get_worker_last_exit_reason,
+  get_worker_last_job_id,
+  get_worker_last_recovery_at,
+  get_worker_last_recovery_count,
+  get_worker_last_recovery_job_id,
+  get_worker_last_status,
+  get_worker_last_tick_at,
+  get_worker_poll_ms,
+  get_worker_processed_jobs,
+  get_worker_recovered_jobs,
+  get_worker_restart_count,
+  get_worker_started_at
+)
 
 fn encode_optional_string(value :: String) -> String do
   let wrapped = if String.length(value) > 0 do
@@ -45,49 +61,39 @@ end
 fn is_recovering_status(status :: String) -> Bool do
   if status == "recovering" do
     true
+  else if status == "crashing" do
+    true
+  else if status == "starting" do
+    true
   else
-    if status == "crashing" do
-      true
-    else
-      if status == "starting" do
-        true
-      else
-        false
-      end
-    end
+    false
   end
 end
 
 fn worker_liveness(last_status :: String, poll_ms :: Int, tick_age_ms :: Int) -> String do
   if last_status == "failed" do
     "failed"
+  else if worker_tick_is_stale(poll_ms, tick_age_ms) do
+    "stale"
+  else if is_recovering_status(last_status) do
+    "recovering"
   else
-    if worker_tick_is_stale(poll_ms, tick_age_ms) == true do
-      "stale"
-    else
-      if is_recovering_status(last_status) == true do
-        "recovering"
-      else
-        "healthy"
-      end
-    end
+    "healthy"
   end
 end
 
 fn health_status(liveness :: String) -> String do
   if liveness == "healthy" do
     "ok"
+  else if liveness == "failed" do
+    "error"
   else
-    if liveness == "failed" do
-      "error"
-    else
-      "degraded"
-    end
+    "degraded"
   end
 end
 
 fn recovery_active(last_status :: String, poll_ms :: Int, tick_age_ms :: Int) -> Bool do
-  if worker_tick_is_stale(poll_ms, tick_age_ms) == true do
+  if worker_tick_is_stale(poll_ms, tick_age_ms) do
     false
   else
     is_recovering_status(last_status)
@@ -95,7 +101,7 @@ fn recovery_active(last_status :: String, poll_ms :: Int, tick_age_ms :: Int) ->
 end
 
 fn bool_json(value :: Bool) -> String do
-  if value == true do
+  if value do
     "true"
   else
     "false"

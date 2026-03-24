@@ -88,7 +88,7 @@ pub fn mark_job_processed(pool :: PoolHandle, job_id :: String) -> Job ! String 
   let ts = current_timestamp()
   let q = Query.from(jobs_table())
     |> Query.where_raw("id = ?::uuid", [job_id])
-  let _ = Repo.update_where(pool,
+  Repo.update_where(pool,
   jobs_table(),
   %{"status" => "processed", "last_error" => "", "processed_at" => ts, "updated_at" => ts},
   q) ?
@@ -99,7 +99,7 @@ pub fn mark_job_failed(pool :: PoolHandle, job_id :: String, error_message :: St
   let ts = current_timestamp()
   let q = Query.from(jobs_table())
     |> Query.where_raw("id = ?::uuid", [job_id])
-  let _ = Repo.update_where(pool,
+  Repo.update_where(pool,
   jobs_table(),
   %{"status" => "failed", "last_error" => error_message, "updated_at" => ts},
   q) ?

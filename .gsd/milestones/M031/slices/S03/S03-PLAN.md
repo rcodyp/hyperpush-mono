@@ -33,7 +33,7 @@
   - Verify: `cargo run -p meshc -- build reference-backend` succeeds; `rg 'let _ =' reference-backend/jobs/worker.mpl` returns 0; `rg '== true' reference-backend/jobs/worker.mpl` returns 0; `rg 'WorkerState \{' reference-backend/jobs/worker.mpl` returns only the struct definition (1 match).
   - Done when: worker.mpl has zero `let _ =`, zero `== true`, zero full struct reconstructions, and the backend compiles clean.
 
-- [ ] **T02: Clean up remaining files, verify full suite, formatter gate** `est:30m`
+- [x] **T02: Clean up remaining files, verify full suite, formatter gate** `est:30m`
   - Why: 5 more files need cleanup (9 total `let _ =`, 4 `== true`, 4 nested if/else chains, 1 long import). Then the full verification gate proves zero regressions.
   - Files: `reference-backend/api/health.mpl`, `reference-backend/api/jobs.mpl`, `reference-backend/storage/jobs.mpl`, `reference-backend/main.mpl`, `reference-backend/runtime/registry.mpl`
   - Do: (1) `api/health.mpl`: Remove 4 `== true`, flatten 4 nested if/else chains to `else if`, convert the 410-char import to parenthesized multiline. (2) `api/jobs.mpl`: Remove 4 `let _ =`. (3) `storage/jobs.mpl`: Remove 2 `let _ =` on `Repo.update_where(...) ?` calls — bare `Repo.update_where(...) ?` is fine, the `?` still propagates errors. (4) `main.mpl`: Remove 2 `let _ =`. (5) `runtime/registry.mpl`: Remove 1 `let _ =`. (6) Run full verification gate: build, fmt --check, test, full e2e suite, anti-pattern grep.

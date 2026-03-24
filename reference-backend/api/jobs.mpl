@@ -34,17 +34,17 @@ fn log_get_success(job :: Job) do
 end
 
 fn create_job_response(job :: Job, payload :: String) do
-  let _ = log_create_success(job, payload)
+  log_create_success(job, payload)
   HTTP.response(201, job_to_json(job))
 end
 
 fn create_job_error_response(e :: String) do
-  let _ = println("[reference-backend] Job create failed: #{e}")
+  println("[reference-backend] Job create failed: #{e}")
   HTTP.response(400, json { error : e })
 end
 
 fn get_job_success_response(job :: Job) do
-  let _ = log_get_success(job)
+  log_get_success(job)
   HTTP.response(200, job_to_json(job))
 end
 
@@ -52,7 +52,7 @@ fn get_job_error_response(job_id :: String, e :: String) do
   if e == "not found" do
     HTTP.response(404, json { error : "job not found" })
   else
-    let _ = println("[reference-backend] Job fetch failed id=#{job_id}: #{e}")
+    println("[reference-backend] Job fetch failed id=#{job_id}: #{e}")
     HTTP.response(500, json { error : e })
   end
 end

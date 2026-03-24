@@ -24,7 +24,7 @@ end
 
 pub fn start_registry(pool :: PoolHandle, database_url :: String, poll_ms :: Int) do
   let registry_pid = RuntimeRegistry.start(pool, database_url, poll_ms)
-  let _ = Process.register("reference_backend_registry", registry_pid)
+  Process.register("reference_backend_registry", registry_pid)
   registry_pid
 end
 
