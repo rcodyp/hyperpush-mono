@@ -38,3 +38,12 @@
 {"ts":"2026-03-25T01:38:32.115Z","flowId":"2293e7c2-63b4-4313-83e6-96d1cb4b90fa","seq":2,"eventType":"dispatch-match","rule":"needs-discussion → discuss-milestone","data":{"unitType":"discuss-milestone","unitId":"M033"}}
 {"ts":"2026-03-25T01:38:32.230Z","flowId":"2293e7c2-63b4-4313-83e6-96d1cb4b90fa","seq":3,"eventType":"unit-start","data":{"unitType":"discuss-milestone","unitId":"M033"}}
 {"ts":"2026-03-25T02:08:32.471Z","flowId":"2293e7c2-63b4-4313-83e6-96d1cb4b90fa","seq":4,"eventType":"unit-end","data":{"unitType":"discuss-milestone","unitId":"M033","status":"completed","artifactVerified":true},"causedBy":{"flowId":"2293e7c2-63b4-4313-83e6-96d1cb4b90fa","seq":3}}
+{"ts":"2026-03-25T02:08:40.559Z","flowId":"2293e7c2-63b4-4313-83e6-96d1cb4b90fa","seq":5,"eventType":"iteration-end","data":{"iteration":33}}
+{"ts":"2026-03-25T02:08:40.560Z","flowId":"2a6926bb-fdd0-4b4e-b9bc-f2e1a2c35a7f","seq":1,"eventType":"iteration-start","data":{"iteration":34}}
+{"ts":"2026-03-25T02:08:40.808Z","flowId":"2a6926bb-fdd0-4b4e-b9bc-f2e1a2c35a7f","seq":2,"eventType":"dispatch-match","rule":"needs-discussion → discuss-milestone","data":{"unitType":"discuss-milestone","unitId":"M033"}}
+{"ts":"2026-03-25T02:08:40.822Z","flowId":"80256cce-b8bc-4262-8cc0-0f07e637fb66","seq":1,"eventType":"iteration-start","data":{"iteration":35}}
+{"ts":"2026-03-25T02:08:41.179Z","flowId":"80256cce-b8bc-4262-8cc0-0f07e637fb66","seq":2,"eventType":"dispatch-match","rule":"needs-discussion → discuss-milestone","data":{"unitType":"discuss-milestone","unitId":"M033"}}
+{"ts":"2026-03-25T03:07:25.548Z","flowId":"89056261-8096-4f5e-aa3d-02b3c1f146a8","seq":1,"eventType":"iteration-start","data":{"iteration":1}}
+{"ts":"2026-03-25T03:07:26.679Z","flowId":"89056261-8096-4f5e-aa3d-02b3c1f146a8","seq":2,"eventType":"dispatch-match","rule":"pre-planning (no research) → research-milestone","data":{"unitType":"research-milestone","unitId":"M033"}}
+{"ts":"2026-03-25T03:07:26.913Z","flowId":"89056261-8096-4f5e-aa3d-02b3c1f146a8","seq":3,"eventType":"unit-start","data":{"unitType":"research-milestone","unitId":"M033"}}
+{"ts":"2026-03-25T03:23:06.038Z","flowId":"89056261-8096-4f5e-aa3d-02b3c1f146a8","seq":4,"eventType":"unit-end","data":{"unitType":"research-milestone","unitId":"M033","status":"completed","artifactVerified":true},"causedBy":{"flowId":"89056261-8096-4f5e-aa3d-02b3c1f146a8","seq":3}}
