@@ -84,6 +84,12 @@ pub use db::changeset::{
     mesh_changeset_validate_length, mesh_changeset_validate_number,
     mesh_changeset_validate_required,
 };
+pub use db::expr::{
+    mesh_expr_add, mesh_expr_alias, mesh_expr_call, mesh_expr_case, mesh_expr_coalesce,
+    mesh_expr_column, mesh_expr_div, mesh_expr_eq, mesh_expr_excluded, mesh_expr_gt,
+    mesh_expr_gte, mesh_expr_lt, mesh_expr_lte, mesh_expr_mul, mesh_expr_neq, mesh_expr_null,
+    mesh_expr_sub, mesh_expr_value,
+};
 pub use db::json::{mesh_json_get, mesh_json_get_nested};
 pub use db::migration::{
     mesh_migration_add_column, mesh_migration_create_index, mesh_migration_create_table,
@@ -112,8 +118,9 @@ pub use db::repo::{
     mesh_repo_all, mesh_repo_count, mesh_repo_delete, mesh_repo_delete_where,
     mesh_repo_delete_where_returning, mesh_repo_execute_raw, mesh_repo_exists, mesh_repo_get,
     mesh_repo_get_by, mesh_repo_insert, mesh_repo_insert_changeset, mesh_repo_insert_or_update,
-    mesh_repo_one, mesh_repo_preload, mesh_repo_query_raw, mesh_repo_transaction, mesh_repo_update,
-    mesh_repo_update_changeset, mesh_repo_update_where,
+    mesh_repo_insert_or_update_expr, mesh_repo_one, mesh_repo_preload, mesh_repo_query_raw,
+    mesh_repo_transaction, mesh_repo_update, mesh_repo_update_changeset, mesh_repo_update_where,
+    mesh_repo_update_where_expr,
 };
 pub use db::sqlite::{mesh_sqlite_close, mesh_sqlite_execute, mesh_sqlite_open, mesh_sqlite_query};
 pub use dist::node::{
@@ -161,11 +168,6 @@ pub use string::{
 };
 pub use test::{
     mesh_test_assert, mesh_test_assert_eq, mesh_test_assert_ne, mesh_test_assert_raises,
-    mesh_test_begin, mesh_test_cleanup_actors, mesh_test_fail_count, mesh_test_fail_msg,
-    mesh_test_mock_actor, mesh_test_pass, mesh_test_pass_count, mesh_test_run_body,
-    mesh_test_summary,
-};
-ssert_raises,
     mesh_test_begin, mesh_test_cleanup_actors, mesh_test_fail_count, mesh_test_fail_msg,
     mesh_test_mock_actor, mesh_test_pass, mesh_test_pass_count, mesh_test_run_body,
     mesh_test_summary,

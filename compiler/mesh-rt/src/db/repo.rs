@@ -24,6 +24,7 @@
 
 use crate::collections::list::{mesh_list_append, mesh_list_get, mesh_list_length, mesh_list_new};
 use crate::collections::map::{mesh_map_get, mesh_map_put};
+use crate::db::expr::{clone_expr, serialize_expr, SqlExpr};
 use crate::db::changeset::{
     add_constraint_error_to_changeset, map_constraint_error, SLOT_CHANGES, SLOT_VALID,
 };
@@ -1112,6 +1113,115 @@ unsafe fn map_to_columns_and_values(map: *mut u8) -> (Vec<String>, Vec<String>) 
     (columns, values)
 }
 
+/// Extract (column_names, expressions) from a Mesh Map<String, Ptr> pointer.
+unsafe fn map_to_columns_and_exprs(map: *mut u8) -> (Vec<String>, Vec<SqlExpr>) {
+    let len = *(map as *const u64) as usize;
+    let entries = map.add(MAP_HEADER_SIZE) as *const [u64; 2];
+    let mut columns = Vec::with_capacity(len);
+    let mut exprs = Vec::with_capacity(len);
+    for i in 0..len {
+        let key_ptr = (*entries.add(i))[0] as *const MeshString;
+        let expr_ptr = (*entries.add(i))[1] as *mut u8;
+        if !key_ptr.is_null() {
+            columns.push((*key_ptr).as_str().to_string());
+            exprs.push(clone_expr(expr_ptr));
+        }
+    }
+    (columns, exprs)
+}
+
+fn build_set_expr_parts(columns: &[String], exprs: &[SqlExpr], start_idx: usize) -> (Vec<String>, Vec<String>, usize) {
+    let mut set_parts = Vec::with_capacity(columns.len());
+    let mut params = Vec::new();
+    let mut next_idx = start_idx;
+
+    for (column, expr) in columns.iter().zip(exprs.iter()) {
+        let (expr_sql_local, expr_params) = serialize_expr(expr);
+        let (expr_sql, _consumed) = renumber_placeholders(&expr_sql_local, next_idx);
+        next_idx += expr_params.len();
+        params.extend(expr_params);
+        set_parts.push(format!("{} = {}", quote_ident(column), expr_sql));
+    }
+
+    (set_parts, params, next_idx)
+}
+
+fn build_update_where_expr_sql_pure(
+    table: &str,
+    columns: &[String],
+    exprs: &[SqlExpr],
+    where_clauses: &[String],
+    where_params: &[String],
+) -> Result<(String, Vec<String>), &'static str> {
+    if columns.is_empty() {
+        return Err("update_where_expr: no fields provided");
+    }
+    if where_clauses.is_empty() {
+        return Err("update_where_expr: no WHERE conditions");
+    }
+
+    let mut sql = format!("UPDATE {} SET ", quote_ident(table));
+    let (set_parts, mut params, next_idx) = build_set_expr_parts(columns, exprs, 1);
+    sql.push_str(&set_parts.join(", "));
+
+    let (where_sql, where_param_values, _next_idx) =
+        build_where_from_query_parts(where_clauses, where_params, next_idx);
+    sql.push_str(&format!(" WHERE {} RETURNING *", where_sql));
+    params.extend(where_param_values);
+
+    Ok((sql, params))
+}
+
+fn build_insert_or_update_expr_sql_pure(
+    table: &str,
+    insert_columns: &[String],
+    insert_values: &[String],
+    conflict_targets: &[String],
+    update_columns: &[String],
+    update_exprs: &[SqlExpr],
+) -> Result<(String, Vec<String>), &'static str> {
+    if insert_columns.is_empty() {
+        return Err("insert_or_update_expr: no fields provided");
+    }
+    if conflict_targets.is_empty() {
+        return Err("insert_or_update_expr: no conflict targets provided");
+    }
+    if update_columns.is_empty() {
+        return Err("insert_or_update_expr: no update fields provided");
+    }
+
+    let quoted_columns = insert_columns
+        .iter()
+        .map(|column| quote_ident(column))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let placeholders = (1..=insert_columns.len())
+        .map(|idx| format!("${idx}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let quoted_targets = conflict_targets
+        .iter()
+        .map(|target| quote_ident(target))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let (set_parts, update_params, _next_idx) =
+        build_set_expr_parts(update_columns, update_exprs, insert_columns.len() + 1);
+
+    let sql = format!(
+        "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {} RETURNING *",
+        quote_ident(table),
+        quoted_columns,
+        placeholders,
+        quoted_targets,
+        set_parts.join(", ")
+    );
+
+    let mut params = insert_values.to_vec();
+    params.extend(update_params);
+    Ok((sql, params))
+}
+
 // ── Write Operations ──────────────────────────────────────────────────
 
 /// Insert a new row and return the inserted record.
@@ -2062,6 +2172,53 @@ pub extern "C" fn mesh_repo_update_where(
     }
 }
 
+/// Update rows matching a Query's WHERE conditions with expression-valued SET clauses.
+/// `Repo.update_where_expr(pool, table, expr_fields_map, query)`
+///   -> `Result<Map<String,String>, String>`
+#[no_mangle]
+pub extern "C" fn mesh_repo_update_where_expr(
+    pool: u64,
+    table: *mut u8,
+    expr_fields: *mut u8,
+    query: *mut u8,
+) -> *mut u8 {
+    unsafe {
+        let table_str = mesh_str_ref(table);
+        let (columns, exprs) = map_to_columns_and_exprs(expr_fields);
+        let where_clauses = list_to_strings(query_get(query, SLOT_WHERE_CLAUSES));
+        let where_params = list_to_strings(query_get(query, SLOT_WHERE_PARAMS));
+
+        let (sql, params) = match build_update_where_expr_sql_pure(
+            table_str,
+            &columns,
+            &exprs,
+            &where_clauses,
+            &where_params,
+        ) {
+            Ok(built) => built,
+            Err(msg) => return err_result(msg),
+        };
+
+        let sql_ptr = rust_str_to_mesh(&sql) as *const MeshString;
+        let params_ptr = strings_to_mesh_list(&params);
+        let result = mesh_pool_query(pool, sql_ptr, params_ptr);
+
+        let r = &*(result as *const MeshResult);
+        if r.tag != 0 {
+            return result;
+        }
+
+        let list = r.value;
+        let list_len = mesh_list_length(list);
+        if list_len == 0 {
+            return err_result("update_where_expr: no rows matched");
+        }
+
+        let first_row = mesh_list_get(list, 0) as *mut u8;
+        ok_result(first_row)
+    }
+}
+
 /// Delete rows matching a Query's WHERE conditions.
 /// `Repo.delete_where(pool, table, query)` -> `Result<Int, String>`
 #[no_mangle]
@@ -2141,6 +2298,55 @@ pub extern "C" fn mesh_repo_insert_or_update(
         let list_len = mesh_list_length(list);
         if list_len == 0 {
             return err_result("insert_or_update: no row returned");
+        }
+
+        let first_row = mesh_list_get(list, 0) as *mut u8;
+        ok_result(first_row)
+    }
+}
+
+/// Upsert with expression-valued ON CONFLICT DO UPDATE assignments.
+/// `Repo.insert_or_update_expr(pool, table, fields_map, conflict_targets, expr_fields_map)`
+///   -> `Result<Map<String,String>, String>`
+#[no_mangle]
+pub extern "C" fn mesh_repo_insert_or_update_expr(
+    pool: u64,
+    table: *mut u8,
+    fields: *mut u8,
+    conflict_targets: *mut u8,
+    expr_fields: *mut u8,
+) -> *mut u8 {
+    unsafe {
+        let table_str = mesh_str_ref(table);
+        let (insert_columns, insert_values) = map_to_columns_and_values(fields);
+        let targets = list_to_strings(conflict_targets);
+        let (update_columns, update_exprs) = map_to_columns_and_exprs(expr_fields);
+
+        let (sql, params) = match build_insert_or_update_expr_sql_pure(
+            table_str,
+            &insert_columns,
+            &insert_values,
+            &targets,
+            &update_columns,
+            &update_exprs,
+        ) {
+            Ok(built) => built,
+            Err(msg) => return err_result(msg),
+        };
+
+        let sql_ptr = rust_str_to_mesh(&sql) as *const MeshString;
+        let params_ptr = strings_to_mesh_list(&params);
+        let result = mesh_pool_query(pool, sql_ptr, params_ptr);
+
+        let r = &*(result as *const MeshResult);
+        if r.tag != 0 {
+            return result;
+        }
+
+        let list = r.value;
+        let list_len = mesh_list_length(list);
+        if list_len == 0 {
+            return err_result("insert_or_update_expr: no row returned");
         }
 
         let first_row = mesh_list_get(list, 0) as *mut u8;
@@ -3426,5 +3632,108 @@ mod tests {
             "SELECT * FROM \"issues\" WHERE \"status\" = $1 AND \"project_id\" IN (SELECT \"id\" FROM \"projects\" WHERE \"org_id\" = $2)"
         );
         assert_eq!(params, vec!["open", "org-123"]);
+    }
+
+    #[test]
+    fn test_update_where_expr_sql_renumbers_set_and_where_params() {
+        let (sql, params) = build_update_where_expr_sql_pure(
+            "issues",
+            &["event_count".into(), "status".into(), "last_seen".into()],
+            &[
+                SqlExpr::Binary {
+                    op: "+",
+                    lhs: Box::new(SqlExpr::Column("event_count".into())),
+                    rhs: Box::new(SqlExpr::Value("1".into())),
+                },
+                SqlExpr::Case {
+                    branches: vec![(
+                        SqlExpr::Binary {
+                            op: "=",
+                            lhs: Box::new(SqlExpr::Column("status".into())),
+                            rhs: Box::new(SqlExpr::Value("resolved".into())),
+                        },
+                        SqlExpr::Value("unresolved".into()),
+                    )],
+                    else_expr: Box::new(SqlExpr::Column("status".into())),
+                },
+                SqlExpr::Call {
+                    name: "now".into(),
+                    args: vec![],
+                },
+            ],
+            &["RAW:id = ?::uuid".into()],
+            &["issue-123".into()],
+        )
+        .expect("update_where_expr SQL should build");
+
+        assert_eq!(
+            sql,
+            "UPDATE \"issues\" SET \"event_count\" = (\"event_count\" + $1), \"status\" = CASE WHEN (\"status\" = $2) THEN $3 ELSE \"status\" END, \"last_seen\" = now() WHERE id = $4::uuid RETURNING *"
+        );
+        assert_eq!(params, vec!["1", "resolved", "unresolved", "issue-123"]);
+    }
+
+    #[test]
+    fn test_insert_or_update_expr_sql_preserves_insert_then_update_param_order() {
+        let (sql, params) = build_insert_or_update_expr_sql_pure(
+            "issues",
+            &[
+                "project_id".into(),
+                "fingerprint".into(),
+                "title".into(),
+                "level".into(),
+                "event_count".into(),
+            ],
+            &[
+                "project-1".into(),
+                "fp-1".into(),
+                "Boom".into(),
+                "error".into(),
+                "1".into(),
+            ],
+            &["project_id".into(), "fingerprint".into()],
+            &["event_count".into(), "status".into(), "last_seen".into()],
+            &[
+                SqlExpr::Binary {
+                    op: "+",
+                    lhs: Box::new(SqlExpr::Column("event_count".into())),
+                    rhs: Box::new(SqlExpr::Value("1".into())),
+                },
+                SqlExpr::Case {
+                    branches: vec![(
+                        SqlExpr::Binary {
+                            op: "=",
+                            lhs: Box::new(SqlExpr::Column("status".into())),
+                            rhs: Box::new(SqlExpr::Value("resolved".into())),
+                        },
+                        SqlExpr::Value("unresolved".into()),
+                    )],
+                    else_expr: Box::new(SqlExpr::Column("status".into())),
+                },
+                SqlExpr::Call {
+                    name: "now".into(),
+                    args: vec![],
+                },
+            ],
+        )
+        .expect("insert_or_update_expr SQL should build");
+
+        assert_eq!(
+            sql,
+            "INSERT INTO \"issues\" (\"project_id\", \"fingerprint\", \"title\", \"level\", \"event_count\") VALUES ($1, $2, $3, $4, $5) ON CONFLICT (\"project_id\", \"fingerprint\") DO UPDATE SET \"event_count\" = (\"event_count\" + $6), \"status\" = CASE WHEN (\"status\" = $7) THEN $8 ELSE \"status\" END, \"last_seen\" = now() RETURNING *"
+        );
+        assert_eq!(
+            params,
+            vec![
+                "project-1",
+                "fp-1",
+                "Boom",
+                "error",
+                "1",
+                "1",
+                "resolved",
+                "unresolved",
+            ]
+        );
     }
 }

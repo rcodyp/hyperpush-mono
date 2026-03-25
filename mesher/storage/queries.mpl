@@ -157,22 +157,16 @@ pub fn get_project_by_api_key(pool :: PoolHandle, key_value :: String) -> Projec
   end
 end
 
-# Revoke an API key by setting revoked_at to now().
-# Two-step pattern: Repo.query_raw for now() timestamp, then Repo.update_where for the UPDATE.
+# Revoke an API key by setting revoked_at to now() through the neutral expression write path.
 
 pub fn revoke_api_key(pool :: PoolHandle, key_id :: String) -> Int ! String do
-  # Step 1: Get current timestamp from PG
-  let ts_rows = Repo.query_raw(pool, "SELECT now()::text AS ts", []) ?
-  if List.length(ts_rows) > 0 do
-    let ts = Map.get(List.head(ts_rows), "ts")
-    # Step 2: Update with ORM
-    let q = Query.from(ApiKey.__table__())
-      |> Query.where_raw("id = ?::uuid", [key_id])
-    Repo.update_where(pool, ApiKey.__table__(), %{"revoked_at" => ts}, q) ?
-    Ok(1)
-  else
-    Err("revoke_api_key: timestamp generation failed")
-  end
+  let q = Query.from(ApiKey.__table__())
+    |> Query.where_raw("id = ?::uuid", [key_id])
+  Repo.update_where_expr(pool,
+  ApiKey.__table__(),
+  %{"revoked_at" => Expr.call("now", [])},
+  q) ?
+  Ok(1)
 end
 
 # --- User queries ---
@@ -306,28 +300,38 @@ end
 
 # --- Issue queries (Phase 89) ---
 # Upsert an issue: insert on first occurrence, update on subsequent.
-# Uses PostgreSQL ON CONFLICT on (project_id, fingerprint) unique constraint.
+# Uses neutral expression-valued conflict updates for arithmetic, now(), and CASE.
 # Handles GROUP-04 (new issue), GROUP-05 (event_count + last_seen), and
 # ISSUE-02 (regression: resolved flips to unresolved on new event).
 # Returns Ok(issue_id) or Err.
-# ORM boundary: Repo.insert_or_update cannot express custom SET expressions --
-# event_count = issues.event_count + 1 (arithmetic) and
-# status = CASE WHEN issues.status = 'resolved' THEN 'unresolved' ELSE issues.status END
-# (conditional). The ORM upsert uses SET field = EXCLUDED.field which only copies the
-# INSERT value, not computed expressions. Intentional raw SQL.
 
 pub fn upsert_issue(pool :: PoolHandle,
 project_id :: String,
 fingerprint :: String,
 title :: String,
 level :: String) -> String ! String do
-  let sql = "INSERT INTO issues (project_id, fingerprint, title, level, event_count) VALUES ($1::uuid, $2, $3, $4, 1) ON CONFLICT (project_id, fingerprint) DO UPDATE SET event_count = issues.event_count + 1, last_seen = now(), status = CASE WHEN issues.status = 'resolved' THEN 'unresolved' ELSE issues.status END RETURNING id::text"
-  let rows = Repo.query_raw(pool, sql, [project_id, fingerprint, title, level]) ?
-  if List.length(rows) > 0 do
-    Ok(Map.get(List.head(rows), "id"))
-  else
-    Err("upsert_issue: no id returned")
-  end
+  let insert_fields = %{
+    "project_id" => project_id,
+    "fingerprint" => fingerprint,
+    "title" => title,
+    "level" => level,
+    "event_count" => "1"
+  }
+  let update_fields = %{
+    "event_count" => Expr.add(Expr.column("issues.event_count"), Expr.value("1")),
+    "last_seen" => Expr.call("now", []),
+    "status" => Expr.case(
+      [Expr.eq(Expr.column("issues.status"), Expr.value("resolved"))],
+      [Expr.value("unresolved")],
+      Expr.column("issues.status")
+    )
+  }
+  let row = Repo.insert_or_update_expr(pool,
+  Issue.__table__(),
+  insert_fields,
+  ["project_id", "fingerprint"],
+  update_fields) ?
+  Ok(Map.get(row, "id"))
 end
 
 # Check if an issue with the given fingerprint is discarded (ISSUE-05 suppression).

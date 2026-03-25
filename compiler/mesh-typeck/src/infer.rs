@@ -2096,6 +2096,91 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
         modules.insert("Orm".to_string(), orm_mod);
     }
 
+    // ── Expr module (M033/S01) ──────────────────────────────────────
+    {
+        let ptr_t = Ty::Con(TyCon::new("Ptr"));
+        let mut expr_mod = HashMap::new();
+        expr_mod.insert(
+            "column".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::string()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "value".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::string()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "null".to_string(),
+            Scheme::mono(Ty::fun(vec![], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "call".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::string(), Ty::list(ptr_t.clone())],
+                ptr_t.clone(),
+            )),
+        );
+        expr_mod.insert(
+            "add".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "sub".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "mul".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "div".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "eq".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "neq".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "lt".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "lte".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "gt".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "gte".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), ptr_t.clone()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "case".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![Ty::list(ptr_t.clone()), Ty::list(ptr_t.clone()), ptr_t.clone()],
+                ptr_t.clone(),
+            )),
+        );
+        expr_mod.insert(
+            "coalesce".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::list(ptr_t.clone())], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "excluded".to_string(),
+            Scheme::mono(Ty::fun(vec![Ty::string()], ptr_t.clone())),
+        );
+        expr_mod.insert(
+            "alias".to_string(),
+            Scheme::mono(Ty::fun(vec![ptr_t.clone(), Ty::string()], ptr_t.clone())),
+        );
+        modules.insert("Expr".to_string(), expr_mod);
+    }
+
     // ── Query module (Phase 98) ─────────────────────────────────────
     {
         let ptr_t = Ty::Con(TyCon::new("Ptr"));
@@ -2401,6 +2486,19 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
                 Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
             )),
         );
+        // Repo.update_where_expr(PoolHandle, String, Map<String,Ptr>, Ptr) -> Result<Map<String,String>, String>
+        repo_mod.insert(
+            "update_where_expr".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    pool_t.clone(),
+                    Ty::string(),
+                    Ty::map(Ty::string(), ptr_t.clone()),
+                    ptr_t.clone(),
+                ],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
+            )),
+        );
         // Repo.delete_where(PoolHandle, String, Ptr) -> Result<Int, String>  (pool, table, query)
         repo_mod.insert(
             "delete_where".to_string(),
@@ -2438,6 +2536,20 @@ fn stdlib_modules() -> HashMap<String, HashMap<String, Scheme>> {
                     Ty::list(Ty::string()),
                 ],
                 ptr_t.clone(),
+            )),
+        );
+        // Repo.insert_or_update_expr(PoolHandle, String, Map<String,String>, List<String>, Map<String,Ptr>) -> Result<Map<String,String>, String>
+        repo_mod.insert(
+            "insert_or_update_expr".to_string(),
+            Scheme::mono(Ty::fun(
+                vec![
+                    pool_t.clone(),
+                    Ty::string(),
+                    Ty::map(Ty::string(), Ty::string()),
+                    Ty::list(Ty::string()),
+                    Ty::map(Ty::string(), ptr_t.clone()),
+                ],
+                Ty::result(Ty::map(Ty::string(), Ty::string()), Ty::string()),
             )),
         );
         // Repo.delete_where_returning(PoolHandle, String, Ptr) -> Ptr
@@ -2698,6 +2810,7 @@ const STDLIB_MODULE_NAMES: &[&str] = &[
     "Iter",      // Phase 76
     "Ws",        // Phase 88
     "Orm",       // Phase 97
+    "Expr",      // M033/S01
     "Query",     // Phase 98
     "Repo",      // Phase 98
     "Changeset", // Phase 99

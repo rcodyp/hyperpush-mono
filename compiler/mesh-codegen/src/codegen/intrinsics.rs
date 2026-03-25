@@ -2491,9 +2491,9 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
         Some(inkwell::module::Linkage::External),
     );
 
-    // ── Phase 97: ORM SQL Generation ──────────────────────────────────
+    // ── Phase 97: ORM SQL generation ────────────────────────────────
 
-    // mesh_orm_build_select(table: ptr, columns: ptr, where_clauses: ptr, order_by: ptr, limit: i64, offset: i64) -> ptr
+    // mesh_orm_build_select(table: ptr, fields: ptr, where_clauses: ptr, order_by: ptr, limit: i64, offset: i64) -> ptr
     module.add_function(
         "mesh_orm_build_select",
         ptr_type.fn_type(
@@ -2520,15 +2520,7 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     // mesh_orm_build_update(table: ptr, set_columns: ptr, where_clauses: ptr, returning: ptr) -> ptr
     module.add_function(
         "mesh_orm_build_update",
-        ptr_type.fn_type(
-            &[
-                ptr_type.into(),
-                ptr_type.into(),
-                ptr_type.into(),
-                ptr_type.into(),
-            ],
-            false,
-        ),
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into(), ptr_type.into(), ptr_type.into()], false),
         Some(inkwell::module::Linkage::External),
     );
 
@@ -2536,6 +2528,99 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     module.add_function(
         "mesh_orm_build_delete",
         ptr_type.fn_type(&[ptr_type.into(), ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // ── M033/S01: neutral SQL expression builder ─────────────────────
+
+    module.add_function(
+        "mesh_expr_column",
+        ptr_type.fn_type(&[ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_value",
+        ptr_type.fn_type(&[ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_null",
+        ptr_type.fn_type(&[], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_call",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_add",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_sub",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_mul",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_div",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_eq",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_neq",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_lt",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_lte",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_gt",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_gte",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_case",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into(), ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_coalesce",
+        ptr_type.fn_type(&[ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_excluded",
+        ptr_type.fn_type(&[ptr_type.into()], false),
+        Some(inkwell::module::Linkage::External),
+    );
+    module.add_function(
+        "mesh_expr_alias",
+        ptr_type.fn_type(&[ptr_type.into(), ptr_type.into()], false),
         Some(inkwell::module::Linkage::External),
     );
 
@@ -2892,6 +2977,21 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
         Some(inkwell::module::Linkage::External),
     );
 
+    // mesh_repo_update_where_expr(pool: i64, table: ptr, expr_fields: ptr, query: ptr) -> ptr
+    module.add_function(
+        "mesh_repo_update_where_expr",
+        ptr_type.fn_type(
+            &[
+                i64_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+            ],
+            false,
+        ),
+        Some(inkwell::module::Linkage::External),
+    );
+
     // mesh_repo_delete_where(pool: i64, table: ptr, query: ptr) -> ptr
     module.add_function(
         "mesh_repo_delete_where",
@@ -2918,6 +3018,22 @@ pub fn declare_intrinsics<'ctx>(module: &Module<'ctx>) {
     // mesh_repo_insert_or_update(pool: i64, table: ptr, fields: ptr, conflict_targets: ptr, update_fields: ptr) -> ptr
     module.add_function(
         "mesh_repo_insert_or_update",
+        ptr_type.fn_type(
+            &[
+                i64_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+                ptr_type.into(),
+            ],
+            false,
+        ),
+        Some(inkwell::module::Linkage::External),
+    );
+
+    // mesh_repo_insert_or_update_expr(pool: i64, table: ptr, fields: ptr, conflict_targets: ptr, expr_fields: ptr) -> ptr
+    module.add_function(
+        "mesh_repo_insert_or_update_expr",
         ptr_type.fn_type(
             &[
                 i64_type.into(),
@@ -3543,6 +3659,26 @@ mod tests {
         assert!(module.get_function("mesh_orm_build_update").is_some());
         assert!(module.get_function("mesh_orm_build_delete").is_some());
 
+        // M033/S01: neutral SQL expression builder
+        assert!(module.get_function("mesh_expr_column").is_some());
+        assert!(module.get_function("mesh_expr_value").is_some());
+        assert!(module.get_function("mesh_expr_null").is_some());
+        assert!(module.get_function("mesh_expr_call").is_some());
+        assert!(module.get_function("mesh_expr_add").is_some());
+        assert!(module.get_function("mesh_expr_sub").is_some());
+        assert!(module.get_function("mesh_expr_mul").is_some());
+        assert!(module.get_function("mesh_expr_div").is_some());
+        assert!(module.get_function("mesh_expr_eq").is_some());
+        assert!(module.get_function("mesh_expr_neq").is_some());
+        assert!(module.get_function("mesh_expr_lt").is_some());
+        assert!(module.get_function("mesh_expr_lte").is_some());
+        assert!(module.get_function("mesh_expr_gt").is_some());
+        assert!(module.get_function("mesh_expr_gte").is_some());
+        assert!(module.get_function("mesh_expr_case").is_some());
+        assert!(module.get_function("mesh_expr_coalesce").is_some());
+        assert!(module.get_function("mesh_expr_excluded").is_some());
+        assert!(module.get_function("mesh_expr_alias").is_some());
+
         // Phase 101: Migration DDL Operations
         assert!(module.get_function("mesh_migration_create_table").is_some());
         assert!(module.get_function("mesh_migration_drop_table").is_some());
@@ -3585,6 +3721,12 @@ mod tests {
         assert!(module.get_function("mesh_query_select_max").is_some());
         // Phase 109: Upsert, RETURNING, Subquery
         assert!(module.get_function("mesh_repo_insert_or_update").is_some());
+        assert!(module
+            .get_function("mesh_repo_insert_or_update_expr")
+            .is_some());
+        assert!(module
+            .get_function("mesh_repo_update_where_expr")
+            .is_some());
         assert!(module
             .get_function("mesh_repo_delete_where_returning")
             .is_some());

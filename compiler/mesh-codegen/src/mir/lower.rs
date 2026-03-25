@@ -2228,6 +2228,82 @@ impl<'a> Lowerer<'a> {
                 Box::new(MirType::Ptr),
             ),
         );
+        // ── M033/S01: Neutral SQL expression builder ──────────────────
+        self.known_functions.insert(
+            "mesh_expr_column".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_value".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_null".to_string(),
+            MirType::FnPtr(vec![], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_call".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_add".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_sub".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_mul".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_div".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_eq".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_neq".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_lt".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_lte".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_gt".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_gte".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_case".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        self.known_functions.insert(
+            "mesh_expr_coalesce".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_excluded".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr], Box::new(MirType::Ptr)),
+        );
+        self.known_functions.insert(
+            "mesh_expr_alias".to_string(),
+            MirType::FnPtr(vec![MirType::Ptr, MirType::Ptr], Box::new(MirType::Ptr)),
+        );
         // ── Phase 98: Query Builder ─────────────────────────────────────
         // mesh_query_from(table: ptr) -> ptr
         self.known_functions.insert(
@@ -2501,6 +2577,14 @@ impl<'a> Lowerer<'a> {
                 Box::new(MirType::Ptr),
             ),
         );
+        // mesh_repo_update_where_expr(pool: i64, table: ptr, expr_fields: ptr, query: ptr) -> ptr
+        self.known_functions.insert(
+            "mesh_repo_update_where_expr".to_string(),
+            MirType::FnPtr(
+                vec![MirType::Int, MirType::Ptr, MirType::Ptr, MirType::Ptr],
+                Box::new(MirType::Ptr),
+            ),
+        );
         // mesh_repo_delete_where(pool: i64, table: ptr, query: ptr) -> ptr
         self.known_functions.insert(
             "mesh_repo_delete_where".to_string(),
@@ -2529,6 +2613,20 @@ impl<'a> Lowerer<'a> {
         // mesh_repo_insert_or_update(pool: i64, table: ptr, fields: ptr, conflict_targets: ptr, update_fields: ptr) -> ptr
         self.known_functions.insert(
             "mesh_repo_insert_or_update".to_string(),
+            MirType::FnPtr(
+                vec![
+                    MirType::Int,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                    MirType::Ptr,
+                ],
+                Box::new(MirType::Ptr),
+            ),
+        );
+        // mesh_repo_insert_or_update_expr(pool: i64, table: ptr, fields: ptr, conflict_targets: ptr, expr_fields: ptr) -> ptr
+        self.known_functions.insert(
+            "mesh_repo_insert_or_update_expr".to_string(),
             MirType::FnPtr(
                 vec![
                     MirType::Int,
@@ -13299,6 +13397,25 @@ fn map_builtin_name(name: &str) -> String {
         "orm_build_insert" => "mesh_orm_build_insert".to_string(),
         "orm_build_update" => "mesh_orm_build_update".to_string(),
         "orm_build_delete" => "mesh_orm_build_delete".to_string(),
+        // ── M033/S01: neutral expression builder ────────────────────────
+        "expr_column" => "mesh_expr_column".to_string(),
+        "expr_value" => "mesh_expr_value".to_string(),
+        "expr_null" => "mesh_expr_null".to_string(),
+        "expr_call" => "mesh_expr_call".to_string(),
+        "expr_add" => "mesh_expr_add".to_string(),
+        "expr_sub" => "mesh_expr_sub".to_string(),
+        "expr_mul" => "mesh_expr_mul".to_string(),
+        "expr_div" => "mesh_expr_div".to_string(),
+        "expr_eq" => "mesh_expr_eq".to_string(),
+        "expr_neq" => "mesh_expr_neq".to_string(),
+        "expr_lt" => "mesh_expr_lt".to_string(),
+        "expr_lte" => "mesh_expr_lte".to_string(),
+        "expr_gt" => "mesh_expr_gt".to_string(),
+        "expr_gte" => "mesh_expr_gte".to_string(),
+        "expr_case" => "mesh_expr_case".to_string(),
+        "expr_coalesce" => "mesh_expr_coalesce".to_string(),
+        "expr_excluded" => "mesh_expr_excluded".to_string(),
+        "expr_alias" => "mesh_expr_alias".to_string(),
         // ── Phase 98: Query Builder ─────────────────────────────────────
         "query_from" => "mesh_query_from".to_string(),
         "query_where" => "mesh_query_where".to_string(),
@@ -13347,11 +13464,13 @@ fn map_builtin_name(name: &str) -> String {
         "repo_transaction" => "mesh_repo_transaction".to_string(),
         // ── Phase 103: Extended Repo Write Operations ────────────────────
         "repo_update_where" => "mesh_repo_update_where".to_string(),
+        "repo_update_where_expr" => "mesh_repo_update_where_expr".to_string(),
         "repo_delete_where" => "mesh_repo_delete_where".to_string(),
         "repo_query_raw" => "mesh_repo_query_raw".to_string(),
         "repo_execute_raw" => "mesh_repo_execute_raw".to_string(),
         // ── Phase 109: Upsert, RETURNING, Subquery ────────────────────────
         "repo_insert_or_update" => "mesh_repo_insert_or_update".to_string(),
+        "repo_insert_or_update_expr" => "mesh_repo_insert_or_update_expr".to_string(),
         "repo_delete_where_returning" => "mesh_repo_delete_where_returning".to_string(),
         // ── Phase 100: Repo Preloading ──────────────────────────────────
         "repo_preload" => "mesh_repo_preload".to_string(),
