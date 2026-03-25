@@ -79,11 +79,6 @@ allowed_s03_keep_sites = {
     "check_sample_rate",
 }
 
-s04_excluded_keep_sites = {
-    "get_expired_partitions",
-    "drop_partition",
-}
-
 all_function_names = set()
 for line in queries.splitlines():
     if line.startswith("pub fn "):
@@ -97,7 +92,7 @@ for name in all_function_names:
     if "Repo.query_raw" in body or "Repo.execute_raw" in body or "Query.select_raw" in body:
         raw_site_functions.add(name)
 
-unexpected = sorted(raw_site_functions - allowed_s03_keep_sites - s04_excluded_keep_sites)
+unexpected = sorted(raw_site_functions - allowed_s03_keep_sites)
 if unexpected:
     details = []
     for name in unexpected:

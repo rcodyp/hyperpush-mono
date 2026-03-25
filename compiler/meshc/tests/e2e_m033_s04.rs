@@ -300,6 +300,15 @@ fn count_partitions_in_window(database_url: &str, start_offset_days: i64, end_of
     row_int(&row, "count")
 }
 
+fn inheritance_edges_for_partition(database_url: &str, partition_name: &str) -> i64 {
+    let row = query_single_row(
+        database_url,
+        "SELECT count(*)::text AS count FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid JOIN pg_class p ON p.oid = i.inhparent WHERE p.relname = 'events' AND c.relname = $1",
+        &[partition_name],
+    );
+    row_int(&row, "count")
+}
+
 fn ensure_mesh_rt_staticlib() {
     static BUILD_ONCE: OnceLock<()> = OnceLock::new();
     BUILD_ONCE.get_or_init(|| {
@@ -767,6 +776,11 @@ end
             values.get("dropped").map(String::as_str),
             Some(expired_partition_name.as_str()),
             "Storage.Schema.drop_partition did not drop the listed partition:\n{output}"
+        );
+        assert_eq!(
+            inheritance_edges_for_partition(MESHER_DATABASE_URL, &expired_partition_name),
+            0,
+            "drop_partition should remove the expired partition from pg_inherits: {expired_partition_name}"
         );
 
         for offset in 0..3 {

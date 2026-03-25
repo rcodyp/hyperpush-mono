@@ -84,7 +84,7 @@ cargo run -q -p meshc -- build mesher
 rg -n "pub fn (create_partitions_ahead|get_expired_partitions|drop_partition)" mesher/storage/schema.mpl
 ! rg -n "pub fn get_expired_partitions|pub fn drop_partition" mesher/storage/queries.mpl
 
-- [ ] **T04: Prove schema extras and partition lifecycle on live Postgres** `est:3h`
+- [x] **T04: Prove schema extras and partition lifecycle on live Postgres** `est:3h`
   Why: S04 is only complete once the new helper boundary is proven against real Postgres catalogs and the real Mesher startup path, not just string snapshots.
 
 Steps:
