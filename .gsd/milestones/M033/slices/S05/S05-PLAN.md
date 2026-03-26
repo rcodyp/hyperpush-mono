@@ -31,7 +31,7 @@
 
 ## Tasks
 
-- [ ] **T01: Rewrite the public database guide around the honest Mesh/Mesher boundary** `est:2h`
+- [x] **T01: Rewrite the public database guide around the honest Mesh/Mesher boundary** `est:2h`
   Why: The current database guide is still a generic `Sqlite` / `Pg` / `Pool` brochure, so S05 needs a public Mesher-backed rewrite before automation can lock the milestone’s truth surface.
 
 Do:

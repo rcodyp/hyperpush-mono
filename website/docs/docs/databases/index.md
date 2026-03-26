@@ -1,470 +1,276 @@
 ---
 title: Databases
-description: SQLite, PostgreSQL, connection pooling, and struct mapping in Mesh
+description: "Shipped Mesh/Mesher database boundary: neutral Expr/Query/Repo plus PostgreSQL-only Pg helpers"
 ---
 
 # Databases
 
-Mesh has built-in support for SQLite and PostgreSQL databases. You can run queries, manage transactions, pool connections, and map database rows directly to structs -- all without external dependencies.
+Mesh's database story is currently best understood through the real Mesher storage layer that ships in this repo.
 
-> **Production backend proof:** This guide covers the database APIs themselves. For the repo-backed proof that wires Postgres migrations, runtime health, deploy artifacts, and supervised job processing together, use [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
+This page does **not** promise a universal ORM that erases backend differences. It names the boundary M033 actually proves today:
 
-## SQLite
+- a neutral expression/query/write surface built from `Expr`, `Query`, `Repo`, and `Migration`
+- explicit PostgreSQL-only helpers under `Pg.*`
+- a named set of raw escape hatches that stays honest instead of pretending every SQL shape is portable
 
-SQLite is an embedded database that stores data in a single file (or in memory). Use the `Sqlite` module for all SQLite operations.
+> **Production backend proof:** This page explains the database boundary itself. For the end-to-end backend proof surface that wires migrations, health checks, workers, and deploy artifacts together, start with [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
 
-### Opening a Database
+## What is runtime-proven today
 
-Use `Sqlite.open` with a file path or `":memory:"` for an in-memory database:
+The public database guide is anchored in the same repo paths the live proof stack exercises:
 
-```mesh
-fn main() do
-  let db = Sqlite.open(":memory:")?
-  println("database opened")
-  Sqlite.close(db)
-end
+- `compiler/meshc/tests/e2e_m033_s01.rs` — neutral `Expr` / `Query` / `Repo` expression builder coverage
+- `mesher/storage/writer.mpl` and `mesher/storage/queries.mpl` — the real Mesher write/read paths
+- `mesher/migrations/20260216120000_create_initial_schema.mpl` — the shipped migration that uses the new helpers
+- `mesher/storage/schema.mpl` — runtime partition lifecycle helpers
+- `compiler/meshc/src/migrate.rs` — migration generator guidance that keeps neutral DDL under `Migration.*` and PostgreSQL extras under `Pg.*`
+
+The proof commands behind those surfaces are:
+
+```bash
+bash scripts/verify-m033-s01.sh
+bash scripts/verify-m033-s02.sh
+bash scripts/verify-m033-s03.sh
+bash scripts/verify-m033-s04.sh
+npm --prefix website run build
 ```
 
-`Sqlite.open` returns a `Result` -- use the `?` operator to propagate errors, or pattern match with `case` to handle them explicitly.
+All of the runtime proofs above target live PostgreSQL. SQLite-specific extras are later work and are **not** the proof target for this page.
 
-### Creating Tables
+## Neutral surface: `Expr`, `Query`, `Repo`, `Migration`
 
-Use `Sqlite.execute` for DDL statements (CREATE TABLE, ALTER TABLE, etc.) and DML statements (INSERT, UPDATE, DELETE):
+The neutral part of the boundary is the shape that can be described without pretending JSONB, pgcrypto, partitions, or PostgreSQL catalogs are portable.
 
-```mesh
-fn run_db() -> Int!String do
-  let db = Sqlite.open(":memory:")?
+### `Expr` builds values, columns, NULLs, defaults, and derived projections
 
-  let _ = Sqlite.execute(db, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, age TEXT NOT NULL)", [])?
-
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
-```
-
-The third argument is a list of parameters for parameterized queries. Pass an empty list `[]` when there are no parameters.
-
-### Inserting Data
-
-Use `Sqlite.execute` with parameterized queries to insert data safely. Parameters use `?` placeholders:
+M033's shipped API uses `Expr.label`, not `Expr.alias`.
 
 ```mesh
-fn run_db() -> Int!String do
-  let db = Sqlite.open(":memory:")?
-
-  let _ = Sqlite.execute(db, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, age TEXT NOT NULL)", [])?
-
-  let inserted1 = Sqlite.execute(db, "INSERT INTO users (name, age) VALUES (?, ?)", ["Alice", "30"])?
-  println("${inserted1}")
-
-  let inserted2 = Sqlite.execute(db, "INSERT INTO users (name, age) VALUES (?, ?)", ["Bob", "25"])?
-  println("${inserted2}")
-
-  Sqlite.close(db)
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
+let q = Query.from("m033_expr_selects")
+  |> Query.select_exprs([
+    Expr.label(Expr.coalesce([Expr.column("nickname"), Expr.value("fallback")]), "nick"),
+    Expr.label(Expr.add(Expr.column("amount"), Expr.value("2")), "next_amount"),
+    Expr.label(
+      Expr.case_when(
+        [Expr.eq(Expr.column("status"), Expr.value("resolved"))],
+        [Expr.value("closed")],
+        Expr.column("status")
+      ),
+      "display_status"
+    )
+  ])
+  |> Query.where(:id, "row-1")
 ```
 
-`Sqlite.execute` returns the number of rows affected as an `Int!String` result.
+That exact shape is exercised in `compiler/meshc/tests/e2e_m033_s01.rs`. The important neutral pieces are:
 
-### Querying Data
+- `Expr.value(...)` — bind a literal or parameter
+- `Expr.column(...)` — refer to a column
+- `Expr.null()` — write an actual `NULL`
+- `Expr.case_when(...)` — keep SQL branching in the expression tree
+- `Expr.coalesce([...])` — express fallback/default logic
+- `Expr.label(expr, "name")` — name derived output columns
 
-Use `Sqlite.query` to run SELECT statements. Results are returned as a list of maps, where each map represents a row with column names as keys:
+### `Query.where_expr` and `Query.select_exprs` keep predicates and row shapes explicit
+
+Mesher's read helpers use the same builder surface for real storage paths:
 
 ```mesh
-fn run_db() -> Int!String do
-  let db = Sqlite.open(":memory:")?
-
-  let _ = Sqlite.execute(db, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, age TEXT NOT NULL)", [])?
-  let _ = Sqlite.execute(db, "INSERT INTO users (name, age) VALUES (?, ?)", ["Alice", "30"])?
-  let _ = Sqlite.execute(db, "INSERT INTO users (name, age) VALUES (?, ?)", ["Bob", "25"])?
-
-  let rows = Sqlite.query(db, "SELECT name, age FROM users ORDER BY name", [])?
-
-  List.map(rows, fn(row) do
-    let name = Map.get(row, "name")
-    let age = Map.get(row, "age")
-    println(name <> ":" <> age)
-  end)
-
-  # Parameterized WHERE clause
-  let filtered = Sqlite.query(db, "SELECT name FROM users WHERE age = ?", ["30"])?
-  List.map(filtered, fn(row) do
-    let name = Map.get(row, "name")
-    println("filtered:" <> name)
-  end)
-
-  Sqlite.close(db)
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
+let q = Query.from(Issue.__table__())
+  |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+  |> Query.where_expr(Expr.eq(Expr.column("status"), Expr.value("unresolved")))
+  |> Query.select_expr(Expr.label(Pg.text(Expr.fn_call("count", [Expr.column("*")])), "cnt"))
 ```
 
-Each row is a `Map<String, String>` -- all values are returned as strings regardless of the column type. Use `Map.get(row, "column_name")` to access individual fields.
+The builder calls here are the neutral part: `Query.where_expr(...)`, `Query.select_expr(...)`, and `Query.select_exprs([...])`.
+The nested `Pg.uuid(...)` and `Pg.text(...)` wrappers are the honest PostgreSQL-only part.
 
-### Closing
+### `Repo.insert_expr`, `Repo.update_where_expr`, and `Repo.insert_or_update_expr` accept expression-valued writes
 
-Always close the database when done:
+Mesher uses expression-aware writes instead of falling back to handwritten SQL for common insert/update/upsert paths:
 
 ```mesh
-Sqlite.close(db)
+let row = Repo.insert_expr(pool,
+  User.__table__(),
+  %{
+    "email" => Expr.value(email),
+    "password_hash" => Pg.crypt(Expr.value(password), Pg.gen_salt("bf", 12)),
+    "display_name" => Expr.value(display_name)
+  })?
 ```
-
-### SQLite API Reference
-
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `Sqlite.open(path)` | `String -> Db!String` | Open a database file or `":memory:"` |
-| `Sqlite.execute(db, sql, params)` | `Db, String, List -> Int!String` | Run INSERT/UPDATE/DELETE, returns rows affected |
-| `Sqlite.query(db, sql, params)` | `Db, String, List -> List!String` | Run SELECT, returns list of row maps |
-| `Sqlite.close(db)` | `Db -> ()` | Close the database connection |
-
-## PostgreSQL
-
-Use the `Pg` module to connect to a PostgreSQL database. The API is similar to SQLite but uses connection strings and `$N` parameter placeholders.
-
-### Connecting
-
-Use `Pg.connect` with a PostgreSQL connection string:
 
 ```mesh
-fn run_db() -> Int!String do
-  let conn = Pg.connect("postgres://user:pass@localhost:5432/mydb")?
-  println("connected")
-  Pg.close(conn)
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
+let update_result = Repo.update_where_expr(pool,
+  "m033_expr_updates",
+  %{
+    "amount" => Expr.add(Expr.column("amount"), Expr.value("2")),
+    "touched_at" => Expr.fn_call("now", []),
+    "status" => Expr.case_when(
+      [Expr.eq(Expr.column("status"), Expr.value("resolved"))],
+      [Expr.value("unresolved")],
+      Expr.column("status")
+    )
+  },
+  q)
 ```
-
-The connection string format is `postgres://user:password@host:port/database`.
-
-### Creating Tables and Inserting Data
-
-PostgreSQL uses `$1`, `$2`, etc. for parameterized queries (instead of SQLite's `?` placeholders):
 
 ```mesh
-fn run_db() -> Int!String do
-  let conn = Pg.connect("postgres://user:pass@localhost:5432/mydb")?
-
-  let _ = Pg.execute(conn, "DROP TABLE IF EXISTS users", [])?
-
-  let created = Pg.execute(conn, "CREATE TABLE users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, age INTEGER NOT NULL)", [])?
-  println("created: ${created}")
-
-  let ins1 = Pg.execute(conn, "INSERT INTO users (name, age) VALUES ($1, $2)", ["Alice", "30"])?
-  println("inserted: ${ins1}")
-
-  let ins2 = Pg.execute(conn, "INSERT INTO users (name, age) VALUES ($1, $2)", ["Bob", "25"])?
-  println("inserted: ${ins2}")
-
-  Pg.close(conn)
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
+let row = Repo.insert_or_update_expr(pool,
+  Issue.__table__(),
+  %{"project_id" => project_id, "fingerprint" => fingerprint, "title" => title, "level" => level, "event_count" => "1"},
+  ["project_id", "fingerprint"],
+  %{
+    "event_count" => Expr.add(Expr.column("issues.event_count"), Expr.value("1")),
+    "last_seen" => Expr.fn_call("now", []),
+    "status" => Expr.case_when(
+      [Expr.eq(Expr.column("issues.status"), Expr.value("resolved"))],
+      [Expr.value("unresolved")],
+      Expr.column("issues.status")
+    )
+  })?
 ```
 
-### Querying Data
-
-Use `Pg.query` to run SELECT statements. Like SQLite, results are returned as a list of maps:
+And when a real null assignment is needed, Mesher uses `Expr.null()` explicitly:
 
 ```mesh
-fn run_db() -> Int!String do
-  let conn = Pg.connect("postgres://user:pass@localhost:5432/mydb")?
-
-  let rows = Pg.query(conn, "SELECT id, name, age FROM users ORDER BY name", [])?
-  List.map(rows, fn(row) do
-    let name = Map.get(row, "name")
-    let age = Map.get(row, "age")
-    println(name <> " is " <> age)
-  end)
-
-  # Query with parameter
-  let filtered = Pg.query(conn, "SELECT name FROM users WHERE age > $1", ["26"])?
-  List.map(filtered, fn(row) do
-    let name = Map.get(row, "name")
-    println("older: " <> name)
-  end)
-
-  Pg.close(conn)
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
+Repo.update_where_expr(pool, Issue.__table__(), %{"assigned_to" => Expr.null()}, q)?
 ```
 
-### PostgreSQL API Reference
+### `Migration.create_index(...)` is the neutral DDL path
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `Pg.connect(url)` | `String -> Conn!String` | Connect to a PostgreSQL server |
-| `Pg.execute(conn, sql, params)` | `Conn, String, List -> Int!String` | Run INSERT/UPDATE/DELETE, returns rows affected |
-| `Pg.query(conn, sql, params)` | `Conn, String, List -> List!String` | Run SELECT, returns list of row maps |
-| `Pg.close(conn)` | `Conn -> ()` | Close the connection |
-
-## Transactions
-
-### SQLite Transactions
-
-Use `Sqlite.begin`, `Sqlite.commit`, and `Sqlite.rollback` for explicit transaction control:
+The migration helper guidance in `compiler/meshc/src/migrate.rs` and the shipped Mesher migration both keep plain index creation under `Migration.create_index(...)`:
 
 ```mesh
-# Derived from runtime API
-fn run_db() -> Int!String do
-  let db = Sqlite.open(":memory:")?
-  let _ = Sqlite.execute(db, "CREATE TABLE accounts (id INTEGER PRIMARY KEY, balance INTEGER)", [])?
-  let _ = Sqlite.execute(db, "INSERT INTO accounts (balance) VALUES (?)", ["100"])?
-
-  let _ = Sqlite.begin(db)?
-  let _ = Sqlite.execute(db, "UPDATE accounts SET balance = balance - 50 WHERE id = 1", [])?
-  let _ = Sqlite.execute(db, "UPDATE accounts SET balance = balance + 50 WHERE id = 2", [])?
-  let _ = Sqlite.commit(db)?
-
-  Sqlite.close(db)
-  Ok(0)
-end
+Migration.create_index(pool,
+  "events",
+  ["issue_id", "received_at:DESC"],
+  "name:idx_events_issue_received")?
 ```
 
-If any statement between `begin` and `commit` fails, call `Sqlite.rollback(db)` to undo the changes.
+Use `Migration.*` for the common DDL surface. When the DDL depends on PostgreSQL-only behavior, the repo keeps that explicit under `Pg.*` instead of hiding it behind a fake portable abstraction.
 
-### PostgreSQL Transactions
+## PostgreSQL-only `Pg.*` extras
 
-PostgreSQL supports the same `begin`/`commit`/`rollback` pattern:
+When behavior depends on PostgreSQL types, operators, extensions, partitions, or catalogs, the repo names that dependency directly under `Pg.*`.
+
+### Casts and typed expressions
+
+Mesher uses typed PG wrappers inside otherwise neutral builders:
+
+- `Pg.uuid(Expr.value(project_id))`
+- `Pg.timestamptz(Expr.fn_call("now", []))`
+- `Pg.text(Expr.column("created_at"))`
+- `Pg.cast(Expr.value("1024"), "bigint")`
+
+These are PostgreSQL-only. The surrounding `Expr` / `Query` / `Repo` call may be neutral, but the typed behavior is not.
+
+### JSONB and search helpers
+
+The shipped Mesher search/tag paths stay explicit about PostgreSQL JSONB and text search:
 
 ```mesh
-# Derived from runtime API
-fn transfer(conn, from_id, to_id, amount) -> Int!String do
-  let _ = Pg.begin(conn)?
-  let _ = Pg.execute(conn, "UPDATE accounts SET balance = balance - $1 WHERE id = $2", [amount, from_id])?
-  let _ = Pg.execute(conn, "UPDATE accounts SET balance = balance + $1 WHERE id = $2", [amount, to_id])?
-  let _ = Pg.commit(conn)?
-  Ok(0)
-end
-```
+let search_vector = Pg.to_tsvector("english", Expr.column("message"))
+let search_terms = Pg.plainto_tsquery("english", Expr.value(search_query))
 
-PostgreSQL also provides `Pg.transaction` for callback-based transactions that automatically commit on success and rollback on failure:
+let q = Query.from(Event.__table__())
+  |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+  |> Query.where_expr(Pg.tsvector_matches(search_vector, search_terms))
+  |> Query.select_expr(Expr.label(Pg.ts_rank(search_vector, search_terms), "rank"))
+```
 
 ```mesh
-# Derived from runtime API
-fn main() do
-  let conn = Pg.connect("postgres://user:pass@localhost:5432/mydb")?
-  let result = Pg.transaction(conn, fn(tx) do
-    let _ = Pg.execute(tx, "INSERT INTO logs (msg) VALUES ($1)", ["hello"])?
-    Ok(42)
-  end)
-  case result do
-    Ok(val) -> println("committed: ${val}")
-    Err(msg) -> println("rolled back: ${msg}")
-  end
-end
+let q = Query.from(Event.__table__())
+  |> Query.where_expr(Expr.eq(Expr.column("project_id"), Pg.uuid(Expr.value(project_id))))
+  |> Query.where_expr(Pg.jsonb_contains(Expr.column("tags"), Pg.jsonb(Expr.value(tag_json))))
 ```
 
-### Transaction API Reference
-
-| Function | Description |
-|----------|-------------|
-| `Sqlite.begin(db)` | Start a SQLite transaction |
-| `Sqlite.commit(db)` | Commit the current SQLite transaction |
-| `Sqlite.rollback(db)` | Rollback the current SQLite transaction |
-| `Pg.begin(conn)` | Start a PostgreSQL transaction |
-| `Pg.commit(conn)` | Commit the current PostgreSQL transaction |
-| `Pg.rollback(conn)` | Rollback the current PostgreSQL transaction |
-| `Pg.transaction(conn, fn)` | Run a function inside a transaction (auto commit/rollback) |
-
-## Connection Pooling
-
-For production applications, use connection pooling to share a fixed set of database connections across multiple concurrent actors. The `Pool` module manages a pool of PostgreSQL connections:
+The corresponding schema uses PostgreSQL-specific indexing too:
 
 ```mesh
-# Derived from runtime API
-fn main() do
-  let pool = Pool.open("postgres://user:pass@localhost:5432/mydb", 2, 10, 5000)?
-
-  let rows = Pool.query(pool, "SELECT * FROM users", [])?
-  List.map(rows, fn(row) do
-    let name = Map.get(row, "name")
-    println(name)
-  end)
-
-  let _ = Pool.execute(pool, "INSERT INTO users (name) VALUES ($1)", ["Charlie"])?
-
-  Pool.close(pool)
-end
+Pg.create_gin_index(pool, "events", "idx_events_tags", "tags", "jsonb_path_ops")?
 ```
 
-### Pool.open Parameters
+### Crypto helpers
 
-`Pool.open(url, min, max, timeout_ms)` creates a pool with:
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `url` | `String` | PostgreSQL connection string |
-| `min` | `Int` | Minimum connections to pre-create |
-| `max` | `Int` | Maximum connections allowed |
-| `timeout_ms` | `Int` | How long to wait (ms) if all connections are busy |
-
-The pool pre-creates `min` connections at startup. When a query runs and no idle connections are available, the pool creates new connections up to `max`. If all connections are busy, the caller blocks until one becomes available or the timeout expires.
-
-### Automatic Connection Management
-
-`Pool.query` and `Pool.execute` handle connection checkout and return automatically. You do not need to manually manage individual connections:
-
-1. A connection is checked out from the pool
-2. The query or statement is executed
-3. The connection is returned to the pool (even on error)
-
-If a connection has a pending transaction when returned, it is automatically rolled back.
-
-### Manual Checkout
-
-For advanced use cases (multiple queries on the same connection), use `Pool.checkout` and `Pool.checkin`:
+Mesher's auth path does not hide pgcrypto behind a generic password API. It uses PostgreSQL-only helpers directly:
 
 ```mesh
-# Derived from runtime API
-fn main() do
-  let pool = Pool.open("postgres://...", 2, 10, 5000)?
-  let conn = Pool.checkout(pool)?
-
-  # Use the connection directly with Pg functions
-  let _ = Pg.execute(conn, "INSERT INTO users (name) VALUES ($1)", ["Alice"])?
-  let rows = Pg.query(conn, "SELECT * FROM users", [])?
-
-  Pool.checkin(pool, conn)
-  Pool.close(pool)
-end
+let row = Repo.insert_expr(pool,
+  User.__table__(),
+  %{
+    "email" => Expr.value(email),
+    "password_hash" => Pg.crypt(Expr.value(password), Pg.gen_salt("bf", 12)),
+    "display_name" => Expr.value(display_name)
+  })?
 ```
 
-### Pool API Reference
-
-| Function | Description |
-|----------|-------------|
-| `Pool.open(url, min, max, timeout_ms)` | Create a connection pool |
-| `Pool.query(pool, sql, params)` | Auto checkout, query, checkin |
-| `Pool.execute(pool, sql, params)` | Auto checkout, execute, checkin |
-| `Pool.checkout(pool)` | Manually borrow a connection |
-| `Pool.checkin(pool, conn)` | Return a connection to the pool |
-| `Pool.close(pool)` | Drain all connections and close the pool |
-
-## Struct Mapping
-
-Use `deriving(Row)` to automatically map database rows to structs. This generates a `from_row` function that converts a `Map<String, String>` (as returned by `Sqlite.query` and `Pg.query`) into your struct:
+That dependency is backed by the migration's explicit extension install:
 
 ```mesh
-struct User do
-  name :: String
-  age :: Int
-  score :: Float
-  active :: Bool
-end deriving(Row)
-
-fn main() do
-  let row = Map.new()
-  let row = Map.put(row, "name", "Alice")
-  let row = Map.put(row, "age", "30")
-  let row = Map.put(row, "score", "95.5")
-  let row = Map.put(row, "active", "t")
-
-  let result = User.from_row(row)
-  case result do
-    Ok(u) -> println("${u.name} ${u.age} ${u.score} ${u.active}")
-    Err(e) -> println("Error: ${e}")
-  end
-end
+Pg.create_extension(pool, "pgcrypto")?
 ```
 
-### Supported Field Types
+### Partition and schema helpers
 
-The `from_row` function automatically converts string values from the database to the struct's field types:
-
-| Struct Field Type | Conversion |
-|-------------------|------------|
-| `String` | Used as-is |
-| `Int` | Parsed from string (e.g., `"30"` -> `30`) |
-| `Float` | Parsed from string (e.g., `"95.5"` -> `95.5`) |
-| `Bool` | Parsed from string (`"t"`, `"true"`, `"1"` -> `true`) |
-
-### Using with Queries
-
-Combine struct mapping with database queries to get typed results:
+The migration/runtime partition story is also explicit about PostgreSQL:
 
 ```mesh
-struct User do
-  name :: String
-  age :: Int
-end deriving(Row)
-
-fn run_db() -> Int!String do
-  let db = Sqlite.open(":memory:")?
-  let _ = Sqlite.execute(db, "CREATE TABLE users (name TEXT, age INTEGER)", [])?
-  let _ = Sqlite.execute(db, "INSERT INTO users VALUES (?, ?)", ["Alice", "30"])?
-
-  let rows = Sqlite.query(db, "SELECT name, age FROM users", [])?
-
-  List.map(rows, fn(row) do
-    let result = User.from_row(row)
-    case result do
-      Ok(u) -> println("${u.name} is ${u.age}")
-      Err(e) -> println("Error: ${e}")
-    end
-  end)
-
-  Sqlite.close(db)
-  Ok(0)
-end
-
-fn main() do
-  let r = run_db()
-  case r do
-    Ok(_) -> println("done")
-    Err(msg) -> println("error: " <> msg)
-  end
-end
+Pg.create_range_partitioned_table(pool, "events", [...], "received_at")?
+Pg.create_daily_partitions_ahead(pool, "events", days)?
+Pg.list_daily_partitions_before(pool, "events", max_days)?
+Pg.drop_partition(pool, partition_name)?
 ```
 
-## What's Next?
+`mesher/migrations/20260216120000_create_initial_schema.mpl` handles the schema-time partitioned table creation, while `mesher/storage/schema.mpl` owns the runtime create/list/drop lifecycle for those partitions.
 
-- [Web](/docs/web/) -- HTTP servers, routing, middleware, WebSocket, and TLS
-- [Concurrency](/docs/concurrency/) -- actors, message passing, and supervision trees
-- [Type System](/docs/type-system/) -- structs, sum types, generics, and deriving
+## Escape hatches and the honest leftover raw list
+
+M033 does **not** claim that Mesh or Mesher have reached zero raw SQL/DDL.
+
+The escape hatches are part of the public contract:
+
+- `Repo.query_raw(pool, sql, params)` — raw read boundary
+- `Repo.execute_raw(pool, sql, params)` — raw write/update boundary
+- `Migration.execute(pool, sql)` — raw DDL boundary when a migration shape does not fit `Migration.*` or `Pg.*`
+
+The shipped M033 Mesher migration does not currently need `Migration.execute(...)` because `Migration.create_index(...)` plus `Pg.create_*` cover the DDL it uses today.
+
+The current Mesher storage layer still keeps a named raw list in `mesher/storage/queries.mpl` instead of pretending those shapes are portable:
+
+- `check_volume_spikes` — correlated update with `JOIN`, `HAVING`, `GREATEST`, and interval arithmetic
+- `extract_event_fields` — JSONB fingerprint fallback chain with `WITH ORDINALITY`
+- `list_issues_filtered` — optional filters plus tuple-cursor pagination
+- `event_volume_hourly` — `date_trunc(...)` bucket projection that must preserve labeled bucket rows on the live dashboard path
+- `get_event_neighbors` — paired scalar subqueries with tuple comparison for next/previous navigation
+- `evaluate_threshold_rule` — threshold + cooldown evaluation over derived subqueries
+- `get_event_alert_rules` and `get_threshold_rules` — explicit alert-rule selectors that keep stable text rows on the live alert path
+- `should_fire_by_cooldown` — boolean cooldown gate over interval arithmetic
+- `list_alerts` — alert listing with optional status filter on the live alerts route
+- `check_sample_rate` — server-side `random() < COALESCE((SELECT sample_rate ...), 1.0)` sampling predicate
+
+That is the honest boundary today: most common expression/query/write/schema shapes are on the builder/helper surface, and the remaining raw sites are named on purpose.
+
+## What this page is not claiming
+
+- It is **not** claiming that PostgreSQL JSONB/search/crypto/partition features are portable to SQLite.
+- It is **not** claiming that every SQL/DDL shape has a universal Mesh abstraction.
+- It is **not** claiming runtime proof for SQLite extras in M033.
+- It **is** claiming that the repo now names the portable core, names the PostgreSQL-only helpers, and names the deliberate raw keep-sites instead of hiding them.
+
+## Proof and failure map
+
+If this surface drifts, rerun the proof that matches the boundary you touched:
+
+| Surface | Proof command | Primary files |
+| --- | --- | --- |
+| neutral `Expr` / `Query` / `Repo` builder | `bash scripts/verify-m033-s01.sh` | `compiler/meshc/tests/e2e_m033_s01.rs` |
+| PostgreSQL JSONB/search/crypto helpers | `bash scripts/verify-m033-s02.sh` | `mesher/storage/writer.mpl`, `mesher/storage/queries.mpl` |
+| composed reads and named raw keep-sites | `bash scripts/verify-m033-s03.sh` | `mesher/storage/queries.mpl` |
+| migration + schema helpers | `bash scripts/verify-m033-s04.sh` | `mesher/migrations/20260216120000_create_initial_schema.mpl`, `mesher/storage/schema.mpl`, `compiler/meshc/src/migrate.rs` |
+| docs page rendering | `npm --prefix website run build` | `website/docs/docs/databases/index.md` |
+
+## What's next?
+
+- [Production Backend Proof](/docs/production-backend-proof/) — repo-level proof surface for the assembled backend
+- [Web](/docs/web/) — HTTP and WebSocket primitives that consume these storage helpers
+- `reference-backend/README.md` — operator/developer runbook for the broader backend package
