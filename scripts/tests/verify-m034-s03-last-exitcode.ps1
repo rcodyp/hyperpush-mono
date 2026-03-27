@@ -50,6 +50,15 @@ $logContent = Get-Content $logPath -Raw
 if (-not $logContent.Contains('display: Write-Output ok')) {
     throw 'combined log did not keep the display text'
 }
+if (-not $logContent.Contains('exit_code: 0')) {
+    throw 'combined log did not preserve the successful exit code'
+}
+if (-not $logContent.Contains("stdout_path: $stdoutPath")) {
+    throw 'combined log did not preserve the stdout artifact path'
+}
+if (-not $logContent.Contains("stderr_path: $stderrPath")) {
+    throw 'combined log did not preserve the stderr artifact path'
+}
 if (-not $logContent.Contains('[stdout]')) {
     throw 'combined log did not preserve stdout section'
 }

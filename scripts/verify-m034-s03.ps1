@@ -59,11 +59,15 @@ function Combine-CommandLog {
         [string]$Display,
         [string]$StdoutPath,
         [string]$StderrPath,
-        [string]$LogPath
+        [string]$LogPath,
+        [int]$ExitCode
     )
 
     $content = [System.Collections.Generic.List[string]]::new()
     $content.Add("display: $Display")
+    $content.Add("exit_code: $ExitCode")
+    $content.Add("stdout_path: $StdoutPath")
+    $content.Add("stderr_path: $StderrPath")
     if ((Test-Path $StdoutPath) -and (Get-Item $StdoutPath).Length -gt 0) {
         $content.Add('')
         $content.Add('[stdout]')
@@ -100,7 +104,7 @@ function Invoke-LoggedCommand {
         if ($null -eq $exitCode) { $exitCode = 0 }
     }
 
-    Combine-CommandLog -Display $Display -StdoutPath $stdoutPath -StderrPath $stderrPath -LogPath $logPath
+    Combine-CommandLog -Display $Display -StdoutPath $stdoutPath -StderrPath $stderrPath -LogPath $logPath -ExitCode $exitCode
     $script:LastStdoutPath = $stdoutPath
     $script:LastStderrPath = $stderrPath
     $script:LastLogPath = $logPath

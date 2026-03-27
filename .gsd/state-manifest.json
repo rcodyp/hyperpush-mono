@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-03-27T20:21:20.455Z",
+  "exported_at": "2026-03-27T20:31:39.663Z",
   "milestones": [
     {
       "id": "M001",
@@ -4187,19 +4187,30 @@
       "milestone_id": "M034",
       "slice_id": "S10",
       "id": "T02",
-      "title": "Make the Windows installed-compiler path target-aware and keep staged smoke diagnostics truthful",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Made meshc’s linker/runtime discovery target-aware for Windows MSVC and updated staged smoke logs so hosted Windows failures keep a truthful phase log.",
+      "status": "complete",
+      "one_liner": "Made meshc’s linker/runtime discovery target-aware for Windows MSVC and updated staged smoke logs so hosted Windows failures keep a truthful phase log.",
+      "narrative": "I refactored `compiler/mesh-codegen/src/link.rs` around a small target classifier so the linker path no longer assumes every host behaves like Unix. The linker now receives the requested target triple, keeps `cc` plus direct `libmesh_rt.a` linking on Unix-like targets, and switches Windows MSVC to `clang(.exe)` plus direct `mesh_rt.lib` linking. Runtime lookup is now target-aware as well: when a target triple is provided it searches the target-specific Cargo layout first, falls back to the host profile layout, and emits explicit errors that name the expected runtime filename, the target triple, the searched paths, and the cargo command needed to rebuild `mesh-rt`.\n\nI threaded the target triple through `compiler/mesh-codegen/src/lib.rs` so the linker repair is actually used by `meshc build` and multi-module builds, added focused unit coverage in `link.rs` for Windows filename selection, Unix filename preservation, unsupported target rejection, and missing-runtime error text, and updated the runtime crate doc comment so the platform-specific artifact names are no longer described as Unix-only.\n\nOn the staged-smoke side, I kept the workflow shape intact but tightened the PowerShell command-log helper in `scripts/verify-m034-s03.ps1`: every command log now records the display text, exit code, and stdout/stderr artifact paths even when the underlying subprocess is silent. I extended `scripts/tests/verify-m034-s03-last-exitcode.ps1` to assert those new fields, adjusted the workflow contract wording in `scripts/verify-m034-s02-workflows.sh`, and recorded the linking rule in `.gsd/DECISIONS.md` and `.gsd/KNOWLEDGE.md`.",
+      "verification_result": "Ran the task’s required verification commands directly. `cargo test -p mesh-codegen link -- --nocapture` passed with the new link-path regression coverage in place. `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1` passed and confirmed the PowerShell helper now preserves exit-code and artifact-path metadata in the combined log. `bash scripts/verify-m034-s02-workflows.sh` passed, confirming the release workflow contract still points at the real staged smoke steps after the wording update.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-03-27T20:31:39.042Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "`cargo test -p mesh-codegen link -- --nocapture` still reports two pre-existing warnings in `compiler/mesh-codegen/src/mir/lower.rs` (`unused import: crate::mir::MirType` and an always-true `len() >= 0` comparison). They are unrelated to this linker task and remained unchanged.",
+      "key_files": [
+        "compiler/mesh-codegen/src/link.rs",
+        "compiler/mesh-codegen/src/lib.rs",
+        "scripts/verify-m034-s03.ps1",
+        "scripts/tests/verify-m034-s03-last-exitcode.ps1",
+        "scripts/verify-m034-s02-workflows.sh",
+        "compiler/mesh-rt/src/lib.rs",
+        ".gsd/DECISIONS.md",
+        ".gsd/KNOWLEDGE.md"
+      ],
+      "key_decisions": [
+        "D105: use target-aware linker selection and pass the resolved runtime static library path directly to the linker instead of assuming Unix `cc -lmesh_rt` semantics on every host."
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S10\nmilestone: M034\nkey_files:\n  - compiler/mesh-codegen/src/link.rs\n  - compiler/mesh-codegen/src/lib.rs\n  - scripts/verify-m034-s03.ps1\n  - scripts/tests/verify-m034-s03-last-exitcode.ps1\n  - scripts/verify-m034-s02-workflows.sh\n  - compiler/mesh-rt/src/lib.rs\n  - .gsd/DECISIONS.md\n  - .gsd/KNOWLEDGE.md\nkey_decisions:\n  - D105: use target-aware linker selection and pass the resolved runtime static library path directly to the linker instead of assuming Unix `cc -lmesh_rt` semantics on every host.\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-03-27T20:31:39.043Z\nblocker_discovered: false\n---\n\n# T02: Made meshc’s linker/runtime discovery target-aware for Windows MSVC and updated staged smoke logs so hosted Windows failures keep a truthful phase log.\n\n**Made meshc’s linker/runtime discovery target-aware for Windows MSVC and updated staged smoke logs so hosted Windows failures keep a truthful phase log.**\n\n## What Happened\n\nI refactored `compiler/mesh-codegen/src/link.rs` around a small target classifier so the linker path no longer assumes every host behaves like Unix. The linker now receives the requested target triple, keeps `cc` plus direct `libmesh_rt.a` linking on Unix-like targets, and switches Windows MSVC to `clang(.exe)` plus direct `mesh_rt.lib` linking. Runtime lookup is now target-aware as well: when a target triple is provided it searches the target-specific Cargo layout first, falls back to the host profile layout, and emits explicit errors that name the expected runtime filename, the target triple, the searched paths, and the cargo command needed to rebuild `mesh-rt`.\n\nI threaded the target triple through `compiler/mesh-codegen/src/lib.rs` so the linker repair is actually used by `meshc build` and multi-module builds, added focused unit coverage in `link.rs` for Windows filename selection, Unix filename preservation, unsupported target rejection, and missing-runtime error text, and updated the runtime crate doc comment so the platform-specific artifact names are no longer described as Unix-only.\n\nOn the staged-smoke side, I kept the workflow shape intact but tightened the PowerShell command-log helper in `scripts/verify-m034-s03.ps1`: every command log now records the display text, exit code, and stdout/stderr artifact paths even when the underlying subprocess is silent. I extended `scripts/tests/verify-m034-s03-last-exitcode.ps1` to assert those new fields, adjusted the workflow contract wording in `scripts/verify-m034-s02-workflows.sh`, and recorded the linking rule in `.gsd/DECISIONS.md` and `.gsd/KNOWLEDGE.md`.\n\n## Verification\n\nRan the task’s required verification commands directly. `cargo test -p mesh-codegen link -- --nocapture` passed with the new link-path regression coverage in place. `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1` passed and confirmed the PowerShell helper now preserves exit-code and artifact-path metadata in the combined log. `bash scripts/verify-m034-s02-workflows.sh` passed, confirming the release workflow contract still points at the real staged smoke steps after the wording update.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `cargo test -p mesh-codegen link -- --nocapture` | 0 | ✅ pass | 1882ms |\n| 2 | `pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1` | 0 | ✅ pass | 2883ms |\n| 3 | `bash scripts/verify-m034-s02-workflows.sh` | 0 | ✅ pass | 1255ms |\n\n\n## Deviations\n\nNone.\n\n## Known Issues\n\n`cargo test -p mesh-codegen link -- --nocapture` still reports two pre-existing warnings in `compiler/mesh-codegen/src/mir/lower.rs` (`unused import: crate::mir::MirType` and an always-true `len() >= 0` comparison). They are unrelated to this linker task and remained unchanged.\n\n## Files Created/Modified\n\n- `compiler/mesh-codegen/src/link.rs`\n- `compiler/mesh-codegen/src/lib.rs`\n- `scripts/verify-m034-s03.ps1`\n- `scripts/tests/verify-m034-s03-last-exitcode.ps1`\n- `scripts/verify-m034-s02-workflows.sh`\n- `compiler/mesh-rt/src/lib.rs`\n- `.gsd/DECISIONS.md`\n- `.gsd/KNOWLEDGE.md`\n",
       "description": "Repair the Windows/MSVC runtime-library discovery and linker invocation path in the compiler, then update the staged smoke verifier and workflow contract so hosted Windows failures stay localizable instead of stopping at an empty build bundle.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Target-aware runtime lookup in `mesh-codegen` | Return a specific runtime-library discovery error naming the expected target/profile path instead of falling back to Unix assumptions. | Fail the build immediately; do not keep waiting on a nonexistent runtime artifact. | Reject unsupported/unknown target triples explicitly instead of emitting a broken linker command. |\n| Hosted staged verifier / workflow contract | Keep the verifier red with preserved phase logs and contract failures rather than silently skipping the Windows build step. | Surface the first failing phase and log paths under `.tmp/m034-s03/`. | Treat missing staged archives, runtime artifacts, or log files as contract failures. |\n\n## Load Profile\n\n- **Shared resources**: release asset archives, target/debug runtime artifacts, staged `.tmp/m034-s03/` verifier tree, and hosted Windows runners.\n- **Per-operation cost**: one runtime-library lookup, one linker invocation, one staged installer/build smoke replay.\n- **10x breakpoint**: incorrect target/runtime naming or overly brittle verifier assumptions will fail every Windows smoke build on hosted runners, even when install/version checks pass.\n\n## Negative Tests\n\n- **Malformed inputs**: missing runtime archive, missing target-specific static library, unsupported target triple, and staged artifact trees missing expected binaries.\n- **Error paths**: linker driver missing, runtime library lookup fails, or staged hello-build still exits non-zero with stdout/stderr capture preserved.\n- **Boundary conditions**: debug vs release runtime preference, Windows MSVC artifact naming vs Unix `libmesh_rt.a`, and unchanged Unix/macOS linker behavior.\n\n## Steps\n\n1. Refactor `compiler/mesh-codegen/src/link.rs` so runtime-library discovery and linker arguments are target-aware, with an explicit Windows/MSVC branch and preserved Unix behavior.\n2. Add a focused compiler-side regression around that target selection logic; keep it close to `link.rs` unless a small `meshc` integration test is the only way to assert the behavior honestly.\n3. Update `scripts/verify-m034-s03.ps1` and any release-workflow contract text in `scripts/verify-m034-s02-workflows.sh` / `.github/workflows/release.yml` only as needed to match the repaired runtime path and to keep phase logs actionable.\n4. Re-run the PowerShell helper regression and the workflow contract checker so the hosted smoke surface stays honest.\n\n## Must-Haves\n\n- [ ] Installed `meshc.exe` no longer assumes Unix linker/runtime naming on the Windows MSVC path.\n- [ ] The compiler emits actionable runtime-library/linker errors if the Windows path regresses again.\n- [ ] The staged Windows verifier and workflow contract still prove the real build step instead of skipping it.\n- [ ] Unix/macOS runtime lookup behavior remains intact.",
       "estimate": "1h 30m",
       "files": [
@@ -5522,6 +5533,18 @@
       "decision": "Registry package latest-version source of truth",
       "choice": "Recompute packages.latest_version from committed versions rows under a per-package row lock after each publish, and make metadata/search fail closed when the latest-version join is missing.",
       "rationale": "Last-writer-wins updates on packages.latest_version allowed overlapping publishes to move package-level latest backward even while the newer version row already existed. Re-deriving latest from committed version data removes the race, preserves description updates, and keeps named-install, package metadata, and search/list surfaces aligned on one truthful latest pointer.",
+      "revisable": "Yes",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 3414,
+      "id": "D105",
+      "when_context": "M034/S10/T02",
+      "scope": "compiler",
+      "decision": "How mesh-codegen should link the Mesh runtime on Windows MSVC versus Unix hosts",
+      "choice": "Use target-aware linker selection and pass the resolved runtime static library path directly to the linker; keep `cc` + `libmesh_rt.a` on Unix and use `clang.exe`/`clang` with `mesh_rt.lib` on Windows MSVC.",
+      "rationale": "Cargo emits different static-library names across target families, so the old Unix-only `cc -lmesh_rt` flow could not find or describe the Windows MSVC runtime correctly. Passing the resolved runtime file path avoids platform-specific `-l` naming assumptions, keeps Unix behavior intact, and makes Windows failures name the expected artifact and linker driver explicitly.",
       "revisable": "Yes",
       "made_by": "agent",
       "superseded_by": null
@@ -8871,6 +8894,39 @@
       "verdict": "✅ pass",
       "duration_ms": 2100,
       "created_at": "2026-03-27T20:21:17.878Z"
+    },
+    {
+      "id": 305,
+      "task_id": "T02",
+      "slice_id": "S10",
+      "milestone_id": "M034",
+      "command": "cargo test -p mesh-codegen link -- --nocapture",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 1882,
+      "created_at": "2026-03-27T20:31:39.042Z"
+    },
+    {
+      "id": 306,
+      "task_id": "T02",
+      "slice_id": "S10",
+      "milestone_id": "M034",
+      "command": "pwsh -NoProfile -File scripts/tests/verify-m034-s03-last-exitcode.ps1",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 2883,
+      "created_at": "2026-03-27T20:31:39.042Z"
+    },
+    {
+      "id": 307,
+      "task_id": "T02",
+      "slice_id": "S10",
+      "milestone_id": "M034",
+      "command": "bash scripts/verify-m034-s02-workflows.sh",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 1255,
+      "created_at": "2026-03-27T20:31:39.042Z"
     }
   ]
 }

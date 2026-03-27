@@ -42,7 +42,7 @@
   - Files: registry/src/db/packages.rs, registry/src/routes/metadata.rs, registry/src/routes/search.rs, scripts/tests/verify-m034-s01-fetch-retry.sh
   - Verify: cargo test --manifest-path registry/Cargo.toml latest -- --nocapture
 bash scripts/tests/verify-m034-s01-fetch-retry.sh
-- [ ] **T02: Make the Windows installed-compiler path target-aware and keep staged smoke diagnostics truthful** — Repair the Windows/MSVC runtime-library discovery and linker invocation path in the compiler, then update the staged smoke verifier and workflow contract so hosted Windows failures stay localizable instead of stopping at an empty build bundle.
+- [x] **T02: Made meshc’s linker/runtime discovery target-aware for Windows MSVC and updated staged smoke logs so hosted Windows failures keep a truthful phase log.** — Repair the Windows/MSVC runtime-library discovery and linker invocation path in the compiler, then update the staged smoke verifier and workflow contract so hosted Windows failures stay localizable instead of stopping at an empty build bundle.
 
 ## Failure Modes
 

@@ -3,7 +3,7 @@
 //! This crate provides the runtime support functions that compiled Mesh
 //! programs call at runtime. It is compiled as both:
 //!
-//! - A static library (`libmesh_rt.a`) for linking into Mesh binaries
+//! - A platform-specific static library (`libmesh_rt.a` on Unix, `mesh_rt.lib` on Windows MSVC) for linking into Mesh binaries
 //! - A Rust library (`lib`) for unit testing
 //!
 //! ## Modules

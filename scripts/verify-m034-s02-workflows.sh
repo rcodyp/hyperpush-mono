@@ -659,7 +659,7 @@ if verify_release_assets.is_a?(Hash)
 
   build_mesh_rt = verify_find_step.call("Build mesh-rt for smoke verifier")
   unless build_mesh_rt.is_a?(Hash) && build_mesh_rt["run"].to_s.strip == "cargo build -q -p mesh-rt"
-    errors << "verify-release-assets job must build mesh-rt so the staged smoke can find libmesh_rt.a"
+    errors << "verify-release-assets job must build mesh-rt so the staged smoke can find the target-aware runtime static library"
   end
 
   verify_unix = verify_find_step.call("Verify staged installer assets (Unix)")

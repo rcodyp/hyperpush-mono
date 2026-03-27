@@ -160,7 +160,7 @@ pub fn compile_to_llvm_ir(
 /// * `output` - Path to write the final executable
 /// * `opt_level` - Optimization level (0 = none, 2 = default)
 /// * `target_triple` - Optional target triple; None = host default
-/// * `rt_lib_path` - Optional path to `libmesh_rt.a`; None = auto-detect
+/// * `rt_lib_path` - Optional path to the Mesh runtime static library; None = auto-detect
 ///
 /// # Errors
 ///
@@ -178,7 +178,7 @@ pub fn compile_to_binary(
     compile_to_object(parse, typeck, &obj_path, opt_level, target_triple)?;
 
     // Link with mesh-rt
-    link::link(&obj_path, output, rt_lib_path)?;
+    link::link(&obj_path, output, target_triple, rt_lib_path)?;
 
     Ok(())
 }
@@ -228,7 +228,7 @@ pub fn compile_mir_to_binary(
     }
 
     codegen.emit_object(&obj_path)?;
-    link::link(&obj_path, output, rt_lib_path)?;
+    link::link(&obj_path, output, target_triple, rt_lib_path)?;
 
     Ok(())
 }
