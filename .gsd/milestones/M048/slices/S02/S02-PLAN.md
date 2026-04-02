@@ -8,7 +8,7 @@
   - Estimate: 2h
   - Files: compiler/mesh-lsp/src/analysis.rs, compiler/mesh-pkg/src/manifest.rs
   - Verify: cargo test -p mesh-lsp -- --nocapture
-- [ ] **T02: Extend the retained `meshc lsp` JSON-RPC proof to cover override-entry projects** — The slice needs one transport-level proof that exercises the real `meshc lsp` server rather than only unit tests inside `analysis.rs`. Reuse the S01 fixture shapes inside `compiler/meshc/tests/e2e_lsp.rs`, open an override-entry project through JSON-RPC, and pin clean diagnostics plus at least one semantic provider query that depends on project-aware imports/definitions.
+- [x] **T02: Extended the retained `meshc lsp` JSON-RPC rail to prove override-entry projects through live diagnostics and nested-import hover.** — The slice needs one transport-level proof that exercises the real `meshc lsp` server rather than only unit tests inside `analysis.rs`. Reuse the S01 fixture shapes inside `compiler/meshc/tests/e2e_lsp.rs`, open an override-entry project through JSON-RPC, and pin clean diagnostics plus at least one semantic provider query that depends on project-aware imports/definitions.
   - Estimate: 90m
   - Files: compiler/meshc/tests/e2e_lsp.rs, compiler/meshc/tests/e2e_m048_s01.rs
   - Verify: cargo test -p meshc --test e2e_lsp -- --nocapture
