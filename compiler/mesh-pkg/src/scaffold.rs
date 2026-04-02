@@ -57,6 +57,12 @@ fn write_project_file(path: &Path, contents: &str) -> Result<(), String> {
     std::fs::write(path, contents).map_err(|e| format!("Failed to write {}: {}", path.display(), e))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TodoApiDatabase {
+    Sqlite,
+    Postgres,
+}
+
 /// Create a new hello-world Mesh project with the given name inside the given parent directory.
 pub fn scaffold_project(name: &str, dir: &Path) -> Result<(), String> {
     let project_dir = create_project_dir(name, dir)?;
@@ -311,8 +317,29 @@ ENTRYPOINT ["/usr/local/bin/__NAME__"]
     .replace("__NAME__", name)
 }
 
-/// Create a new clustered SQLite Todo API starter template.
+/// Create a new Todo API starter template using the default SQLite backend.
 pub fn scaffold_todo_api_project(name: &str, dir: &Path) -> Result<(), String> {
+    scaffold_todo_api_project_with_db(name, dir, TodoApiDatabase::Sqlite)
+}
+
+/// Create a new Todo API starter template for the selected database backend.
+pub fn scaffold_todo_api_project_with_db(
+    name: &str,
+    dir: &Path,
+    database: TodoApiDatabase,
+) -> Result<(), String> {
+    match database {
+        TodoApiDatabase::Sqlite => scaffold_sqlite_todo_api_project(name, dir),
+        TodoApiDatabase::Postgres => scaffold_postgres_todo_api_project(name, dir),
+    }
+}
+
+fn scaffold_postgres_todo_api_project(_name: &str, _dir: &Path) -> Result<(), String> {
+    Err("`meshc init --template todo-api --db postgres <name>` is reserved for the Postgres starter and is not implemented yet; use `meshc init --template todo-api <name>` or `--db sqlite` for the current SQLite starter.".to_string())
+}
+
+/// Create a new clustered SQLite Todo API starter template.
+fn scaffold_sqlite_todo_api_project(name: &str, dir: &Path) -> Result<(), String> {
     let project_dir = create_project_dir(name, dir)?;
 
     let manifest = format!(
@@ -911,6 +938,52 @@ mod tests {
             err.contains("already exists"),
             "Error should mention 'already exists', got: {}",
             err
+        );
+    }
+
+    #[test]
+    fn m049_s01_todo_api_database_selector_keeps_sqlite_contract() {
+        let tmp = TempDir::new().unwrap();
+        scaffold_todo_api_project_with_db("todo-api", tmp.path(), TodoApiDatabase::Sqlite)
+            .expect("sqlite todo-api scaffold should succeed");
+
+        let project_dir = tmp.path().join("todo-api");
+        assert!(project_dir.join("mesh.toml").exists());
+        assert!(project_dir.join("main.mpl").exists());
+        assert!(project_dir.join("storage/todos.mpl").exists());
+
+        let main = std::fs::read_to_string(project_dir.join("main.mpl")).unwrap();
+        assert!(main.contains("TODO_DB_PATH"));
+        assert!(main.contains("ensure_schema"));
+
+        let storage = std::fs::read_to_string(project_dir.join("storage/todos.mpl")).unwrap();
+        assert!(storage.contains("Sqlite.open"));
+        assert!(storage.contains("CREATE TABLE IF NOT EXISTS todos"));
+    }
+
+    #[test]
+    fn m049_s01_todo_api_database_selector_fails_closed_for_postgres() {
+        let tmp = TempDir::new().unwrap();
+        let project_dir = tmp.path().join("todo-api");
+
+        let error =
+            scaffold_todo_api_project_with_db("todo-api", tmp.path(), TodoApiDatabase::Postgres)
+                .expect_err(
+                    "postgres todo-api scaffold should fail closed until the starter lands",
+                );
+
+        assert!(
+            error.contains("--db postgres"),
+            "error should mention the postgres flag contract, got: {error}"
+        );
+        assert!(
+            error.contains("not implemented yet"),
+            "error should explain the current dedicated-path state, got: {error}"
+        );
+        assert!(
+            !project_dir.exists(),
+            "postgres path should fail before creating {}",
+            project_dir.display()
         );
     }
 

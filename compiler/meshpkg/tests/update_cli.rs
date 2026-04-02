@@ -78,8 +78,9 @@ fn json_mode_rejects_update_before_installer_launch() {
     );
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let json: Value = serde_json::from_str(stderr.trim())
-        .unwrap_or_else(|error| panic!("meshpkg --json update should emit one JSON error: {error}\nstderr:\n{stderr}"));
+    let json: Value = serde_json::from_str(stderr.trim()).unwrap_or_else(|error| {
+        panic!("meshpkg --json update should emit one JSON error: {error}\nstderr:\n{stderr}")
+    });
     let message = json["error"]
         .as_str()
         .expect("json error payload should contain an error string");

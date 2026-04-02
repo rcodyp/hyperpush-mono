@@ -3,7 +3,7 @@
 //! Provides the `meshc` command with the following subcommands:
 //!
 //! - `meshc build <dir>` - Compile a Mesh project to a native binary
-//! - `meshc init [--clustered] [--template <name>] <name>` - Initialize a new Mesh project
+//! - `meshc init [--clustered] [--template <name>] [--db <sqlite|postgres>] <name>` - Initialize a new Mesh project
 //! - `meshc cluster <status|continuity|diagnostics> ...` - Inspect runtime-owned clustered operator surfaces
 //! - `meshc deps [dir]` - Resolve and fetch dependencies
 //! - `meshc update` - Refresh installed `meshc` and `meshpkg` through the canonical installer path
@@ -34,7 +34,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use mesh_parser::ast::expr::{FieldAccess, NameRef};
 use mesh_parser::ast::AstNode;
 use mesh_parser::syntax_kind::SyntaxKind;
@@ -94,6 +94,10 @@ enum Commands {
         /// Generate a named starter template (currently: todo-api)
         #[arg(long)]
         template: Option<String>,
+
+        /// Select the todo-api database backend (sqlite, postgres)
+        #[arg(long, value_enum)]
+        db: Option<InitTodoDb>,
 
         /// Project name (creates directory with this name)
         name: String,
@@ -171,6 +175,86 @@ enum MigrateAction {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum InitTodoDb {
+    Sqlite,
+    Postgres,
+}
+
+impl From<InitTodoDb> for mesh_pkg::TodoApiDatabase {
+    fn from(value: InitTodoDb) -> Self {
+        match value {
+            InitTodoDb::Sqlite => mesh_pkg::TodoApiDatabase::Sqlite,
+            InitTodoDb::Postgres => mesh_pkg::TodoApiDatabase::Postgres,
+        }
+    }
+}
+
+enum InitTarget {
+    HelloWorld,
+    Clustered,
+    TodoApi(mesh_pkg::TodoApiDatabase),
+}
+
+fn resolve_init_target(
+    clustered: bool,
+    template: Option<&str>,
+    db: Option<InitTodoDb>,
+) -> Result<InitTarget, String> {
+    if let Some(template_name) = template {
+        if template_name != "todo-api" {
+            let db_guidance = if db.is_some() {
+                " `--db` is only supported with `--template todo-api`."
+            } else {
+                ""
+            };
+            return Err(format!(
+                "unknown init template '{template_name}'; supported templates: todo-api.{db_guidance}"
+            ));
+        }
+    }
+
+    if db.is_some() && template != Some("todo-api") {
+        return Err(
+            "`--db` is only supported with `meshc init --template todo-api <name>`; omit `--db` for the current starter or add `--template todo-api`."
+                .to_string(),
+        );
+    }
+
+    if clustered && template == Some("todo-api") {
+        return Err(
+            "`meshc init --clustered` cannot be combined with `--template todo-api` or `--db`; use `meshc init --template todo-api <name>` for the current SQLite starter."
+                .to_string(),
+        );
+    }
+
+    match (clustered, template, db) {
+        (true, None, None) => Ok(InitTarget::Clustered),
+        (false, Some("todo-api"), Some(database)) => Ok(InitTarget::TodoApi(database.into())),
+        (false, Some("todo-api"), None) => {
+            Ok(InitTarget::TodoApi(mesh_pkg::TodoApiDatabase::Sqlite))
+        }
+        (false, None, None) => Ok(InitTarget::HelloWorld),
+        _ => unreachable!("init argument validation should return early for unsupported cases"),
+    }
+}
+
+fn run_init_command(
+    clustered: bool,
+    template: Option<&str>,
+    db: Option<InitTodoDb>,
+    name: &str,
+    dir: &Path,
+) -> Result<(), String> {
+    match resolve_init_target(clustered, template, db)? {
+        InitTarget::HelloWorld => mesh_pkg::scaffold_project(name, dir),
+        InitTarget::Clustered => mesh_pkg::scaffold_clustered_project(name, dir),
+        InitTarget::TodoApi(database) => {
+            mesh_pkg::scaffold_todo_api_project_with_db(name, dir, database)
+        }
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -216,19 +300,11 @@ fn main() {
         Commands::Init {
             clustered,
             template,
+            db,
             name,
         } => {
             let dir = std::env::current_dir().unwrap_or_default();
-            let result = match template.as_deref() {
-                Some("todo-api") => mesh_pkg::scaffold_todo_api_project(&name, &dir),
-                Some(other) => Err(format!(
-                    "unknown init template '{}'; supported templates: todo-api",
-                    other
-                )),
-                None if clustered => mesh_pkg::scaffold_clustered_project(&name, &dir),
-                None => mesh_pkg::scaffold_project(&name, &dir),
-            };
-            if let Err(e) = result {
+            if let Err(e) = run_init_command(clustered, template.as_deref(), db, &name, &dir) {
                 eprintln!("error: {}", e);
                 process::exit(1);
             }

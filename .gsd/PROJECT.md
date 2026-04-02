@@ -6,7 +6,7 @@ Mesh is a programming language and backend application platform repository aimed
 
 M048 is complete. The repo now ships a default-plus-override executable-entry contract across compiler build/test, `mesh-lsp`, editor hosts, and `meshpkg publish`; installer-backed `meshc update` / `meshpkg update`; truthful editor grammar and init-time Mesh skill guidance for `@cluster` plus both interpolation forms; and one retained closeout rail (`bash scripts/verify-m048-s05.sh`) plus bounded public docs that keep first-contact tooling claims honest.
 
-The current wave continues the evaluator-facing public-surface reset: M049 will replace stale scaffold/example surfaces with current Mesh patterns, M050 will rewrite public docs into evaluator-facing material instead of a proof maze, M051 will retire `reference-backend/` in favor of `mesher/` as the deeper living reference app, and later milestones will align landing/packages/deploy surfaces with that same truthful story.
+The current wave continues the evaluator-facing public-surface reset: M049 will replace stale scaffold/example surfaces with generated SQLite-local and Postgres-clustered starters, M050 will rewrite public docs into evaluator-facing material instead of a proof maze, M051 will retire `reference-backend/` in favor of `mesher/` as the deeper living reference app, and later milestones will align landing/packages/deploy/load-balancing surfaces with that same truthful story.
 
 ## Core Value
 
@@ -74,11 +74,11 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 - [x] M046: Language-Owned Tiny Cluster Proofs — make clustered work auto-triggered, decorator-declarable, route-free, and equally proven through `meshc init --clustered`, `tiny-cluster/`, and rebuilt `cluster-proof/`
 - [x] M047: Cluster Declaration Reset & Clustered Route Ergonomics — replace `clustered(work)` with `@cluster`, reset canonical examples/scaffolds to ordinary `@cluster` function names, continue the clustered-route wrapper work honestly, and ship a clear SQLite Todo scaffold with a complete Dockerfile that makes clustering obvious without looking like a proof app
 - [x] M048: Entrypoint Flexibility & Tooling Truth Reset — make entrypoints configurable, add toolchain self-update, and align editors plus init-time skills with the current language/runtime contract
-- [ ] M049: Scaffold & Example Reset — support SQLite or Postgres scaffolds, generate checked-in examples, and replace proof-app-shaped public teaching surfaces
+- [ ] M049: Scaffold & Example Reset — support SQLite-local and Postgres-clustered scaffolds, generate checked-in examples, and replace proof-app-shaped public teaching surfaces
 - [ ] M050: Public Docs Truth Reset — make docs evaluator-facing, remove proof-maze public material, and re-test commands and code samples one by one
 - [ ] M051: Mesher as the Living Reference App — retire `reference-backend/`, keep `mesher/` healthy, and modernize it as the deeper real reference app
 - [ ] M052: Public Website & Packages Surface Reset — align landing, docs, and packages surfaces into one coherent public Mesh story
-- [ ] M053: Deploy Truth for Scaffolds & Packages Surface — prove the public scaffold and packages surfaces through CI and real Fly-backed deployment behavior
+- [ ] M053: Deploy Truth for Scaffolds & Packages Surface — prove the Postgres starter and packages surfaces through CI and real deployment evidence while keeping the public contract platform-agnostic
 - [ ] M054: Load Balancing Deep Dive & Runtime Follow-through — explain current balancing honestly and implement follow-through if the existing server-side story is not sufficient
 - [ ] M035: Test Framework Hardening — get Mesh's testing story ready to test `mesher` thoroughly during development
 - [ ] M037: Package Experience & Ecosystem Polish — improve the package manager experience, website-first, once the underlying trust path is proven

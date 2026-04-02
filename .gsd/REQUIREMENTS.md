@@ -323,27 +323,27 @@ This file is the explicit capability and coverage contract for the project.
 - Validation: mapped
 - Notes: The repo already deploys this surface; the requirement is to make it part of the main public contract and evidence chain.
 
-### R122 — The SQLite scaffold has a truthful two-node Fly proof with explicit single-writer, node-affined storage semantics.
+### R122 — The Postgres scaffold gets the truthful clustered deploy proof, while SQLite stays an explicitly local starter.
 - Class: integration
 - Status: active
-- Description: The SQLite starter should be proven on Fly in a two-node clustered deployment, but the proof and docs must stay explicit that SQLite durability is node-affined / single-writer truth rather than shared multi-writer storage magic.
-- Why it matters: A fake clustered SQLite durability story would overclaim the platform and weaken the public proof surface.
+- Description: The Postgres starter should be proven through a real clustered deployment with endpoint exercise and operator truth, while the SQLite starter remains explicitly local/single-node and never implies shared clustered durability.
+- Why it matters: This preserves an honest serious production path without asking SQLite to carry a fake shared-storage story.
 - Source: user
 - Primary owning slice: M053/S02 (provisional)
-- Supporting slices: M049/S01 (provisional)
+- Supporting slices: M049/S01 (provisional), M049/S02 (provisional)
 - Validation: mapped
-- Notes: Fly volumes are one-to-one with Machines; any stronger storage story would require explicit replication work.
+- Notes: Fly can remain the current proving ground, but the public contract stays platform-agnostic and must not imply shared SQLite durability.
 
 ### R123 — Mesh explains current load balancing honestly and implements follow-through if the current server-side story is insufficient.
 - Class: operability
 - Status: active
-- Description: Mesh should document how load balancing actually works today across Mesh runtime behavior and Fly routing, then implement runtime/platform follow-through if the current behavior is not enough for the clustered-app story being told publicly.
+- Description: Mesh should document how load balancing actually works today across Mesh runtime behavior and the current proving environments, then implement runtime/platform follow-through if the current behavior is not enough for the clustered-app story being told publicly.
 - Why it matters: Load balancing is one of the language's distinctive public claims, so the story has to be both accurate and good enough.
 - Source: user
 - Primary owning slice: M054/S01 (provisional)
 - Supporting slices: M053/S02 (provisional)
 - Validation: mapped
-- Notes: The baseline story is Fly Proxy plus server-side routing, not frontend-held node awareness.
+- Notes: The baseline story is platform-agnostic server-side routing first; Fly Proxy is the current proving environment, not the full product contract.
 
 ## Validated
 

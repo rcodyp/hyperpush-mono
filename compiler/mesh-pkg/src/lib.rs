@@ -16,7 +16,10 @@ pub use manifest::{
     SourceClusteredDeclarationSyntax, DEFAULT_CLUSTER_REPLICATION_COUNT,
 };
 pub use resolver::resolve_dependencies;
-pub use scaffold::{scaffold_clustered_project, scaffold_project, scaffold_todo_api_project};
+pub use scaffold::{
+    scaffold_clustered_project, scaffold_project, scaffold_todo_api_project,
+    scaffold_todo_api_project_with_db, TodoApiDatabase,
+};
 pub use toolchain_update::{
     run_toolchain_update, ToolchainUpdateError, ToolchainUpdateMode, ToolchainUpdateOutcome,
 };

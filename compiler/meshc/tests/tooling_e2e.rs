@@ -5,7 +5,8 @@
 //! - `meshc fmt` formats files, `meshc fmt --check` verifies formatting
 //! - `meshc init` creates a compilable project
 //! - `meshc init --clustered` creates a clustered project using only public clustered-app surfaces
-//! - `meshc init --template todo-api` creates a clustered SQLite Todo API starter
+//! - `meshc init --template todo-api` creates the current clustered SQLite Todo API starter
+//! - `meshc init --template todo-api --db ...` validates the typed DB-selection seam and fail-closed paths
 //! - `meshc repl --help` confirms REPL subcommand availability
 //! - `meshc lsp --help` confirms LSP subcommand availability
 
@@ -754,6 +755,169 @@ fn test_init_clustered_todo_template_rejects_existing_directory() {
         combined.contains("already exists"),
         "expected existing-directory collision message, got:\n{}",
         combined
+    );
+}
+
+#[test]
+fn test_init_todo_template_db_sqlite_explicit_flag_preserves_current_starter() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let output = Command::new(meshc_bin())
+        .args([
+            "init",
+            "--template",
+            "todo-api",
+            "--db",
+            "sqlite",
+            "todo-starter",
+        ])
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run meshc init --template todo-api --db sqlite");
+
+    assert!(
+        output.status.success(),
+        "meshc init --template todo-api --db sqlite failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let project_dir = dir.path().join("todo-starter");
+    let main = std::fs::read_to_string(project_dir.join("main.mpl")).unwrap();
+    let storage = std::fs::read_to_string(project_dir.join("storage/todos.mpl")).unwrap();
+
+    assert!(main.contains("TODO_DB_PATH"));
+    assert!(main.contains("ensure_schema"));
+    assert!(storage.contains("Sqlite.open"));
+    assert!(storage.contains("CREATE TABLE IF NOT EXISTS todos"));
+}
+
+#[test]
+fn test_init_todo_template_db_rejects_usage_without_todo_template() {
+    let dir = tempfile::tempdir().unwrap();
+    let project_dir = dir.path().join("plain-project");
+
+    let output = Command::new(meshc_bin())
+        .args(["init", "--db", "sqlite", "plain-project"])
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run meshc init --db sqlite without template");
+
+    assert!(
+        !output.status.success(),
+        "meshc init --db sqlite without --template todo-api should fail"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("`--db` is only supported"), "{}", stderr);
+    assert!(stderr.contains("--template todo-api"), "{}", stderr);
+    assert!(
+        !project_dir.exists(),
+        "unexpected project created at {}",
+        project_dir.display()
+    );
+}
+
+#[test]
+fn test_init_todo_template_db_rejects_clustered_todo_template_conflict() {
+    let dir = tempfile::tempdir().unwrap();
+    let project_dir = dir.path().join("todo-starter");
+
+    let output = Command::new(meshc_bin())
+        .args([
+            "init",
+            "--clustered",
+            "--template",
+            "todo-api",
+            "--db",
+            "sqlite",
+            "todo-starter",
+        ])
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run meshc init --clustered --template todo-api --db sqlite");
+
+    assert!(
+        !output.status.success(),
+        "clustered todo-api init should fail instead of silently ignoring flags"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("`meshc init --clustered` cannot be combined"),
+        "{}",
+        stderr
+    );
+    assert!(stderr.contains("--template todo-api"), "{}", stderr);
+    assert!(
+        !project_dir.exists(),
+        "unexpected project created at {}",
+        project_dir.display()
+    );
+}
+
+#[test]
+fn test_init_todo_template_db_rejects_unknown_values_before_generation() {
+    let dir = tempfile::tempdir().unwrap();
+    let project_dir = dir.path().join("todo-starter");
+
+    let output = Command::new(meshc_bin())
+        .args([
+            "init",
+            "--template",
+            "todo-api",
+            "--db",
+            "mysql",
+            "todo-starter",
+        ])
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run meshc init --template todo-api --db mysql");
+
+    assert!(
+        !output.status.success(),
+        "unknown todo-api db values should fail during clap parsing"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("invalid value 'mysql'"), "{}", stderr);
+    assert!(stderr.contains("--db <DB>"), "{}", stderr);
+    assert!(
+        !project_dir.exists(),
+        "unexpected project created at {}",
+        project_dir.display()
+    );
+}
+
+#[test]
+fn test_init_todo_template_postgres_fails_closed_before_project_generation() {
+    let dir = tempfile::tempdir().unwrap();
+    let project_dir = dir.path().join("todo-starter");
+
+    let output = Command::new(meshc_bin())
+        .args([
+            "init",
+            "--template",
+            "todo-api",
+            "--db",
+            "postgres",
+            "todo-starter",
+        ])
+        .current_dir(dir.path())
+        .output()
+        .expect("failed to run meshc init --template todo-api --db postgres");
+
+    assert!(
+        !output.status.success(),
+        "postgres todo-api path should fail closed until the dedicated scaffold lands"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--db postgres"), "{}", stderr);
+    assert!(stderr.contains("not implemented yet"), "{}", stderr);
+    assert!(
+        !project_dir.exists(),
+        "postgres failure path should not create {}",
+        project_dir.display()
     );
 }
 

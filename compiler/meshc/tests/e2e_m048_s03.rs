@@ -50,12 +50,19 @@ fn meshpkg_source_bin() -> PathBuf {
         );
     });
 
-    let binary = repo_root().join("target").join("debug").join(if cfg!(windows) {
-        "meshpkg.exe"
-    } else {
-        "meshpkg"
-    });
-    assert!(binary.is_file(), "expected meshpkg binary at {}", binary.display());
+    let binary = repo_root()
+        .join("target")
+        .join("debug")
+        .join(if cfg!(windows) {
+            "meshpkg.exe"
+        } else {
+            "meshpkg"
+        });
+    assert!(
+        binary.is_file(),
+        "expected meshpkg binary at {}",
+        binary.display()
+    );
     binary
 }
 
@@ -139,14 +146,13 @@ fn run_logged_command(
     let stderr_path = artifacts.join(format!("{label}.stderr.log"));
 
     let mut command = Command::new(program);
-    command.current_dir(repo_root()).args(args).envs(envs.iter().cloned());
-    let output = command.output().unwrap_or_else(|error| {
-        panic!(
-            "failed to run {} {:?}: {error}",
-            program.display(),
-            args
-        )
-    });
+    command
+        .current_dir(repo_root())
+        .args(args)
+        .envs(envs.iter().cloned());
+    let output = command
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run {} {:?}: {error}", program.display(), args));
 
     fs::write(&stdout_path, &output.stdout)
         .unwrap_or_else(|error| panic!("failed to write {}: {error}", stdout_path.display()));
@@ -316,7 +322,8 @@ fn write_executable_script(path: &Path, script: &str) {
 }
 
 fn sha256_hex(path: &Path) -> String {
-    let bytes = fs::read(path).unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    let bytes =
+        fs::read(path).unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
@@ -346,7 +353,9 @@ fn stage_tarball(source_binary: &Path, archive_path: &Path, entry_name: &str) {
         .arg(&payload_root)
         .arg(entry_name)
         .output()
-        .unwrap_or_else(|error| panic!("failed to run tar for {}: {error}", archive_path.display()));
+        .unwrap_or_else(|error| {
+            panic!("failed to run tar for {}: {error}", archive_path.display())
+        });
     assert!(
         output.status.success(),
         "tar failed while building {}:\n{}",
@@ -578,12 +587,7 @@ fn handle_static_request(stream: TcpStream, root: &Path, requests: &Arc<Mutex<Ve
     };
 
     match fs::read(&path) {
-        Ok(body) => write_http_response(
-            &mut stream,
-            "200 OK",
-            content_type_for(&path),
-            &body,
-        ),
+        Ok(body) => write_http_response(&mut stream, "200 OK", content_type_for(&path), &body),
         Err(_) => write_http_response(
             &mut stream,
             "404 Not Found",
@@ -703,7 +707,10 @@ impl UpdateHarness {
             ),
             (
                 "MESH_INSTALL_RELEASE_BASE_URL".to_string(),
-                format!("{}/snowdamiz/mesh-lang/releases/download", self.server.base_url()),
+                format!(
+                    "{}/snowdamiz/mesh-lang/releases/download",
+                    self.server.base_url()
+                ),
             ),
             (
                 "MESH_INSTALL_DOWNLOAD_TIMEOUT_SEC".to_string(),
@@ -717,8 +724,9 @@ impl UpdateHarness {
     }
 
     fn prepare_fake_home(&self) {
-        fs::create_dir_all(self.fake_home())
-            .unwrap_or_else(|error| panic!("failed to create {}: {error}", self.fake_home().display()));
+        fs::create_dir_all(self.fake_home()).unwrap_or_else(|error| {
+            panic!("failed to create {}: {error}", self.fake_home().display())
+        });
         fs::write(self.fake_home().join(".bashrc"), "")
             .unwrap_or_else(|error| panic!("failed to seed .bashrc: {error}"));
     }
@@ -740,8 +748,14 @@ fn m048_s03_staged_meshc_update_installs_both_binaries_into_fake_mesh_home() {
         }),
     );
 
-    record_fake_home_snapshot(&harness.fake_home(), &harness.artifacts.join("fake-home-before.json"));
-    record_version_state(&harness.version_path(), &harness.artifacts.join("version-before.json"));
+    record_fake_home_snapshot(
+        &harness.fake_home(),
+        &harness.artifacts.join("fake-home-before.json"),
+    );
+    record_version_state(
+        &harness.version_path(),
+        &harness.artifacts.join("version-before.json"),
+    );
 
     let update = run_logged_command(
         &harness.artifacts,
@@ -756,8 +770,14 @@ fn m048_s03_staged_meshc_update_installs_both_binaries_into_fake_mesh_home() {
         route_free::command_output_text(&update)
     );
 
-    record_fake_home_snapshot(&harness.fake_home(), &harness.artifacts.join("fake-home-after.json"));
-    record_version_state(&harness.version_path(), &harness.artifacts.join("version-after.json"));
+    record_fake_home_snapshot(
+        &harness.fake_home(),
+        &harness.artifacts.join("fake-home-after.json"),
+    );
+    record_version_state(
+        &harness.version_path(),
+        &harness.artifacts.join("version-after.json"),
+    );
 
     assert!(
         harness.installed_meshc_path().is_file(),
@@ -767,8 +787,12 @@ fn m048_s03_staged_meshc_update_installs_both_binaries_into_fake_mesh_home() {
         harness.installed_meshpkg_path().is_file(),
         "meshc update should install ~/.mesh/bin/meshpkg"
     );
-    let version = fs::read_to_string(harness.version_path())
-        .unwrap_or_else(|error| panic!("failed to read {}: {error}", harness.version_path().display()));
+    let version = fs::read_to_string(harness.version_path()).unwrap_or_else(|error| {
+        panic!(
+            "failed to read {}: {error}",
+            harness.version_path().display()
+        )
+    });
     assert_eq!(
         version.trim(),
         harness.release.version,
@@ -780,7 +804,10 @@ fn m048_s03_staged_meshc_update_installs_both_binaries_into_fake_mesh_home() {
         "installed-meshc-version",
         &harness.installed_meshc_path(),
         &["--version"],
-        &[("HOME".to_string(), harness.fake_home().display().to_string())],
+        &[(
+            "HOME".to_string(),
+            harness.fake_home().display().to_string(),
+        )],
     );
     assert!(
         meshc_version.status.success(),
@@ -799,7 +826,10 @@ fn m048_s03_staged_meshc_update_installs_both_binaries_into_fake_mesh_home() {
         "installed-meshpkg-version",
         &harness.installed_meshpkg_path(),
         &["--version"],
-        &[("HOME".to_string(), harness.fake_home().display().to_string())],
+        &[(
+            "HOME".to_string(),
+            harness.fake_home().display().to_string(),
+        )],
     );
     assert!(
         meshpkg_version.status.success(),
@@ -841,15 +871,24 @@ fn m048_s03_installed_meshpkg_update_repairs_meshc_and_preserves_credentials() {
         &harness.artifacts.join("credential-before.json"),
         &credential_before,
     );
-    record_fake_home_snapshot(&harness.fake_home(), &harness.artifacts.join("fake-home-before.json"));
-    record_version_state(&harness.version_path(), &harness.artifacts.join("version-before.json"));
+    record_fake_home_snapshot(
+        &harness.fake_home(),
+        &harness.artifacts.join("fake-home-before.json"),
+    );
+    record_version_state(
+        &harness.version_path(),
+        &harness.artifacts.join("version-before.json"),
+    );
 
     let broken_meshc = run_logged_command(
         &harness.artifacts,
         "pre-update-broken-meshc-version",
         &harness.installed_meshc_path(),
         &["--version"],
-        &[("HOME".to_string(), harness.fake_home().display().to_string())],
+        &[(
+            "HOME".to_string(),
+            harness.fake_home().display().to_string(),
+        )],
     );
     assert!(
         !broken_meshc.status.success(),
@@ -874,8 +913,14 @@ fn m048_s03_installed_meshpkg_update_repairs_meshc_and_preserves_credentials() {
         &harness.artifacts.join("credential-after.json"),
         &credential_after,
     );
-    record_fake_home_snapshot(&harness.fake_home(), &harness.artifacts.join("fake-home-after.json"));
-    record_version_state(&harness.version_path(), &harness.artifacts.join("version-after.json"));
+    record_fake_home_snapshot(
+        &harness.fake_home(),
+        &harness.artifacts.join("fake-home-after.json"),
+    );
+    record_version_state(
+        &harness.version_path(),
+        &harness.artifacts.join("version-after.json"),
+    );
 
     assert_eq!(
         credential_before["exists"],
@@ -888,13 +933,16 @@ fn m048_s03_installed_meshpkg_update_repairs_meshc_and_preserves_credentials() {
         "credentials should survive installed meshpkg update"
     );
     assert_eq!(
-        credential_before["size"],
-        credential_after["size"],
+        credential_before["size"], credential_after["size"],
         "credentials size should remain stable across update"
     );
 
-    let version = fs::read_to_string(harness.version_path())
-        .unwrap_or_else(|error| panic!("failed to read {}: {error}", harness.version_path().display()));
+    let version = fs::read_to_string(harness.version_path()).unwrap_or_else(|error| {
+        panic!(
+            "failed to read {}: {error}",
+            harness.version_path().display()
+        )
+    });
     assert_eq!(
         version.trim(),
         harness.release.version,
@@ -906,7 +954,10 @@ fn m048_s03_installed_meshpkg_update_repairs_meshc_and_preserves_credentials() {
         "post-update-meshc-version",
         &harness.installed_meshc_path(),
         &["--version"],
-        &[("HOME".to_string(), harness.fake_home().display().to_string())],
+        &[(
+            "HOME".to_string(),
+            harness.fake_home().display().to_string(),
+        )],
     );
     assert!(
         repaired_meshc.status.success(),
@@ -925,7 +976,10 @@ fn m048_s03_installed_meshpkg_update_repairs_meshc_and_preserves_credentials() {
         "post-update-meshpkg-version",
         &harness.installed_meshpkg_path(),
         &["--version"],
-        &[("HOME".to_string(), harness.fake_home().display().to_string())],
+        &[(
+            "HOME".to_string(),
+            harness.fake_home().display().to_string(),
+        )],
     );
     assert!(
         repaired_meshpkg.status.success(),
