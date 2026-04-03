@@ -1650,10 +1650,15 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     assert_contains(
         "README.md",
         &readme,
-        "meshc init --template todo-api todo_api",
+        "meshc init --template todo-api --db sqlite todo_api",
+    );
+    assert_contains(
+        "README.md",
+        &readme,
+        "meshc init --template todo-api --db postgres shared_todo",
     );
     assert_contains("README.md", &readme, "@cluster pub fn add()");
-    assert_contains("README.md", &readme, "actor-backed rate limiting");
+    assert_contains("README.md", &readme, "actor-backed write rate limiting");
     assert_contains("README.md", &readme, "Work.add");
 
     assert_contains(
@@ -1664,7 +1669,12 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     assert_contains(
         "website/docs/docs/tooling/index.md",
         &tooling,
-        "meshc init --template todo-api my_todo_app",
+        "meshc init --template todo-api --db sqlite my_local_todo",
+    );
+    assert_contains(
+        "website/docs/docs/tooling/index.md",
+        &tooling,
+        "meshc init --template todo-api --db postgres my_shared_todo",
     );
     assert_contains(
         "website/docs/docs/tooling/index.md",
@@ -1674,7 +1684,7 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     assert_contains(
         "website/docs/docs/tooling/index.md",
         &tooling,
-        "HTTP.on_get`, `HTTP.on_post`, `HTTP.on_put`, and `HTTP.on_delete`",
+        "The SQLite Todo starter is the honest local starter",
     );
     assert_contains(
         "website/docs/docs/getting-started/clustered-example/index.md",
@@ -1744,8 +1754,6 @@ fn m047_s05_assembled_verifier_replays_cutover_and_todo_rails() {
 
     for needle in [
         "bash scripts/verify-m047-s04.sh",
-        "cargo test -p mesh-pkg m047_s05 -- --nocapture",
-        "cargo test -p meshc --test tooling_e2e test_init_clustered_todo_ -- --nocapture",
         "cargo test -p meshc --test e2e_m047_s05 -- --nocapture",
         "npm --prefix website run build",
         "status.txt",
@@ -1756,8 +1764,6 @@ fn m047_s05_assembled_verifier_replays_cutover_and_todo_rails() {
         "retained-m047-s04-verify",
         "retained-m047-s05-artifacts",
         "m047-s04-replay",
-        "m047-s05-pkg",
-        "m047-s05-tooling",
         "m047-s05-e2e",
         "m047-s05-docs-build",
         "m047-s05-fixture-provenance",

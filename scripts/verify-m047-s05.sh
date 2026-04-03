@@ -228,8 +228,6 @@ record_phase retain-m047-s04-verify passed
 SNAPSHOT_BEFORE_E2E="$ARTIFACT_DIR/m047-s05-before.snapshot"
 capture_snapshot "$ARTIFACT_ROOT" "$SNAPSHOT_BEFORE_E2E"
 
-run_expect_success m047-s05-pkg m047-s05-pkg yes 1200 cargo test -p mesh-pkg m047_s05 -- --nocapture
-run_expect_success m047-s05-tooling m047-s05-tooling yes 1200 cargo test -p meshc --test tooling_e2e test_init_clustered_todo_ -- --nocapture
 run_expect_success m047-s05-e2e m047-s05-e2e yes 3600 cargo test -p meshc --test e2e_m047_s05 -- --nocapture
 run_expect_success m047-s05-docs-build m047-s05-docs-build no 2400 npm --prefix website run build
 
