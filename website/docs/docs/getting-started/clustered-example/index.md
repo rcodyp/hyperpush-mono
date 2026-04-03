@@ -19,9 +19,11 @@ This page teaches the scaffold surface, but the runtime contract stays the same 
 - the runtime automatically starts declared work at startup
 - operators inspect truth only through `meshc cluster status`, continuity list, continuity record, and diagnostics
 
-If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
+If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the PostgreSQL Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
 
-When you want a fuller starter without changing that contract, use `meshc init --template todo-api`. It keeps `@cluster pub fn sync_todos()` route-free in `work.mpl` while the selected read routes dogfood explicit-count `HTTP.clustered(1, ...)` and the rest of the HTTP surface stays local application code.
+When you want the honest local starter, use `meshc init --template todo-api --db sqlite`. It is the single-node SQLite Todo API with generated package tests, local `/health`, and no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story.
+
+When you want a fuller shared or deployable starter without changing that contract, use `meshc init --template todo-api --db postgres`. It keeps `@cluster pub fn sync_todos()` route-free in `work.mpl` while the selected read routes dogfood explicit-count `HTTP.clustered(1, ...)` and the rest of the HTTP surface stays local application code.
 
 ## Generate the scaffold
 
@@ -164,13 +166,14 @@ Use diagnostics when you need the broader cluster view after checking membership
 
 ## Equal-surface follow-ons
 
-Use the three canonical route-free surfaces interchangeably depending on the scope you need, then layer on the fuller Todo starter or proof rails when appropriate:
+Use the three canonical route-free surfaces interchangeably depending on the scope you need, then choose the Todo starter that matches the contract you actually want:
 
 - stay on this page when you want the public scaffold-first story
-- use `meshc init --template todo-api <name>` when you want the fuller starter with local SQLite/HTTP routes plus explicit-count `HTTP.clustered(1, ...)` on the selected read routes while keeping the same source-first `@cluster` contract
+- use `meshc init --template todo-api --db sqlite <name>` when you want the honest local single-node starter with generated package tests and no clustered/operator claim
+- use `meshc init --template todo-api --db postgres <name>` when you want the fuller shared/deployable starter with route-free `work.mpl`, PostgreSQL-backed state, and explicit-count `HTTP.clustered(1, ...)` on the selected read routes while keeping the same source-first `@cluster` contract
 - use [`tiny-cluster/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/tiny-cluster/README.md) when you want the smallest repo-owned package that still proves the route-free contract
 - use [`cluster-proof/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/cluster-proof/README.md) when you want the deeper packaged failover/operator runbook
-- use [Distributed Proof](/docs/distributed-proof/) when you want the repo verifier map; `bash scripts/verify-m047-s04.sh` remains the authoritative cutover rail for the source-first route-free clustered contract, `bash scripts/verify-m047-s05.sh` is the lower-level Todo/runtime subrail that proves the fuller starter natively and inside Docker, `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` remains the repo S07 rail for default-count and two-node wrapper behavior, and `bash scripts/verify-m047-s06.sh` is the final closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle. `bash scripts/verify-m046-s06.sh`, `bash scripts/verify-m046-s05.sh`, `bash scripts/verify-m046-s04.sh`, `bash scripts/verify-m045-s05.sh`, and `bash scripts/verify-m045-s04.sh` remain historical compatibility aliases into the M047 cutover rail, while `bash scripts/verify-m045-s03.sh` remains the historical failover-specific subrail
+- use [Distributed Proof](/docs/distributed-proof/) when you want the repo verifier map; `bash scripts/verify-m047-s04.sh` remains the authoritative cutover rail for the source-first route-free clustered contract, `bash scripts/verify-m047-s05.sh` is the retained historical clustered Todo subrail kept behind fixture-backed rails instead of the public starter contract, `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` remains the repo S07 rail for default-count and two-node wrapper behavior beyond the PostgreSQL Todo starter's explicit-count read routes, and `bash scripts/verify-m047-s06.sh` is the docs and retained-proof closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle. `bash scripts/verify-m046-s06.sh`, `bash scripts/verify-m046-s05.sh`, `bash scripts/verify-m046-s04.sh`, `bash scripts/verify-m045-s05.sh`, and `bash scripts/verify-m045-s04.sh` remain historical compatibility aliases into the M047 cutover rail, while `bash scripts/verify-m045-s03.sh` remains the historical failover-specific subrail
 
 ## What to read next
 

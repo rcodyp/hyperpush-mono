@@ -115,7 +115,7 @@
   - Estimate: 2h
   - Files: compiler/meshc/tests/support/m049_todo_sqlite_scaffold.rs, compiler/meshc/tests/e2e_m049_s02.rs, compiler/meshc/tests/support/mod.rs
   - Verify: - `cargo test -p meshc --test e2e_m049_s02 -- --nocapture`
-- [ ] **T04: Split the public README and website docs between SQLite-local and Postgres-clustered starter guidance** — Update the repo-facing docs so they stop describing the SQLite Todo starter as part of the canonical clustered contract. Keep the current proof-app references bounded until S04, but make the starter split explicit now: SQLite is the local starter, Postgres is the serious clustered/deployable starter, and `meshc init --clustered` stays the minimal clustered scaffold.
+- [x] **T04: Split the public todo-api docs into explicit SQLite-local and Postgres-clustered guidance, and retargeted the M047 S06 docs-contract rails to fail on stale clustered-SQLite wording.** — Update the repo-facing docs so they stop describing the SQLite Todo starter as part of the canonical clustered contract. Keep the current proof-app references bounded until S04, but make the starter split explicit now: SQLite is the local starter, Postgres is the serious clustered/deployable starter, and `meshc init --clustered` stays the minimal clustered scaffold.
 
 ## Steps
 

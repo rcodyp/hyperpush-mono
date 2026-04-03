@@ -448,7 +448,7 @@ for surface in \
     "${safe_name}-explicit-count-wrapper" \
     "$surface" \
     'HTTP\.clustered\(1, \.\.\.\)' \
-    "$surface lost the explicit-count Todo read-route wrapper wording"
+    "$surface lost the explicit-count PostgreSQL Todo read-route wrapper wording"
   assert_file_contains_regex \
     "${safe_name}-todo-read-route" \
     "$surface" \
@@ -470,15 +470,40 @@ for surface in \
     'mutating routes stay local' \
     "$surface lost the local mutating-route guard"
   assert_file_contains_regex \
-    "${safe_name}-todo-template" \
+    "${safe_name}-sqlite-template" \
     "$surface" \
-    'meshc init --template todo-api' \
-    "$surface lost the fuller Todo starter reference"
+    'meshc init --template todo-api --db sqlite' \
+    "$surface lost the explicit SQLite-local starter reference"
+  assert_file_contains_regex \
+    "${safe_name}-postgres-template" \
+    "$surface" \
+    'meshc init --template todo-api --db postgres' \
+    "$surface lost the explicit PostgreSQL starter reference"
+  assert_file_contains_regex \
+    "${safe_name}-sqlite-local" \
+    "$surface" \
+    'single-node SQLite Todo API|honest local starter|honest local path' \
+    "$surface lost the SQLite-local contract wording"
+  assert_file_contains_regex \
+    "${safe_name}-postgres-starter" \
+    "$surface" \
+    'PostgreSQL Todo starter|shared/deployable starter' \
+    "$surface lost the PostgreSQL clustered-starter wording"
   assert_file_contains_regex \
     "${safe_name}-migration-shape" \
     "$surface" \
     '\[cluster\].*sync_todos\(\)' \
     "$surface lost the source-first migration wording"
+  assert_file_omits_regex \
+    "${safe_name}-stale-generic-template" \
+    "$surface" \
+    'meshc init --template todo-api(?! --db (sqlite|postgres))' \
+    "$surface still uses the unsplit generic todo template command"
+  assert_file_omits_regex \
+    "${safe_name}-stale-sqlite-clustered" \
+    "$surface" \
+    'adding a SQLite HTTP app|local SQLite/HTTP routes plus explicit-count `HTTP\.clustered\(1, \.\.\.\)`' \
+    "$surface still presents the SQLite starter as part of the clustered wrapper story"
   assert_file_omits_regex \
     "${safe_name}-stale-non-goal" \
     "$surface" \
