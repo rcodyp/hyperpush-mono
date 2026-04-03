@@ -10,6 +10,8 @@ PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
 STATUS_PATH="$ARTIFACT_DIR/status.txt"
 CURRENT_PHASE_PATH="$ARTIFACT_DIR/current-phase.txt"
 LATEST_PROOF_BUNDLE_PATH="$ARTIFACT_DIR/latest-proof-bundle.txt"
+CLUSTER_PROOF_FIXTURE_ROOT="scripts/fixtures/clustered/cluster-proof"
+CLUSTER_PROOF_FIXTURE_TESTS="$CLUSTER_PROOF_FIXTURE_ROOT/tests"
 
 rm -rf "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"
@@ -318,9 +320,9 @@ run_expect_success m045-s01-bootstrap 00-m045-s01-bootstrap yes 2400 \
 run_expect_success mesh-rt-build 00a-mesh-rt-build no 1800 \
   cargo build -q -p mesh-rt
 run_expect_success cluster-proof-build 01-cluster-proof-build no 1800 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 run_expect_success cluster-proof-tests 02-cluster-proof-tests no 1800 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test "$CLUSTER_PROOF_FIXTURE_TESTS"
 run_expect_success m044-s02-declared-work 03-m044-s02-declared-work yes 1800 \
   cargo test -p meshc --test e2e_m044_s02 m044_s02_declared_work_ -- --nocapture
 run_expect_success tooling-clustered-init 04-tooling-clustered-init yes 1200 \

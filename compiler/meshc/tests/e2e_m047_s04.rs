@@ -16,8 +16,10 @@ struct ContractSources {
     distributed: String,
     tooling: String,
     clustered_example: String,
-    tiny_cluster_readme: String,
-    cluster_proof_readme: String,
+    todo_postgres_readme: String,
+    todo_sqlite_readme: String,
+    tiny_cluster_fixture_readme: String,
+    cluster_proof_fixture_readme: String,
 }
 
 fn repo_root() -> PathBuf {
@@ -113,13 +115,21 @@ fn load_contract_sources(artifacts: &Path) -> ContractSources {
             &repo_root().join("website/docs/docs/getting-started/clustered-example/index.md"),
             &contract_artifacts.join("clustered-example.index.md"),
         ),
-        tiny_cluster_readme: route_free::read_and_archive(
-            &repo_root().join("tiny-cluster/README.md"),
-            &contract_artifacts.join("tiny-cluster.README.md"),
+        todo_postgres_readme: route_free::read_and_archive(
+            &repo_root().join("examples/todo-postgres/README.md"),
+            &contract_artifacts.join("todo-postgres.README.md"),
         ),
-        cluster_proof_readme: route_free::read_and_archive(
-            &repo_root().join("cluster-proof/README.md"),
-            &contract_artifacts.join("cluster-proof.README.md"),
+        todo_sqlite_readme: route_free::read_and_archive(
+            &repo_root().join("examples/todo-sqlite/README.md"),
+            &contract_artifacts.join("todo-sqlite.README.md"),
+        ),
+        tiny_cluster_fixture_readme: route_free::read_and_archive(
+            &route_free::tiny_cluster_fixture_root().join("README.md"),
+            &contract_artifacts.join("tiny-cluster.fixture.README.md"),
+        ),
+        cluster_proof_fixture_readme: route_free::read_and_archive(
+            &route_free::cluster_proof_fixture_root().join("README.md"),
+            &contract_artifacts.join("cluster-proof.fixture.README.md"),
         ),
     }
 }
@@ -146,8 +156,12 @@ fn m047_s04_authoritative_cutover_rail_replays_source_first_contract_and_snapsho
                 "website/docs/docs/distributed/index.md",
                 "website/docs/docs/tooling/index.md",
                 "website/docs/docs/getting-started/clustered-example/index.md",
-                "tiny-cluster/README.md",
-                "cluster-proof/README.md"
+                "examples/todo-postgres/README.md",
+                "examples/todo-sqlite/README.md"
+            ],
+            "retained_fixture_surfaces": [
+                "scripts/fixtures/clustered/tiny-cluster/README.md",
+                "scripts/fixtures/clustered/cluster-proof/README.md"
             ]
         }),
     );
@@ -161,10 +175,12 @@ fn m047_s04_authoritative_cutover_rail_replays_source_first_contract_and_snapsho
             "cargo test -p meshc --test e2e_m047_s01 -- --nocapture",
             "cargo test -p mesh-pkg scaffold_clustered_project_writes_public_cluster_contract -- --nocapture",
             "cargo test -p meshc --test tooling_e2e test_init_clustered_creates_project -- --nocapture",
-            "cargo run -q -p meshc -- test tiny-cluster/tests",
-            "cargo run -q -p meshc -- build tiny-cluster",
-            "cargo run -q -p meshc -- test cluster-proof/tests",
-            "cargo run -q -p meshc -- build cluster-proof",
+            "examples/todo-postgres/README.md",
+            "examples/todo-sqlite/README.md",
+            "cargo run -q -p meshc -- test scripts/fixtures/clustered/tiny-cluster/tests",
+            "cargo run -q -p meshc -- build scripts/fixtures/clustered/tiny-cluster",
+            "cargo run -q -p meshc -- test scripts/fixtures/clustered/cluster-proof/tests",
+            "cargo run -q -p meshc -- build scripts/fixtures/clustered/cluster-proof",
             "npm --prefix website run build",
             "cargo test -p meshc --test e2e_m047_s04 -- --nocapture",
             "status.txt",
@@ -186,6 +202,16 @@ fn m047_s04_authoritative_cutover_rail_replays_source_first_contract_and_snapsho
             "m047-s04-e2e",
             "m047-s04-artifacts",
             "m047-s04-bundle-shape",
+        ],
+    );
+    assert_omits_all(
+        "scripts/verify-m047-s04.sh",
+        &sources.verify_script,
+        &[
+            "cargo run -q -p meshc -- test tiny-cluster/tests",
+            "cargo run -q -p meshc -- build tiny-cluster",
+            "cargo run -q -p meshc -- test cluster-proof/tests",
+            "cargo run -q -p meshc -- build cluster-proof",
         ],
     );
 
@@ -234,6 +260,8 @@ fn m047_s04_public_docs_repoint_to_the_new_cutover_rail() {
                 "`bash scripts/verify-m046-s06.sh` — the historical M046 closeout wrapper retained as a compatibility alias into the M047 cutover rail",
                 "`bash scripts/verify-m046-s05.sh` — the historical M046 equal-surface wrapper retained as a compatibility alias into the M047 cutover rail",
                 "`bash scripts/verify-m045-s05.sh` — the historical M045 closeout wrapper retained as a compatibility alias into the M047 cutover rail",
+                "examples/todo-postgres/README.md",
+                "examples/todo-sqlite/README.md",
             ],
         );
         assert_omits_all(
@@ -243,6 +271,8 @@ fn m047_s04_public_docs_repoint_to_the_new_cutover_rail() {
                 "`bash scripts/verify-m046-s06.sh` — the authoritative assembled closeout rail",
                 "`bash scripts/verify-m046-s05.sh` — the lower-level equal-surface subrail",
                 "`bash scripts/verify-m045-s05.sh` — the historical wrapper name retained for replay and transition into the S06 closeout rail",
+                "tiny-cluster/README.md",
+                "cluster-proof/README.md",
             ],
         );
         assert_clustered_surface_omits_routeful_drift(path_label, source);
@@ -264,13 +294,13 @@ fn m047_s04_clustered_runbooks_treat_m046_and_m045_as_aliases_not_authority() {
             "website/docs/docs/getting-started/clustered-example/index.md",
             &sources.clustered_example,
         ),
-        ("tiny-cluster/README.md", &sources.tiny_cluster_readme),
-        ("cluster-proof/README.md", &sources.cluster_proof_readme),
     ] {
         assert_contains(path_label, source, "bash scripts/verify-m047-s04.sh");
         assert_contains(path_label, source, "bash scripts/verify-m046-s06.sh");
         assert_contains(path_label, source, "bash scripts/verify-m046-s05.sh");
         assert_contains(path_label, source, "bash scripts/verify-m045-s05.sh");
+        assert_contains(path_label, source, "examples/todo-postgres/README.md");
+        assert_contains(path_label, source, "examples/todo-sqlite/README.md");
         assert_omits_all(
             path_label,
             source,
@@ -278,8 +308,104 @@ fn m047_s04_clustered_runbooks_treat_m046_and_m045_as_aliases_not_authority() {
                 "The authoritative assembled closeout rail is `bash scripts/verify-m046-s06.sh`",
                 "the authoritative repo-wide closeout rail is `bash scripts/verify-m046-s06.sh`",
                 "For the repo-wide closeout story, `bash scripts/verify-m046-s06.sh` is the authoritative assembled closeout rail",
+                "tiny-cluster/README.md",
+                "cluster-proof/README.md",
             ],
         );
         assert_clustered_surface_omits_routeful_drift(path_label, source);
     }
+}
+
+#[test]
+fn m047_s04_example_readmes_define_the_public_postgres_vs_sqlite_split() {
+    let artifacts = artifact_dir("cutover-example-readmes");
+    let sources = load_contract_sources(&artifacts);
+
+    assert_contains_all(
+        "examples/todo-postgres/README.md",
+        &sources.todo_postgres_readme,
+        &[
+            "This project was generated by `meshc init --template todo-api --db postgres`.",
+            "@cluster pub fn sync_todos()",
+            "HTTP.clustered(1, ...)",
+            "meshc cluster continuity",
+            "DATABASE_URL",
+        ],
+    );
+    assert_omits_all(
+        "examples/todo-postgres/README.md",
+        &sources.todo_postgres_readme,
+        &[
+            "tiny-cluster/README.md",
+            "cluster-proof/README.md",
+            "clustered(work)",
+        ],
+    );
+
+    assert_contains_all(
+        "examples/todo-sqlite/README.md",
+        &sources.todo_sqlite_readme,
+        &[
+            "This project was generated by `meshc init --template todo-api --db sqlite`.",
+            "It is the honest local starter",
+            "no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story in this starter",
+            "meshc test .",
+        ],
+    );
+    assert_omits_all(
+        "examples/todo-sqlite/README.md",
+        &sources.todo_sqlite_readme,
+        &[
+            "tiny-cluster/README.md",
+            "cluster-proof/README.md",
+            "@cluster pub fn sync_todos()",
+            "meshc cluster continuity",
+        ],
+    );
+}
+
+#[test]
+fn m047_s04_internal_fixture_readmes_stay_lower_level_contracts_after_the_move() {
+    let artifacts = artifact_dir("cutover-fixture-readmes");
+    let sources = load_contract_sources(&artifacts);
+
+    assert_contains_all(
+        "scripts/fixtures/clustered/tiny-cluster/README.md",
+        &sources.tiny_cluster_fixture_readme,
+        &[
+            "scripts/fixtures/clustered/tiny-cluster/",
+            "cargo run -q -p meshc -- build scripts/fixtures/clustered/tiny-cluster",
+            "cargo run -q -p meshc -- test scripts/fixtures/clustered/tiny-cluster/tests",
+            "bash scripts/verify-m047-s04.sh",
+        ],
+    );
+    assert_omits_all(
+        "scripts/fixtures/clustered/tiny-cluster/README.md",
+        &sources.tiny_cluster_fixture_readme,
+        &[
+            "cargo run -q -p meshc -- build tiny-cluster",
+            "cargo run -q -p meshc -- test tiny-cluster/tests",
+        ],
+    );
+
+    assert_contains_all(
+        "scripts/fixtures/clustered/cluster-proof/README.md",
+        &sources.cluster_proof_fixture_readme,
+        &[
+            "scripts/fixtures/clustered/cluster-proof/",
+            "cargo run -q -p meshc -- build scripts/fixtures/clustered/cluster-proof",
+            "cargo run -q -p meshc -- test scripts/fixtures/clustered/cluster-proof/tests",
+            "docker build -f scripts/fixtures/clustered/cluster-proof/Dockerfile -t mesh-cluster-proof .",
+            "bash scripts/verify-m047-s04.sh",
+        ],
+    );
+    assert_omits_all(
+        "scripts/fixtures/clustered/cluster-proof/README.md",
+        &sources.cluster_proof_fixture_readme,
+        &[
+            "cargo run -q -p meshc -- build cluster-proof",
+            "cargo run -q -p meshc -- test cluster-proof/tests",
+            "docker build -f cluster-proof/Dockerfile -t mesh-cluster-proof .",
+        ],
+    );
 }

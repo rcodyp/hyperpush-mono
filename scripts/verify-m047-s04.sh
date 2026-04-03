@@ -357,15 +357,15 @@ assert_file_contains_regex \
   'scripts/verify-m047-s04.sh' \
   'distributed guide lost the authoritative M047 cutover rail reference'
 assert_file_contains_regex \
-  contract-tiny-cluster \
-  tiny-cluster/README.md \
-  'scripts/verify-m047-s04.sh' \
-  'tiny-cluster README lost the authoritative M047 cutover rail reference'
+  contract-todo-postgres \
+  examples/todo-postgres/README.md \
+  'meshc init --template todo-api --db postgres|HTTP\.clustered\(1, \.\.\.\)' \
+  'todo-postgres README lost the serious shared/deployable starter contract'
 assert_file_contains_regex \
-  contract-cluster-proof \
-  cluster-proof/README.md \
-  'scripts/verify-m047-s04.sh' \
-  'cluster-proof README lost the authoritative M047 cutover rail reference'
+  contract-todo-sqlite \
+  examples/todo-sqlite/README.md \
+  'meshc init --template todo-api --db sqlite|does not claim clustered placement, continuity, or operator surfaces' \
+  'todo-sqlite README lost the honest local starter contract'
 assert_file_lacks_regex \
   contract-readme-old-authority \
   README.md \
@@ -376,6 +376,26 @@ assert_file_lacks_regex \
   website/docs/docs/distributed-proof/index.md \
   '`bash scripts/verify-m046-s06.sh` — the authoritative assembled closeout rail' \
   'distributed-proof docs still teach the M046 rail as authoritative'
+assert_file_lacks_regex \
+  contract-readme-old-onboarding \
+  README.md \
+  'tiny-cluster/README\.md|cluster-proof/README\.md' \
+  'README still treats internal proof fixtures as public onboarding surfaces'
+assert_file_lacks_regex \
+  contract-proof-old-onboarding \
+  website/docs/docs/distributed-proof/index.md \
+  'tiny-cluster/README\.md|cluster-proof/README\.md' \
+  'distributed-proof docs still treat internal proof fixtures as public onboarding surfaces'
+assert_file_lacks_regex \
+  contract-todo-postgres-old-runbook \
+  examples/todo-postgres/README.md \
+  'tiny-cluster/README\.md|cluster-proof/README\.md' \
+  'todo-postgres README still points at retired proof-package runbooks'
+assert_file_lacks_regex \
+  contract-todo-sqlite-old-runbook \
+  examples/todo-sqlite/README.md \
+  'tiny-cluster/README\.md|cluster-proof/README\.md' \
+  'todo-sqlite README still points at retired proof-package runbooks'
 record_phase contract-guards passed
 
 run_expect_success m047-s04-parser 00-m047-s04-parser yes 2400 \
@@ -389,13 +409,13 @@ run_expect_success m047-s04-scaffold-unit 03-m047-s04-scaffold-unit yes 1800 \
 run_expect_success m047-s04-scaffold-smoke 04-m047-s04-scaffold-smoke yes 2400 \
   cargo test -p meshc --test tooling_e2e test_init_clustered_creates_project -- --nocapture
 run_expect_success m047-s04-tiny-cluster-tests 05-m047-s04-tiny-cluster-tests no 1800 \
-  cargo run -q -p meshc -- test tiny-cluster/tests
+  cargo run -q -p meshc -- test scripts/fixtures/clustered/tiny-cluster/tests
 run_expect_success m047-s04-tiny-cluster-build 06-m047-s04-tiny-cluster-build no 1800 \
-  cargo run -q -p meshc -- build tiny-cluster
+  cargo run -q -p meshc -- build scripts/fixtures/clustered/tiny-cluster
 run_expect_success m047-s04-cluster-proof-tests 07-m047-s04-cluster-proof-tests no 1800 \
-  cargo run -q -p meshc -- test cluster-proof/tests
+  cargo run -q -p meshc -- test scripts/fixtures/clustered/cluster-proof/tests
 run_expect_success m047-s04-cluster-proof-build 08-m047-s04-cluster-proof-build no 1800 \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build scripts/fixtures/clustered/cluster-proof
 run_expect_success m047-s04-docs-build 09-m047-s04-docs-build no 2400 \
   npm --prefix website run build
 

@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 ARTIFACT_DIR=".tmp/m039-s01/verify"
 PHASE_REPORT_PATH="$ARTIFACT_DIR/phase-report.txt"
+CLUSTER_PROOF_FIXTURE_ROOT="scripts/fixtures/clustered/cluster-proof"
 mkdir -p "$ARTIFACT_DIR"
 : >"$PHASE_REPORT_PATH"
 
@@ -76,7 +77,7 @@ run_expect_success build-tooling 00-build-tooling no \
 [[ -f "$ROOT_DIR/target/debug/libmesh_rt.a" ]] || fail_with_log "cargo build -q -p mesh-rt" "mesh-rt static library was not built" "$ARTIFACT_DIR/00-build-tooling.log"
 
 run_expect_success build-cluster-proof 01-build-cluster-proof no \
-  cargo run -q -p meshc -- build cluster-proof
+  cargo run -q -p meshc -- build "$CLUSTER_PROOF_FIXTURE_ROOT"
 run_expect_success mesh-rt-discovery 02-mesh-rt-discovery yes \
   cargo test -p mesh-rt discovery_ -- --nocapture
 run_expect_success convergence 03-e2e-converges yes \

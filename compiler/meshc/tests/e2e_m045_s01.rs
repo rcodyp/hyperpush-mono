@@ -1,9 +1,12 @@
+mod support;
+
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
+use support::m046_route_free as route_free;
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -438,7 +441,7 @@ fn m045_s01_bootstrap_api_scaffold_contract_uses_runtime_owned_bootstrap() {
     assert!(!main.contains("Node.start("));
     assert!(!main.contains("CLUSTER_PROOF_"));
 
-    assert!(work.contains("@cluster pub fn execute_declared_work"));
+    assert!(work.contains(route_free::STARTUP_SOURCE_DECLARATION));
     assert!(work.contains("1 + 1"));
     assert!(!work.contains("declared_work_runtime_name"));
     assert!(!work.contains("clustered(work)"));
@@ -459,10 +462,8 @@ fn m045_s01_bootstrap_api_scaffold_contract_uses_runtime_owned_bootstrap() {
     assert!(readme.contains("MESH_CONTINUITY_ROLE"));
     assert!(readme.contains("MESH_CONTINUITY_PROMOTION_EPOCH"));
     assert!(readme.contains("`@cluster`"));
-    assert!(readme.contains(
-        "the function name keeps the runtime-owned handler name `Work.execute_declared_work`"
-    ));
-    assert!(readme.contains("The runtime automatically starts the source-declared `@cluster` work function and closes the continuity record when the declared work returns."));
+    assert!(readme.contains(route_free::STARTUP_RUNTIME_NAME_GUIDANCE));
+    assert!(readme.contains(route_free::STARTUP_AUTOSTART_GUIDANCE));
     assert!(!readme.contains("declared_work_runtime_name()"));
     assert!(!readme.contains("clustered(work)"));
     assert!(!readme.contains("Continuity.submit_declared_work"));
@@ -476,7 +477,7 @@ fn m045_s01_bootstrap_api_scaffold_contract_uses_runtime_owned_bootstrap() {
 
 #[test]
 fn m045_s01_cluster_proof_source_contract_uses_runtime_owned_bootstrap() {
-    let cluster_proof_dir = repo_root().join("cluster-proof");
+    let cluster_proof_dir = route_free::cluster_proof_fixture_root();
     let main_path = cluster_proof_dir.join("main.mpl");
     let work_path = cluster_proof_dir.join("work.mpl");
     let work_test_path = cluster_proof_dir.join("tests").join("work.test.mpl");
@@ -493,7 +494,7 @@ fn m045_s01_cluster_proof_source_contract_uses_runtime_owned_bootstrap() {
     assert_source_omits(&main_path, "/work");
     assert_source_omits(&main_path, "/membership");
 
-    assert_source_contains(&work_path, "@cluster pub fn execute_declared_work");
+    assert_source_contains(&work_path, route_free::STARTUP_SOURCE_DECLARATION);
     assert_source_contains(&work_path, "1 + 1");
     assert_source_omits(&work_path, "declared_work_runtime_name");
     assert_source_omits(&work_path, "clustered(work)");
@@ -524,7 +525,10 @@ fn m045_s01_cluster_proof_source_contract_uses_runtime_owned_bootstrap() {
     assert_source_omits(&dockerfile_path, "docker-entrypoint.sh");
     assert_source_omits(&dockerfile_path, "EXPOSE 8080");
 
-    assert_source_contains(&fly_toml_path, "dockerfile = 'cluster-proof/Dockerfile'");
+    assert_source_contains(
+        &fly_toml_path,
+        "dockerfile = 'scripts/fixtures/clustered/cluster-proof/Dockerfile'",
+    );
     assert_source_contains(&fly_toml_path, "MESH_CLUSTER_PORT = '4370'");
     assert_source_contains(
         &fly_toml_path,
@@ -537,14 +541,8 @@ fn m045_s01_cluster_proof_source_contract_uses_runtime_owned_bootstrap() {
     assert_source_contains(&readme_path, "meshc cluster continuity");
     assert_source_contains(&readme_path, "meshc cluster diagnostics");
     assert_source_contains(&readme_path, "route-free");
-    assert_source_contains(
-        &readme_path,
-        "the function name keeps the runtime-owned handler name `Work.execute_declared_work`",
-    );
-    assert_source_contains(
-        &readme_path,
-        "The runtime automatically starts the source-declared `@cluster` work function and closes the continuity record when the declared work returns.",
-    );
+    assert_source_contains(&readme_path, route_free::STARTUP_RUNTIME_NAME_GUIDANCE);
+    assert_source_contains(&readme_path, route_free::STARTUP_AUTOSTART_GUIDANCE);
     assert_source_omits(&readme_path, "declared_work_runtime_name()");
     assert_source_omits(&readme_path, "clustered(work)");
     assert_source_omits(&readme_path, "/work");
@@ -582,19 +580,33 @@ fn m045_s01_cluster_proof_package_contract_builds_and_tests() {
     ensure_mesh_rt_staticlib();
 
     let artifacts = artifact_dir("cluster-proof-package-contract");
-    let build = run_meshc(&["build", "cluster-proof"]);
+    let cluster_proof_dir = route_free::cluster_proof_fixture_root();
+    let cluster_proof_tests_dir = cluster_proof_dir.join("tests");
+    let build = Command::new(meshc_bin())
+        .current_dir(repo_root())
+        .arg("build")
+        .arg(&cluster_proof_dir)
+        .output()
+        .expect("failed to invoke meshc build on relocated cluster-proof fixture");
     write_artifact(&artifacts.join("build.log"), command_output_text(&build));
     assert!(
         build.status.success(),
-        "meshc build cluster-proof should succeed:\n{}",
+        "meshc build {} should succeed:\n{}",
+        cluster_proof_dir.display(),
         command_output_text(&build)
     );
 
-    let tests = run_meshc(&["test", "cluster-proof/tests"]);
+    let tests = Command::new(meshc_bin())
+        .current_dir(repo_root())
+        .arg("test")
+        .arg(&cluster_proof_tests_dir)
+        .output()
+        .expect("failed to invoke meshc test on relocated cluster-proof fixture");
     write_artifact(&artifacts.join("tests.log"), command_output_text(&tests));
     assert!(
         tests.status.success(),
-        "meshc test cluster-proof/tests should succeed:\n{}",
+        "meshc test {} should succeed:\n{}",
+        cluster_proof_tests_dir.display(),
         command_output_text(&tests)
     );
 }

@@ -63,11 +63,11 @@ fn load_scaffold_sources(project_dir: &Path, artifacts: &Path) -> ScaffoldSource
             &package_artifacts.join("README.md"),
         ),
         tiny_cluster_work: route_free::read_and_archive(
-            &repo_root().join("tiny-cluster").join("work.mpl"),
+            &route_free::tiny_cluster_fixture_root().join("work.mpl"),
             &reference_artifacts.join("tiny-cluster.work.mpl"),
         ),
         cluster_proof_work: route_free::read_and_archive(
-            &repo_root().join("cluster-proof").join("work.mpl"),
+            &route_free::cluster_proof_fixture_root().join("work.mpl"),
             &reference_artifacts.join("cluster-proof.work.mpl"),
         ),
     }
