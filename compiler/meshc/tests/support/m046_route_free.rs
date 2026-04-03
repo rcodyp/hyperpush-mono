@@ -21,6 +21,16 @@ pub const STARTUP_RUNTIME_NAME_GUIDANCE: &str =
     "the runtime-owned handler name is derived from the ordinary source function name as `Work.add`";
 pub const STARTUP_AUTOSTART_GUIDANCE: &str =
     "The runtime automatically starts the source-declared `@cluster` function and closes the continuity record when it returns.";
+pub const TINY_CLUSTER_FIXTURE_ROOT_RELATIVE: &str =
+    "scripts/fixtures/clustered/tiny-cluster";
+pub const TINY_CLUSTER_FIXTURE_PACKAGE_NAME: &str = "tiny-cluster";
+pub const TINY_CLUSTER_FIXTURE_REQUIRED_FILES: &[&str] = &[
+    "mesh.toml",
+    "main.mpl",
+    "work.mpl",
+    "README.md",
+    "tests/work.test.mpl",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BuildOutputMetadata {
@@ -47,6 +57,71 @@ pub fn repo_root() -> PathBuf {
         .parent()
         .unwrap()
         .to_path_buf()
+}
+
+fn validate_required_fixture_root(
+    fixture_name: &str,
+    fixture_root_relative: &str,
+    root: &Path,
+    expected_package_name: &str,
+    required_files: &[&str],
+) -> Result<(), String> {
+    if !root.is_dir() {
+        return Err(format!(
+            "{fixture_name} fixture root {} is missing; expected {}",
+            root.display(),
+            fixture_root_relative
+        ));
+    }
+
+    let missing_files = required_files
+        .iter()
+        .copied()
+        .filter(|relative_path| !root.join(relative_path).is_file())
+        .collect::<Vec<_>>();
+    if !missing_files.is_empty() {
+        return Err(format!(
+            "{fixture_name} fixture root {} is missing required files: {}; reference fixture path is {}",
+            root.display(),
+            missing_files.join(", "),
+            fixture_root_relative
+        ));
+    }
+
+    let manifest_path = root.join("mesh.toml");
+    let manifest = fs::read_to_string(&manifest_path).map_err(|error| {
+        format!(
+            "failed to read {fixture_name} fixture manifest {}: {error}",
+            manifest_path.display()
+        )
+    })?;
+    let expected_package_line = format!("name = \"{expected_package_name}\"");
+    if !manifest.contains(&expected_package_line) {
+        return Err(format!(
+            "{fixture_name} fixture root {} is not the expected package directory; {} does not contain {}",
+            root.display(),
+            manifest_path.display(),
+            expected_package_line
+        ));
+    }
+
+    Ok(())
+}
+
+pub fn validate_tiny_cluster_fixture_root(root: &Path) -> Result<(), String> {
+    validate_required_fixture_root(
+        "tiny-cluster",
+        TINY_CLUSTER_FIXTURE_ROOT_RELATIVE,
+        root,
+        TINY_CLUSTER_FIXTURE_PACKAGE_NAME,
+        TINY_CLUSTER_FIXTURE_REQUIRED_FILES,
+    )
+}
+
+pub fn tiny_cluster_fixture_root() -> PathBuf {
+    let root = repo_root().join(TINY_CLUSTER_FIXTURE_ROOT_RELATIVE);
+    validate_tiny_cluster_fixture_root(&root).unwrap_or_else(|message| panic!("{message}"));
+    root
 }
 
 pub fn meshc_bin() -> PathBuf {

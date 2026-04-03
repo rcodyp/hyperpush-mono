@@ -2,6 +2,7 @@ mod support;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::fs;
 use std::path::{Path, PathBuf};
 use support::m046_route_free as route_free;
 
@@ -33,7 +34,7 @@ fn repo_root() -> PathBuf {
 }
 
 fn tiny_cluster_dir() -> PathBuf {
-    repo_root().join("tiny-cluster")
+    route_free::tiny_cluster_fixture_root()
 }
 
 fn dual_stack_cluster_port() -> u16 {
@@ -197,6 +198,21 @@ fn assert_tiny_cluster_source_contract(sources: &TinyClusterSources) {
     assert_contains(
         "tiny-cluster/README.md",
         &sources.readme,
+        "scripts/fixtures/clustered/tiny-cluster",
+    );
+    assert_contains(
+        "tiny-cluster/README.md",
+        &sources.readme,
+        "cargo run -q -p meshc -- build scripts/fixtures/clustered/tiny-cluster",
+    );
+    assert_contains(
+        "tiny-cluster/README.md",
+        &sources.readme,
+        "cargo run -q -p meshc -- test scripts/fixtures/clustered/tiny-cluster/tests",
+    );
+    assert_contains(
+        "tiny-cluster/README.md",
+        &sources.readme,
         "Node.start_from_env()",
     );
     assert_contains("tiny-cluster/README.md", &sources.readme, "runtime-owned");
@@ -240,6 +256,16 @@ fn assert_tiny_cluster_source_contract(sources: &TinyClusterSources) {
         "tiny-cluster/tests/work.test.mpl",
         &sources.work_test,
         "assert_not_contains(work_source, \"Env.get_int\")",
+    );
+    assert_contains(
+        "tiny-cluster/tests/work.test.mpl",
+        &sources.work_test,
+        "scripts/fixtures/clustered/tiny-cluster/mesh.toml",
+    );
+    assert_contains(
+        "tiny-cluster/tests/work.test.mpl",
+        &sources.work_test,
+        "scripts/fixtures/clustered/tiny-cluster/README.md",
     );
 
     assert_contains(
@@ -757,7 +783,7 @@ fn m046_s03_tiny_cluster_failover_helpers_accept_preparing_and_mirrored_pending_
     });
     assert!(pending_record_matches(
         &mirrored,
-        Some("startup::Work.execute_declared_work"),
+        Some(request_key.as_str()),
         Some("attempt-0"),
         "tiny-cluster-primary@127.0.0.1:4370",
         "tiny-cluster-standby@[::1]:4370",
@@ -782,7 +808,7 @@ fn m046_s03_tiny_cluster_failover_helpers_accept_preparing_and_mirrored_pending_
     });
     assert!(!pending_record_matches(
         &completed,
-        Some("startup::Work.execute_declared_work"),
+        Some(request_key.as_str()),
         Some("attempt-0"),
         "tiny-cluster-primary@127.0.0.1:4370",
         "tiny-cluster-standby@[::1]:4370",
@@ -1390,6 +1416,37 @@ fn m046_s03_tiny_cluster_package_contract_remains_source_first_and_route_free() 
     let artifacts = artifact_dir("tiny-cluster-package-contract");
     let sources = load_tiny_cluster_sources(&artifacts);
     assert_tiny_cluster_source_contract(&sources);
+}
+
+#[test]
+fn m046_s03_tiny_cluster_fixture_helper_fails_closed_on_missing_required_file() {
+    let artifacts = artifact_dir("tiny-cluster-fixture-helper-missing-file");
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let broken_root = temp_dir.path().join("broken-tiny-cluster");
+    route_free::archive_directory_tree(&tiny_cluster_dir(), &broken_root);
+
+    let removed_file = broken_root.join("work.mpl");
+    fs::remove_file(&removed_file).unwrap_or_else(|error| {
+        panic!(
+            "failed to remove broken tiny-cluster fixture file {}: {error}",
+            removed_file.display()
+        )
+    });
+
+    let error = route_free::validate_tiny_cluster_fixture_root(&broken_root)
+        .expect_err("missing fixture files should fail before the retained tiny-cluster rail starts");
+    write_artifact(&artifacts.join("fixture-error.txt"), &error);
+    assert_contains(
+        "broken tiny-cluster fixture error",
+        &error,
+        &broken_root.display().to_string(),
+    );
+    assert_contains("broken tiny-cluster fixture error", &error, "work.mpl");
+    assert_contains(
+        "broken tiny-cluster fixture error",
+        &error,
+        route_free::TINY_CLUSTER_FIXTURE_ROOT_RELATIVE,
+    );
 }
 
 #[test]
