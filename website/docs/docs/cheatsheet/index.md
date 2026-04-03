@@ -1,5 +1,6 @@
 ---
 title: Syntax Cheatsheet
+description: Quick Mesh syntax reference for variables, types, functions, actors, HTTP, modules, and testing.
 ---
 
 # Syntax Cheatsheet

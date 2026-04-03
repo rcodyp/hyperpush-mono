@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
 import type { SVGProps } from "react"
+import { DISCORD_URL } from "@/lib/external-links"
 
 function DiscordIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -37,10 +38,20 @@ type Status = "idle" | "loading" | "success" | "error"
 /*  Form logic                                                         */
 /* ------------------------------------------------------------------ */
 
-const FORMSPREE_ID = process.env.NEXT_PUBLIC_FORMSPREE_ID
+function resolveFormspreeTarget(value?: string): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith("https://formspree.io/")) return trimmed.replace(/\/+$/, "")
+  if (trimmed.startsWith("f/")) return `https://formspree.io/${trimmed}`
+  return `https://formspree.io/f/${trimmed}`
+}
+
+const FORMSPREE_TARGET = resolveFormspreeTarget(process.env.NEXT_PUBLIC_FORMSPREE_ID)
 
 async function submitToFormspree(name: string, email: string): Promise<void> {
-  const res = await fetch(`https://formspree.io/f/${FORMSPREE_ID}`, {
+  if (!FORMSPREE_TARGET) throw new Error("Formspree is not configured")
+
+  const res = await fetch(FORMSPREE_TARGET, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ name, email, _subject: "New waitlist signup — hyperpush" }),
@@ -50,7 +61,7 @@ async function submitToFormspree(name: string, email: string): Promise<void> {
 
 async function submitMailto(name: string, email: string): Promise<void> {
   // Fallback: open the user's mail client pre-filled
-  const mailto = `mailto:${process.env.NEXT_PUBLIC_WAITLIST_EMAIL ?? "waitlist@hyperpush.dev"}?subject=Waitlist%20signup&body=Name%3A%20${encodeURIComponent(name)}%0AEmail%3A%20${encodeURIComponent(email)}`
+  const mailto = `mailto:${process.env.NEXT_PUBLIC_WAITLIST_EMAIL ?? "yurlovandrew@gmail.com"}?subject=Waitlist%20signup&body=Name%3A%20${encodeURIComponent(name)}%0AEmail%3A%20${encodeURIComponent(email)}`
   window.location.href = mailto
 }
 
@@ -64,8 +75,6 @@ export function WaitlistDialog({ open, onOpenChange }: WaitlistDialogProps) {
   const [status, setStatus] = useState<Status>("idle")
   const [errorMsg, setErrorMsg] = useState("")
 
-  const discordUrl = process.env.NEXT_PUBLIC_DISCORD_URL ?? "https://discord.gg/hyperpush"
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email) return
@@ -74,7 +83,7 @@ export function WaitlistDialog({ open, onOpenChange }: WaitlistDialogProps) {
     setErrorMsg("")
 
     try {
-      if (FORMSPREE_ID) {
+      if (FORMSPREE_TARGET) {
         await submitToFormspree(name, email)
       } else {
         await submitMailto(name, email)
@@ -113,7 +122,7 @@ export function WaitlistDialog({ open, onOpenChange }: WaitlistDialogProps) {
               </p>
             </div>
             <a
-              href={discordUrl}
+              href={DISCORD_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full"
@@ -200,7 +209,7 @@ export function WaitlistDialog({ open, onOpenChange }: WaitlistDialogProps) {
             </div>
 
             <a
-              href={discordUrl}
+              href={DISCORD_URL}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -210,7 +219,7 @@ export function WaitlistDialog({ open, onOpenChange }: WaitlistDialogProps) {
               </Button>
             </a>
 
-            {!FORMSPREE_ID && (
+            {!FORMSPREE_TARGET && (
               <p className="text-xs text-muted-foreground/50 text-center">
                 Set NEXT_PUBLIC_FORMSPREE_ID to enable email capture
               </p>

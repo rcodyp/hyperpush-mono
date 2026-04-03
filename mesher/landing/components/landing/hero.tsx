@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Github, AlertCircle, AlertTriangle, Info } from "lucide-react"
 import { motion } from "framer-motion"
 import { WaitlistButton } from "@/components/landing/waitlist-dialog"
+import { GITHUB_URL } from "@/lib/external-links"
 
 const events = [
   {
@@ -127,7 +128,7 @@ export function Hero() {
             className="h-11 w-full gap-2 px-6 sm:h-12 sm:w-auto sm:px-8"
             asChild
           >
-            <a href="https://github.com/hyperpush-dev/hyperpush" target="_blank" rel="noopener noreferrer">
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
               <Github className="h-4 w-4" />
               View on GitHub
             </a>

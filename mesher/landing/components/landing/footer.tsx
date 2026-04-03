@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Github } from "lucide-react"
 import type { SVGProps } from "react"
+import { DISCORD_URL, GITHUB_URL, X_URL } from "@/lib/external-links"
 
 function XIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -35,7 +36,7 @@ const footerLinks = {
     { name: "Leaderboard", href: "/community/leaderboard" },
     { name: "Bounties", href: "/community/bounties" },
     { name: "Blog", href: "/community/blog" },
-    { name: "Discord", href: "https://discord.gg/hyperpush" },
+    { name: "Discord", href: DISCORD_URL },
   ],
   Legal: [
     { name: "Privacy", href: "/privacy" },
@@ -45,9 +46,9 @@ const footerLinks = {
 }
 
 const socialLinks = [
-  { name: "X", href: "#", icon: XIcon },
-  { name: "GitHub", href: "#", icon: Github },
-  { name: "Discord", href: "#", icon: DiscordIcon },
+  { name: "X", href: X_URL, icon: XIcon },
+  { name: "GitHub", href: GITHUB_URL, icon: Github },
+  { name: "Discord", href: DISCORD_URL, icon: DiscordIcon },
 ]
 
 export function Footer() {
@@ -72,6 +73,8 @@ export function Footer() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  target={link.href.startsWith("http") ? "_blank" : undefined}
+                  rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   aria-label={link.name}
                 >
@@ -90,6 +93,8 @@ export function Footer() {
                   <li key={link.name}>
                     <Link
                       href={link.href}
+                      target={link.href.startsWith("http") ? "_blank" : undefined}
+                      rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {link.name}

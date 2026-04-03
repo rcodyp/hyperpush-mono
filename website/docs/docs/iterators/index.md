@@ -1,5 +1,6 @@
 ---
 title: Iterators
+description: Lazy iterator pipelines in Mesh with Iter.from, map, filter, reduce, collect, and custom Iterable types.
 ---
 
 # Iterators

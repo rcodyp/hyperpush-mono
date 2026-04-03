@@ -1,12 +1,13 @@
 {
   "name": "website",
   "version": "1.0.0",
-  "description": "",
+  "description": "Marketing and documentation site for Mesh, the programming language built for distributed systems.",
   "main": "index.js",
   "scripts": {
     "dev": "vitepress dev docs",
     "build": "vitepress build docs",
-    "preview": "vitepress preview docs"
+    "preview": "vitepress preview docs",
+    "generate:og": "python3 scripts/generate-og-image.py"
   },
   "keywords": [],
   "author": "",

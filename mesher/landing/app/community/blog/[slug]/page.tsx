@@ -7,7 +7,9 @@ import { motion } from "framer-motion"
 import { CommunityLayout } from "@/components/community/community-layout"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { WaitlistButton } from "@/components/landing/waitlist-dialog"
 import { ArrowLeft, Clock, Share2 } from "lucide-react"
+import { DISCORD_URL } from "@/lib/external-links"
 
 const postsContent: Record<string, {
   title: string
@@ -232,8 +234,10 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
               Get updates on new features, engineering deep-dives, and community events.
             </p>
             <div className="flex items-center justify-center gap-3">
-              <Button size="sm">Join Waitlist</Button>
-              <Button size="sm" variant="outline">Discord</Button>
+              <WaitlistButton size="sm">Join Waitlist</WaitlistButton>
+              <Button size="sm" variant="outline" asChild>
+                <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Discord</a>
+              </Button>
             </div>
           </div>
         </div>

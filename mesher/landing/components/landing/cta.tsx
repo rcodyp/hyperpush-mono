@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Github } from "lucide-react"
 import { WaitlistButton } from "@/components/landing/waitlist-dialog"
+import { GITHUB_URL } from "@/lib/external-links"
 
 export function CTA() {
   return (
@@ -42,7 +43,7 @@ export function CTA() {
               className="h-11 sm:h-12 px-6 sm:px-8 gap-2 w-full sm:w-auto"
               asChild
             >
-              <a href="https://github.com/hyperpush-dev/hyperpush" target="_blank" rel="noopener noreferrer">
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
                 <Github className="w-4 h-4" />
                 Star on GitHub
               </a>

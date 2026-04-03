@@ -1,5 +1,6 @@
 ---
 title: Type System
+description: "Static typing and inference in Mesh: generics, enums, traits, aliases, annotations, and compile-time safety."
 ---
 
 # Type System

@@ -2,6 +2,7 @@
 import { useData } from 'vitepress'
 
 const { isDark } = useData()
+const currentYear = new Date().getUTCFullYear()
 
 const resources = [
   { label: 'Getting Started', href: '/docs/getting-started/' },
@@ -83,7 +84,7 @@ const community = [
       <!-- Bottom bar -->
       <div class="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-6">
         <p class="text-xs text-muted-foreground">
-          &copy; {{ new Date().getFullYear() }} The Mesh Programming Language
+          &copy; {{ currentYear }} The Mesh Programming Language
         </p>
         <div class="flex items-center gap-4">
           <a href="https://github.com/snowdamiz/mesh-lang" class="text-xs text-muted-foreground hover:text-foreground transition-colors">

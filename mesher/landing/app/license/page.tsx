@@ -1,6 +1,7 @@
 "use client"
 
 import { LegalPage, Section, SubSection, LegalList, InfoBox } from "@/components/legal/legal-page"
+import { GITHUB_DISPLAY } from "@/lib/external-links"
 
 export default function LicensePage() {
   return (
@@ -181,8 +182,8 @@ export default function LicensePage() {
           The complete license texts are available in the repository:
         </p>
         <LegalList items={[
-          "AGPL-3.0: /LICENSE in the hyperpush-dev/hyperpush repository",
-          "MIT: /LICENSE in each SDK repository (hyperpush-dev/sdk-js, hyperpush-dev/sdk-rs, etc.)",
+          `AGPL-3.0: /LICENSE in the main repository under ${GITHUB_DISPLAY}`,
+          `MIT: /LICENSE in each SDK repository under ${GITHUB_DISPLAY}`,
         ]} />
         <p>
           For questions about licensing, contact{" "}

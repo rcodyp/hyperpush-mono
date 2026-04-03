@@ -1,5 +1,6 @@
 ---
 title: Getting Started
+description: Install Mesh, create your first project, run a program, and learn the core meshc workflow.
 ---
 
 # Getting Started

@@ -1,5 +1,6 @@
 ---
 title: Concurrency
+description: Mesh concurrency guide covering actors, mailboxes, message passing, supervision, timers, and fault-tolerant patterns.
 ---
 
 # Concurrency

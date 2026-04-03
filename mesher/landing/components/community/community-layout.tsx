@@ -6,6 +6,7 @@ import { ChevronRight, Trophy, Target, BookOpen } from "lucide-react"
 import { motion } from "framer-motion"
 import { Header } from "@/components/landing/header"
 import { Footer } from "@/components/landing/footer"
+import { DISCORD_URL } from "@/lib/external-links"
 import type { SVGProps } from "react"
 
 function DiscordIcon(props: SVGProps<SVGSVGElement>) {
@@ -20,7 +21,7 @@ const communityNav = [
   { title: "Leaderboard", href: "/community/leaderboard", icon: Trophy },
   { title: "Bounties", href: "/community/bounties", icon: Target },
   { title: "Blog", href: "/community/blog", icon: BookOpen },
-  { title: "Discord", href: "https://discord.gg/hyperpush", icon: DiscordIcon, external: true },
+  { title: "Discord", href: DISCORD_URL, icon: DiscordIcon, external: true },
 ]
 
 export function CommunityLayout({

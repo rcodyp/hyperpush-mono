@@ -1,5 +1,6 @@
 ---
 title: Language Basics
+description: "Core Mesh syntax and semantics: variables, functions, strings, control flow, modules, results, options, and pipes."
 ---
 
 # Language Basics

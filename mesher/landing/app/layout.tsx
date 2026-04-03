@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { X_HANDLE } from '@/lib/external-links'
 import './globals.css'
 
 const _geist = Geist({ subsets: ['latin'] })
@@ -10,7 +11,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hyperpush.dev'
 
 const title = 'hyperpush — Open Source Error Tracking with Token Rewards'
 const description =
-  'Track errors, fix bugs, earn $INDEX tokens. The open-source Sentry alternative built on Solana — free forever with built-in token economics and developer bounties.'
+  'Open-source error tracking with built-in token economics for Solana and beyond. Your project gets funded, contributors get paid, software gets healthier.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -56,8 +57,8 @@ export const metadata: Metadata = {
     title,
     description,
     images: ['/x-banner.png'],
-    site: '@hyperpush',
-    creator: '@hyperpush',
+    site: X_HANDLE,
+    creator: X_HANDLE,
   },
   robots: {
     index: true,

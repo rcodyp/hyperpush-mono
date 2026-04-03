@@ -1,6 +1,7 @@
 ---
 layout: page
-title: Package
+title: Package Details
+description: Browse Mesh package details, install commands, version history, and README content from the public registry.
 ---
 
 <script setup>

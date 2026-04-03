@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Github, Check } from "lucide-react"
 import { WaitlistButton } from "@/components/landing/waitlist-dialog"
+import { GITHUB_URL } from "@/lib/external-links"
 
 const benefits = [
   "Full Pro tier features for 6 months",
@@ -49,7 +50,7 @@ export function OSSProgram() {
                 Join Waitlist
               </WaitlistButton>
               <Button size="lg" variant="outline" className="h-11 px-6 gap-2 w-full sm:w-auto" asChild>
-                <a href="https://github.com/hyperpush-dev/hyperpush" target="_blank" rel="noopener noreferrer">
+                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
                   <Github className="w-4 h-4" />
                   See Requirements
                 </a>

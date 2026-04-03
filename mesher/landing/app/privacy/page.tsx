@@ -1,6 +1,7 @@
 "use client"
 
 import { LegalPage, Section, SubSection, LegalList, InfoBox } from "@/components/legal/legal-page"
+import { GITHUB_DISPLAY } from "@/lib/external-links"
 
 export default function PrivacyPage() {
   return (
@@ -163,7 +164,7 @@ export default function PrivacyPage() {
         </p>
         <LegalList items={[
           "Email: privacy@hyperpush.dev",
-          "GitHub: github.com/hyperpush-dev/hyperpush",
+          `GitHub: ${GITHUB_DISPLAY}`,
         ]} />
       </Section>
     </LegalPage>

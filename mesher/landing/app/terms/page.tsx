@@ -1,6 +1,7 @@
 "use client"
 
 import { LegalPage, Section, SubSection, LegalList, InfoBox } from "@/components/legal/legal-page"
+import { GITHUB_DISPLAY } from "@/lib/external-links"
 
 export default function TermsPage() {
   return (
@@ -218,7 +219,7 @@ export default function TermsPage() {
         <p>For questions about these Terms:</p>
         <LegalList items={[
           "Email: legal@hyperpush.dev",
-          "GitHub: github.com/hyperpush-dev/hyperpush",
+          `GitHub: ${GITHUB_DISPLAY}`,
         ]} />
       </Section>
     </LegalPage>

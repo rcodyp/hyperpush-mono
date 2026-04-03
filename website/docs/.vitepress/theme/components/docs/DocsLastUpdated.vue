@@ -11,6 +11,7 @@ const lastUpdated = computed(() => {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'UTC',
   })
 })
 </script>
