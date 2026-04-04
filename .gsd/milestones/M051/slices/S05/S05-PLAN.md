@@ -66,7 +66,7 @@ Relocate the public proof-page verifier from the retiring repo-root app tree to 
   - Verify: `bash scripts/verify-production-proof-surface.sh`
 `cargo test -p meshc --test e2e_m050_s01 -- --nocapture`
 `cargo test -p meshc --test e2e_m050_s03 -- --nocapture`
-- [ ] **T02: Remove the last public `reference-backend` wording and tighten the docs contracts** — ---
+- [x] **T02: Removed the last public `reference-backend` doc wording and locked the docs contracts to the generic backend-proof handoff.** — ---
 estimated_steps: 4
 estimated_files: 7
 skills_used:

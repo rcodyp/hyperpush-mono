@@ -421,10 +421,13 @@ checks = {
             '/docs/production-backend-proof/',
             'examples/todo-sqlite/README.md',
             'examples/todo-postgres/README.md',
+            'small backend-shaped Mesh project over real stdio JSON-RPC',
+            'same-file go-to-definition inside backend-shaped project code',
         ],
         'omits': [
             'meshc test reference-backend',
             'meshc fmt --check reference-backend',
+            'reference-backend/api/jobs.mpl',
         ],
     },
     'distributed': {
@@ -444,8 +447,12 @@ checks = {
             'bash scripts/verify-m051-s01.sh',
             'bash scripts/verify-m051-s02.sh',
             'bash scripts/verify-m047-s04.sh',
+            'keep the deeper backend handoff on Production Backend Proof, Mesher, and the retained backend-only verifier instead of promoting any repo-root runbook as a coequal first-contact clustered starter',
         ],
-        'omits': ['reference-backend/README.md'],
+        'omits': [
+            'reference-backend/README.md',
+            'keep `reference-backend` as the deeper backend proof surface rather than a coequal first-contact clustered starter',
+        ],
     },
     'production_backend_proof': {
         'contains': [

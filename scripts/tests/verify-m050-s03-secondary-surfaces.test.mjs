@@ -31,6 +31,8 @@ const staleFixturePath = 'scripts/fixtures/backend/reference-backend/'
 const proofRoleSentence = "This is the compact public-secondary handoff for Mesh's backend proof story."
 const proofAudienceSentence = 'Public readers should still stay scaffold/examples first:'
 const proofBoundarySentence = 'This page only names the deeper maintainer surfaces behind that public story: Mesher as the maintained app, and a retained backend-only verifier kept behind a named replay instead of a public repo-root runbook.'
+const distributedProofBoundarySentence = 'keep the deeper backend handoff on Production Backend Proof, Mesher, and the retained backend-only verifier instead of promoting any repo-root runbook as a coequal first-contact clustered starter'
+const distributedProofStaleBoundarySentence = 'keep `reference-backend` as the deeper backend proof surface rather than a coequal first-contact clustered starter'
 const distributedProofRoleSentence = 'This is the only public-secondary docs page that carries the named clustered verifier rails.'
 const proofDirectRailMarkers = [
   'bash scripts/verify-m047-s04.sh',
@@ -140,12 +142,14 @@ function validateSecondarySurfaces(baseRoot) {
     mesherRunbookLink,
     mesherVerifierCommand,
     retainedVerifierCommand,
+    distributedProofBoundarySentence,
     '## Public surfaces and verifier rails',
     '## Named proof commands',
   ])
   requireExcludes(errors, files.distributedProof, distributedProof, [
     staleRunbookLink,
     staleFixturePath,
+    distributedProofStaleBoundarySentence,
   ])
   requireOrdered(errors, files.distributedProof, distributedProof, [
     distributedProofRoleSentence,
@@ -275,6 +279,10 @@ test('contract fails closed when Distributed Proof or Testing reintroduce stale 
 
   let mutatedDistributedProof = readFrom(tmpRoot, files.distributedProof)
   mutatedDistributedProof = mutatedDistributedProof.replace(mesherRunbookLink, staleRunbookLink)
+  mutatedDistributedProof = mutatedDistributedProof.replace(
+    distributedProofBoundarySentence,
+    distributedProofStaleBoundarySentence,
+  )
   writeTo(tmpRoot, files.distributedProof, mutatedDistributedProof)
 
   let mutatedTesting = readFrom(tmpRoot, files.testing)
@@ -286,6 +294,7 @@ test('contract fails closed when Distributed Proof or Testing reintroduce stale 
 
   const errors = validateSecondarySurfaces(tmpRoot)
   assert.ok(errors.some((error) => error.includes(`${files.distributedProof} missing ${JSON.stringify(mesherRunbookLink)}`) || error.includes(`${files.distributedProof} still contains stale text ${JSON.stringify(staleRunbookLink)}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`${files.distributedProof} missing ${JSON.stringify(distributedProofBoundarySentence)}`) || error.includes(`${files.distributedProof} still contains stale text ${JSON.stringify(distributedProofStaleBoundarySentence)}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`${files.testing} still contains stale text ${JSON.stringify('meshc test reference-backend')}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`${files.testing} still contains stale text ${JSON.stringify('meshc test --coverage reference-backend')}`)), errors.join('\n'))
 })

@@ -166,6 +166,8 @@ fn m051_s04_public_docs_scaffold_and_skill_stay_examples_first() {
             "/docs/production-backend-proof/",
             "meshc init --template todo-api --db sqlite my_local_todo",
             "meshc init --template todo-api --db postgres my_shared_todo",
+            "small backend-shaped Mesh project over real stdio JSON-RPC",
+            "same-file go-to-definition inside backend-shaped project code",
         ],
     );
     assert_omits_all(
@@ -175,6 +177,7 @@ fn m051_s04_public_docs_scaffold_and_skill_stay_examples_first() {
             "/docs/distributed-proof/",
             "meshc test reference-backend",
             "meshc fmt --check reference-backend",
+            "reference-backend/api/jobs.mpl",
         ],
     );
 
@@ -198,7 +201,13 @@ fn m051_s04_public_docs_scaffold_and_skill_stay_examples_first() {
             "mesher/README.md",
             "bash scripts/verify-m051-s01.sh",
             "bash scripts/verify-m051-s02.sh",
+            "keep the deeper backend handoff on Production Backend Proof, Mesher, and the retained backend-only verifier instead of promoting any repo-root runbook as a coequal first-contact clustered starter",
         ],
+    );
+    assert_omits(
+        DISTRIBUTED_PROOF_PATH,
+        &distributed_proof,
+        "keep `reference-backend` as the deeper backend proof surface rather than a coequal first-contact clustered starter",
     );
     assert_contains_all(
         PRODUCTION_BACKEND_PROOF_PATH,

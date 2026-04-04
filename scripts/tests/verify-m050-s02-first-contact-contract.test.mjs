@@ -63,6 +63,8 @@ const directProofRailMarkers = [
 ]
 const directRepoRootBackendMarkers = [
   'reference-backend/README.md',
+  'reference-backend/api/jobs.mpl',
+  'same-file go-to-definition on `reference-backend/api/jobs.mpl`',
   'meshc test reference-backend',
   'meshc test reference-backend/tests',
   'meshc test reference-backend/tests/config.test.mpl',
@@ -205,6 +207,8 @@ function validateFirstContactContract(baseRoot) {
     'meshc test tests/example.test.mpl',
     'meshc test --coverage .',
     'meshc fmt --check .',
+    'small backend-shaped Mesh project over real stdio JSON-RPC',
+    'same-file go-to-definition inside backend-shaped project code',
     '## Editor Support',
     '### Support tiers',
     '### VS Code',
@@ -410,6 +414,8 @@ test('contract fails closed when Tooling reintroduces repo-root backend day-one 
   mutatedTooling = mutatedTooling.replace('meshc test tests/example.test.mpl', 'meshc test reference-backend/tests/config.test.mpl')
   mutatedTooling = mutatedTooling.replace('meshc test --coverage .', 'meshc test --coverage reference-backend')
   mutatedTooling = mutatedTooling.replace('meshc fmt --check .', 'meshc fmt --check reference-backend')
+  mutatedTooling = mutatedTooling.replace('small backend-shaped Mesh project over real stdio JSON-RPC', '`reference-backend/` over real stdio JSON-RPC')
+  mutatedTooling = mutatedTooling.replace('same-file go-to-definition inside backend-shaped project code', 'same-file go-to-definition on `reference-backend/api/jobs.mpl`')
   mutatedTooling = mutatedTooling.replace(toolingM050VerifierCommand, toolingM048VerifierCommand)
   mutatedTooling = mutatedTooling.replace(postgresStarterLink, `${staleRepoBlobBase}examples/todo-postgres/README.md`)
   writeTo(tmpRoot, toolingPath, mutatedTooling)
@@ -421,6 +427,8 @@ test('contract fails closed when Tooling reintroduces repo-root backend day-one 
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md missing ${JSON.stringify(toolingM050VerifierCommand)}`) || error.includes(`website/docs/docs/tooling/index.md missing ordered marker ${JSON.stringify(toolingM050VerifierCommand)}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify('reference-backend/README.md')}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify('meshc test reference-backend')}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify('reference-backend/api/jobs.mpl')}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify('same-file go-to-definition on `reference-backend/api/jobs.mpl`')}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify('meshc fmt --check reference-backend')}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify(staleRepoBlobBase)}`)), errors.join('\n'))
 })

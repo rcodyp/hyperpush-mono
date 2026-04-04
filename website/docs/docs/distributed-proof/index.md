@@ -70,7 +70,7 @@ The public clustered story is intentionally smaller than a generic clustering ma
 - keep the PostgreSQL Todo starter's clustered-route adoption narrow: `work.mpl` stays route-free, `GET /todos` and `GET /todos/:id` use explicit-count `HTTP.clustered(1, ...)`, and `GET /health` plus mutating routes stay local application routes
 - defer default-count and two-node `HTTP.clustered(...)` behavior to `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` instead of implying the public starter surfaces already prove it
 - keep Fly as read-only evidence instead of destructive failover proof
-- keep `reference-backend` as the deeper backend proof surface rather than a coequal first-contact clustered starter
+- keep the deeper backend handoff on Production Backend Proof, Mesher, and the retained backend-only verifier instead of promoting any repo-root runbook as a coequal first-contact clustered starter
 
 ## Named proof commands
 

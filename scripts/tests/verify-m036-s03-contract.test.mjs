@@ -72,6 +72,8 @@ function validateSupportContract(baseRoot) {
     'Best-effort editors should invoke `meshc fmt <file>` directly and treat that integration as user-maintained.',
     'The JSON-RPC transport is shared across editors, but Mesh only publishes repo-owned editor-host guidance for VS Code and Neovim.',
     'Best-effort editors that support LSP can point their client at:',
+    'small backend-shaped Mesh project over real stdio JSON-RPC',
+    'same-file go-to-definition inside backend-shaped project code',
     '### VS Code',
     'VS Code is a first-class editor host in the public Mesh tooling contract.',
     'bash scripts/verify-m036-s03.sh',
@@ -97,6 +99,10 @@ function validateSupportContract(baseRoot) {
     '### Other Editors',
     'Most editors can be configured to run the formatter automatically when you save a file.',
     'For other editors that support LSP (Neovim, Emacs, Helix, Zed), configure the language server command as:',
+    'reference-backend/',
+    'reference-backend/api/jobs.mpl',
+    'scripts/fixtures/backend/reference-backend',
+    '`reference-backend/README.md`',
   ])
 
   requireIncludes(errors, vscodeReadmePath, vscodeReadme, [
@@ -185,6 +191,32 @@ test('contract validation fails closed on stale Other Editors wording and best-e
   const errors = validateSupportContract(tmpRoot)
   assert.ok(errors.some((error) => error.includes('website/docs/docs/tooling/index.md still contains stale text "### Other Editors"')), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes('website/docs/docs/tooling/index.md missing the best-effort support-tier table row')), errors.join('\n'))
+})
+
+test('contract validation fails closed when the tooling page reintroduces repo-root backend proof wording', (t) => {
+  const tmpRoot = mkTmpDir(t, 'verify-m036-s03-tooling-backend-')
+  for (const relativePath of [
+    'website/docs/docs/tooling/index.md',
+    'tools/editors/vscode-mesh/README.md',
+    'tools/editors/neovim-mesh/README.md',
+  ]) {
+    copyRepoFile(tmpRoot, relativePath)
+  }
+
+  const toolingPath = 'website/docs/docs/tooling/index.md'
+  const mutatedTooling = readFrom(tmpRoot, toolingPath)
+    .replace(
+      'small backend-shaped Mesh project over real stdio JSON-RPC',
+      '`reference-backend/` over real stdio JSON-RPC',
+    )
+    .replace(
+      'same-file go-to-definition inside backend-shaped project code',
+      'same-file go-to-definition on `reference-backend/api/jobs.mpl`',
+    )
+  writeTo(tmpRoot, toolingPath, mutatedTooling)
+
+  const errors = validateSupportContract(tmpRoot)
+  assert.ok(errors.some((error) => error.includes('website/docs/docs/tooling/index.md still contains stale text "reference-backend/"') || error.includes('website/docs/docs/tooling/index.md still contains stale text "reference-backend/api/jobs.mpl"')), errors.join('\n'))
 })
 
 test('contract validation fails closed when the Neovim README reverts to withholding the public tier', (t) => {

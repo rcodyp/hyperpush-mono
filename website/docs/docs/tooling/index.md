@@ -380,7 +380,7 @@ This starts the language server on **stdin/stdout** using the **JSON-RPC** proto
 
 ### Features
 
-The transport-level regression suite for `meshc lsp` now exercises these editor-facing behaviors against `reference-backend/` over real stdio JSON-RPC:
+The transport-level regression suite for `meshc lsp` now exercises these editor-facing behaviors against a small backend-shaped Mesh project over real stdio JSON-RPC:
 
 | Feature | Description |
 |---------|-------------|
@@ -414,7 +414,7 @@ The JSON-RPC transport is shared across editors, but Mesh only publishes repo-ow
 
 ### VS Code
 
-VS Code is a first-class editor host in the public Mesh tooling contract. The official Mesh extension provides syntax highlighting plus the `meshc lsp` features that now have transport-level proof on `reference-backend/`: diagnostics, hover, go-to-definition, document formatting, and signature help. The current repo-owned proof stays intentionally bounded to same-file go-to-definition on `reference-backend/api/jobs.mpl`, clean diagnostics plus hover for a manifest-first override-entry fixture rooted by `mesh.toml` + `lib/start.mpl`, and shared grammar parity for `@cluster`, `@cluster(N)`, `#{...}`, and `${...}`. The extension is located in the `tools/editors/vscode-mesh/` directory of the Mesh repository.
+VS Code is a first-class editor host in the public Mesh tooling contract. The official Mesh extension provides syntax highlighting plus the `meshc lsp` features that now have transport-level proof on a small backend-shaped Mesh project: diagnostics, hover, go-to-definition, document formatting, and signature help. The current repo-owned proof stays intentionally bounded to same-file go-to-definition inside backend-shaped project code, clean diagnostics plus hover for a manifest-first override-entry fixture rooted by `mesh.toml` + `lib/start.mpl`, and shared grammar parity for `@cluster`, `@cluster(N)`, `#{...}`, and `${...}`. The extension is located in the `tools/editors/vscode-mesh/` directory of the Mesh repository.
 
 #### Features
 
