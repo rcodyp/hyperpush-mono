@@ -50,14 +50,37 @@ meshc update
 meshpkg update
 ```
 
-### 3. Start a new project
+### 3. Start with hello world
 
 ```bash
 meshc init hello_mesh
 cd hello_mesh
 ```
 
-`main.mpl` remains the default executable entrypoint. If you need a different startup file, use the optional `[package].entrypoint = "lib/start.mpl"` setting in `mesh.toml`.
+Open `main.mpl` and replace its contents with:
+
+```mesh
+fn main() do
+  println("Hello, World!")
+end
+```
+
+Compile and run it:
+
+```bash
+meshc build .
+./hello_mesh
+```
+
+`main.mpl` remains the default executable entrypoint. If you need a different startup file later, use the optional `[package].entrypoint = "lib/start.mpl"` setting in `mesh.toml`.
+
+### 4. Choose your next starter
+
+Once hello-world runs, pick the starter that matches your next job:
+
+- `meshc init --clustered hello_cluster` — the minimal clustered starter. The generated example uses `@cluster pub fn add()` and the runtime-owned handler name `Work.add`.
+- `meshc init --template todo-api --db sqlite todo_api` — the **honest local starter** and the **honest local single-node SQLite starter**. It includes actor-backed write rate limiting. See `examples/todo-sqlite/README.md`.
+- `meshc init --template todo-api --db postgres shared_todo` — the **shared/deployable** starter and the **serious shared/deployable PostgreSQL starter**. It uses `HTTP.clustered(1, ...)` for `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. See `examples/todo-postgres/README.md`.
 
 Then follow the generated project README, or go straight to the docs:
 
@@ -71,12 +94,6 @@ Then follow the generated project README, or go straight to the docs:
 - **Production Backend Proof:** https://meshlang.dev/docs/production-backend-proof/
 - **Distributed Proof:** https://meshlang.dev/docs/distributed-proof/
 - **Tooling docs:** https://meshlang.dev/docs/tooling/
-
-## Starter paths
-
-- `meshc init --clustered hello_cluster` — the minimal clustered starter. The generated example uses `@cluster pub fn add()` and the runtime-owned handler name `Work.add`.
-- `meshc init --template todo-api --db sqlite todo_api` — the **honest local starter** and the **honest local single-node SQLite starter**. It includes actor-backed write rate limiting. See `examples/todo-sqlite/README.md`.
-- `meshc init --template todo-api --db postgres shared_todo` — the **shared/deployable** starter and the **serious shared/deployable PostgreSQL starter**. It uses `HTTP.clustered(1, ...)` for `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. See `examples/todo-postgres/README.md`.
 - If you are migrating older clustered code, move helper-shaped names like `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary source-first declarations and follow the `e2e_m047_s07` route behavior notes in the docs.
 - `reference-backend/README.md` — the deeper backend runbook once the starter docs stop being enough.
 - `bash scripts/verify-m049-s05.sh` — the assembled repo verifier for the current scaffold/examples-first onboarding contract.

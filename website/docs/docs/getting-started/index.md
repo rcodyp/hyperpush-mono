@@ -1,26 +1,11 @@
 ---
 title: Getting Started
-description: Install Mesh, create your first project, run a program, and learn the core meshc workflow.
+description: Install Mesh, run hello-world, then choose the starter path that matches your next job.
 ---
 
 # Getting Started
 
-This guide will take you from zero to running your first Mesh program. By the end, you will have Mesh installed, understand the basic project structure, and have compiled and run a working program.
-
-> **Production backend proof:** This guide stays focused on first steps. If you are evaluating Mesh as a real backend runtime, start with [Production Backend Proof](/docs/production-backend-proof/) and the repo runbook at `reference-backend/README.md`.
->
-> **Starting a clustered app?** Go straight to [Clustered Example](/docs/getting-started/clustered-example/). It uses the real `meshc init --clustered` scaffold, the public `MESH_*` runtime contract, and the runtime-owned `meshc cluster status|continuity|diagnostics` inspection commands.
-
-## What is Mesh?
-
-Mesh is a statically-typed, compiled programming language designed for expressive, readable concurrency. It combines the actor model from Erlang/Elixir with a modern type system, pattern matching, and native compilation via LLVM.
-
-Key properties of Mesh:
-
-- **Statically typed with inference** -- the compiler catches type errors at compile time, but you rarely need to write type annotations thanks to type inference
-- **Compiles to native code** -- Mesh compiles via LLVM to produce fast native binaries
-- **Actor-based concurrency** -- lightweight actors with message passing, supervision trees, and fault tolerance built into the language
-- **Familiar syntax** -- inspired by Elixir and Rust, with `do...end` blocks, pattern matching, and pipe operators
+This guide takes you through the public first-contact path: install Mesh, run hello-world, then choose the starter that matches what you want to evaluate next.
 
 ## Installation
 
@@ -44,7 +29,7 @@ irm https://meshlang.dev/install.ps1 | iex
 
 The installers place both binaries in `~/.mesh/bin` on Unix-like systems and `~\.mesh\bin` on Windows.
 
-### Verifying Installation
+### Verify the install
 
 After installing, verify both binaries are available:
 
@@ -53,17 +38,15 @@ meshc --version
 meshpkg --version
 ```
 
-For the named backend proof behind this public install contract, see [Production Backend Proof](/docs/production-backend-proof/) and the repo runbook at `reference-backend/README.md`.
-
 You should see the Mesh version number printed for each command.
 
-### Alternative: Build from Source
+### Alternative: Build from source
 
 If you are contributing to Mesh or targeting an environment outside the public installer coverage, build from source instead. Treat this as an alternative workflow, not the primary public install path:
 
 ```bash
-git clone https://github.com/hyperpush-org/hyperpush-mono.git
-cd hyperpush-mono
+git clone https://github.com/snowdamiz/mesh-lang.git
+cd mesh-lang
 cargo install --path compiler/meshc
 cargo install --path compiler/meshpkg
 ```
@@ -77,7 +60,7 @@ meshc init hello
 cd hello
 ```
 
-Open `main.mpl` -- meshc generates a starter file for you. Replace its contents with:
+Open `main.mpl` and replace its contents with:
 
 ```mesh
 fn main() do
@@ -94,101 +77,22 @@ meshc build .
 
 You should see `Hello, World!` printed to the terminal.
 
-Let's break down what's happening:
+`main.mpl` remains the default executable entrypoint. If you need a different startup file later, use the optional `[package].entrypoint = "lib/start.mpl"` setting in `mesh.toml`.
 
-- `fn main()` declares the entry point of the program -- every Mesh program starts here
-- `do...end` defines the function body
-- `println` prints a string to stdout followed by a newline
-- Mesh source files use the `.mpl` file extension
+## Choose your next starter
 
-## Your First Program
+Once hello-world runs, pick the starter that matches your next job.
 
-Now let's write something more interesting. Open `main.mpl` and replace its contents with:
-
-```mesh
-fn greet(name :: String) -> String do
-  "Hello, #{name}!"
-end
-
-fn main() do
-  let message = greet("Mesh")
-  println(message)
-end
-```
-
-Compile and run it:
-
-```bash
-meshc build .
-./hello
-```
-
-This prints `Hello, Mesh!`. Here's what's new:
-
-- `let` creates a variable binding -- variables in Mesh are immutable by default
-- `::` provides a type annotation -- `name :: String` means the parameter `name` has type `String`
-- `->` declares the return type -- `-> String` means the function returns a `String`
-- `"#{name}"` is string interpolation -- expressions inside `#{}` are evaluated and inserted into the string. The older `${}` syntax also works: both are valid.
-- The last expression in a function is its return value -- no explicit `return` keyword needed
-
-### Adding More Functions
-
-Let's extend the program with some arithmetic:
-
-```mesh
-fn add(a :: Int, b :: Int) -> Int do
-  a + b
-end
-
-fn double(x :: Int) -> Int do
-  x * 2
-end
-
-fn main() do
-  let sum = add(10, 20)
-  println("#{sum}")
-
-  let result = double(7)
-  println("#{result}")
-
-  let greeting = "Mesh"
-  println("Hello, #{greeting}!")
-end
-```
-
-This demonstrates:
-
-- Functions with multiple parameters
-- `Int` type for integers
-- String interpolation with expressions: `"#{sum}"` converts the integer to a string automatically
-
-### Using the Pipe Operator
-
-Mesh has a pipe operator `|>` that passes the result of one function as the first argument to the next:
-
-```mesh
-fn double(x :: Int) -> Int do
-  x * 2
-end
-
-fn add_one(x :: Int) -> Int do
-  x + 1
-end
-
-fn main() do
-  let result = 5 |> double |> add_one
-  println("#{result}")
-end
-```
-
-This prints `11`. The expression `5 |> double |> add_one` is equivalent to `add_one(double(5))` -- it reads left to right, making chains of transformations easy to follow.
+- `meshc init --clustered hello_cluster` — the minimal clustered starter. It keeps the public clustered-app contract small: `work.mpl` declares `@cluster`, `main.mpl` boots through `Node.start_from_env()`, and runtime inspection stays on Mesh-owned `meshc cluster status|continuity|diagnostics` commands.
+- `meshc init --template todo-api --db sqlite todo_api` — the honest local starter. It is a single-node SQLite Todo API with actor-backed write rate limiting, generated package tests, and no clustered placement or operator claims.
+- `meshc init --template todo-api --db postgres shared_todo` — the serious shared/deployable PostgreSQL starter. It keeps clustered work source-first, uses migrations plus a real `DATABASE_URL`, and dogfoods `HTTP.clustered(1, ...)` only on the shared read routes while local health and mutating routes stay local.
 
 ## What's Next?
 
-Now that you have Mesh installed and running, explore the language in depth:
+The proof pages stay public, but they are follow-on reading after the starter chooser instead of the first stop.
 
 - [Clustered Example](/docs/getting-started/clustered-example/) -- the scaffold-first clustered tutorial using `meshc init --clustered`
-- [Production Backend Proof](/docs/production-backend-proof/) -- the canonical public proof surface for the real `reference-backend/` package
+- [Production Backend Proof](/docs/production-backend-proof/) -- the deeper backend proof surface once the starter docs stop being enough, paired with `reference-backend/README.md`
 - [Language Basics](/docs/language-basics/) -- variables, types, functions, pattern matching, control flow, and more
 - [Type System](/docs/type-system/) -- structs, sum types, generics, and type inference
 - [Concurrency](/docs/concurrency/) -- actors, message passing, supervision, and services
