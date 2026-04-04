@@ -1545,6 +1545,14 @@ fn e2e_reference_backend_deploy_artifact_smoke() {
             smoke_job
         );
 
+        let smoke_health = get_json(&config, "/health", 200);
+        let baseline_processed_jobs = smoke_health["worker"]["processed_jobs"].as_i64().unwrap_or(0);
+        assert!(
+            baseline_processed_jobs >= 1,
+            "staged deploy smoke should leave at least one processed worker job before the ownership probe: {}",
+            smoke_health
+        );
+
         let mut worker_job_id = None;
         for seq in 0..6 {
             let payload_body = format!(
@@ -1561,7 +1569,9 @@ fn e2e_reference_backend_deploy_artifact_smoke() {
                 created_job
             );
 
-            if let Some((job_id, _)) = wait_for_worker_processed_job(&config, 1, 20) {
+            if let Some((job_id, _)) =
+                wait_for_worker_processed_job(&config, baseline_processed_jobs + 1, 20)
+            {
                 worker_job_id = Some(job_id);
                 break;
             }

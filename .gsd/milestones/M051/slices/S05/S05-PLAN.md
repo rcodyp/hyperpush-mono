@@ -193,7 +193,7 @@ Convert the retained backend fixture and its verifier from “compatibility copy
   - Verify: `test ! -e reference-backend`
 `cargo test -p meshc --test e2e_m051_s02 -- --nocapture`
 `DATABASE_URL=${DATABASE_URL:?set DATABASE_URL} bash scripts/verify-m051-s02.sh`
-- [ ] **T04: Add the final S05 contract and assembled post-deletion acceptance rail** — ---
+- [x] **T04: Added the M051 S05 post-deletion contract and wrapper, but the final replay still fails in the retained S02 fixture-smoke handoff.** — ---
 estimated_steps: 4
 estimated_files: 2
 skills_used:
