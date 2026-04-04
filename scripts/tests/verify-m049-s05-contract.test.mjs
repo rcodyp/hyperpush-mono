@@ -70,6 +70,8 @@ function validateVerifierContract(baseRoot) {
   requireIncludes(errors, verifierPath, verifier, [
     'bash scripts/verify-m050-s01.sh',
     'm050-s01-preflight',
+    'bash scripts/verify-m050-s02.sh',
+    'm050-s02-preflight',
     'node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs',
     'cargo test -p mesh-pkg m049_s0 -- --nocapture',
     'cargo test -p meshc --test tooling_e2e test_init_todo_template_ -- --nocapture',
@@ -91,6 +93,7 @@ function validateVerifierContract(baseRoot) {
     'retained-m045-s02-verify',
     'retained-m047-s05-verify',
     'retained-m048-s05-verify',
+    'retained-m050-s02-verify',
     'retained-m049-s01-artifacts',
     'retained-m049-s02-artifacts',
     'retained-m049-s03-artifacts',
@@ -99,6 +102,10 @@ function validateVerifierContract(baseRoot) {
     'current-phase.txt',
     'phase-report.txt',
     'full-contract.log',
+    'built-html/getting-started.index.html',
+    'built-html/clustered-example.index.html',
+    'built-html/tooling.index.html',
+    'built-html/summary.json',
     'todos-unmigrated.http',
     'todos-unmigrated.json',
   ])
@@ -113,12 +120,13 @@ function validateVerifierContract(baseRoot) {
     'source "$ROOT_DIR/.env"',
     'cat .env',
     'echo "$DATABASE_URL"',
-    'printf \"%s\\n\" \"$DATABASE_URL\"',
+    'printf "%s\\n" "$DATABASE_URL"',
     'todos-unmigrated.response.json',
   ])
 
   requireOrdered(errors, verifierPath, verifier, [
     'bash scripts/verify-m050-s01.sh',
+    'bash scripts/verify-m050-s02.sh',
     'node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs',
     'cargo test -p mesh-pkg m049_s0 -- --nocapture',
     'cargo test -p meshc --test tooling_e2e test_init_todo_template_ -- --nocapture',
@@ -151,6 +159,7 @@ function validateDocsContract(baseRoot) {
     'shared/deployable',
   ])
   requireIncludes(errors, toolingPath, tooling, [
+    'bash scripts/verify-m050-s02.sh',
     'bash scripts/verify-m049-s05.sh',
     'meshc init --template todo-api --db sqlite',
     'meshc init --template todo-api --db postgres',
@@ -161,6 +170,13 @@ function validateDocsContract(baseRoot) {
   requireOrdered(errors, readmePath, readme, [
     'meshc init --template todo-api --db sqlite',
     'meshc init --template todo-api --db postgres',
+    'bash scripts/verify-m049-s05.sh',
+  ])
+
+  requireOrdered(errors, toolingPath, tooling, [
+    'meshc init --template todo-api --db sqlite',
+    'meshc init --template todo-api --db postgres',
+    'bash scripts/verify-m050-s02.sh',
     'bash scripts/verify-m049-s05.sh',
   ])
 
@@ -178,28 +194,16 @@ test('contract fails closed when the assembled replay order drifts', (t) => {
 
   let mutated = readFrom(tmpRoot, verifierPath)
   mutated = mutated.replace(
-    'bash scripts/verify-m050-s01.sh',
-    'bash scripts/verify-m050-s01.sh # moved-later',
+    'bash scripts/verify-m050-s02.sh',
+    'bash scripts/verify-m050-s02.sh # moved-later',
   )
   mutated = mutated.replace(
     'node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs',
-    'bash scripts/verify-m050-s01.sh',
+    'bash scripts/verify-m050-s02.sh',
   )
   mutated = mutated.replace(
-    'bash scripts/verify-m050-s01.sh # moved-later',
+    'bash scripts/verify-m050-s02.sh # moved-later',
     'node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs',
-  )
-  mutated = mutated.replace(
-    'cargo build -q -p meshc',
-    'cargo build -q -p meshc # moved-later',
-  )
-  mutated = mutated.replace(
-    'node scripts/tests/verify-m049-s03-materialize-examples.mjs --check',
-    'cargo build -q -p meshc',
-  )
-  mutated = mutated.replace(
-    'cargo build -q -p meshc # moved-later',
-    'node scripts/tests/verify-m049-s03-materialize-examples.mjs --check',
   )
   mutated = mutated.replace(
     'bash scripts/verify-m048-s05.sh',
@@ -215,20 +219,20 @@ test('contract fails closed when the assembled replay order drifts', (t) => {
   assert.ok(errors.some((error) => error.includes('drifted order')), errors.join('\n'))
 })
 
-test('contract fails closed when Postgres fallback and retained bundle markers disappear', (t) => {
+test('contract fails closed when retained m050-s02 bundle markers disappear', (t) => {
   const tmpRoot = mkTmpDir(t, 'verify-m049-s05-bundle-')
   copyRepoFile(tmpRoot, verifierPath)
 
   let mutated = readFrom(tmpRoot, verifierPath)
-  mutated = mutated.replaceAll('.tmp/m049-s01/local-postgres/connection.env', '.tmp/m049-s01/verify/connection.env')
-  mutated = mutated.replaceAll('retained-m045-s02-verify', 'retained-m045-s02-copy')
-  mutated = mutated.replaceAll('retained-m049-s03-artifacts', 'retained-m049-s03-copy')
+  mutated = mutated.replaceAll('retained-m050-s02-verify', 'retained-m050-s02-copy')
+  mutated = mutated.replaceAll('built-html/tooling.index.html', 'built-html/tooling.html')
+  mutated = mutated.replaceAll('built-html/summary.json', 'built-html/markers.json')
   writeTo(tmpRoot, verifierPath, mutated)
 
   const errors = validateVerifierContract(tmpRoot)
-  assert.ok(errors.some((error) => error.includes('missing ".tmp/m049-s01/local-postgres/connection.env"')), errors.join('\n'))
-  assert.ok(errors.some((error) => error.includes('missing "retained-m045-s02-verify"')), errors.join('\n'))
-  assert.ok(errors.some((error) => error.includes('missing "retained-m049-s03-artifacts"')), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes('missing "retained-m050-s02-verify"')), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes('missing "built-html/tooling.index.html"')), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes('missing "built-html/summary.json"')), errors.join('\n'))
 })
 
 test('current repo documents the assembled verifier and dual-db onboarding split', () => {
@@ -247,6 +251,7 @@ test('docs contract fails closed when verifier discoverability or the db split d
   writeTo(tmpRoot, 'README.md', mutatedReadme)
 
   let mutatedTooling = readFrom(tmpRoot, 'website/docs/docs/tooling/index.md')
+  mutatedTooling = mutatedTooling.replace('bash scripts/verify-m050-s02.sh', 'bash scripts/verify-m048-s05.sh')
   mutatedTooling = mutatedTooling.replace('bash scripts/verify-m049-s05.sh', 'bash scripts/verify-m048-s05.sh')
   mutatedTooling = mutatedTooling.replace('shared/deployable', 'starter')
   writeTo(tmpRoot, 'website/docs/docs/tooling/index.md', mutatedTooling)
@@ -254,5 +259,5 @@ test('docs contract fails closed when verifier discoverability or the db split d
   const errors = validateDocsContract(tmpRoot)
   assert.ok(errors.some((error) => error.includes('README.md missing "bash scripts/verify-m049-s05.sh"')), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes('README.md missing "meshc init --template todo-api --db postgres"') || error.includes('README.md missing ordered marker "meshc init --template todo-api --db postgres"')), errors.join('\n'))
-  assert.ok(errors.some((error) => error.includes('website/docs/docs/tooling/index.md missing "bash scripts/verify-m049-s05.sh"') || error.includes('website/docs/docs/tooling/index.md missing "shared/deployable"')), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes('website/docs/docs/tooling/index.md missing "bash scripts/verify-m050-s02.sh"') || error.includes('website/docs/docs/tooling/index.md missing "bash scripts/verify-m049-s05.sh"') || error.includes('website/docs/docs/tooling/index.md missing "shared/deployable"')), errors.join('\n'))
 })

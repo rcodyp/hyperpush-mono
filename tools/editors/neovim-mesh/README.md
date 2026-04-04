@@ -17,7 +17,7 @@ This pack is installed through Neovim's native package runtime under `pack/*/sta
 
 - No Tree-sitter grammar.
 - No plugin-manager-specific setup.
-- No claims beyond the classic interpolation plus `@cluster` decorator syntax and native `meshc lsp` path proven in `scripts/verify-m036-s02.sh`.
+- No claims beyond the classic syntax plus native `meshc lsp` path proven in `scripts/verify-m036-s02.sh`.
 
 ## Install
 

@@ -102,7 +102,7 @@ function validateOnboardingContract(baseRoot) {
     'examples/todo-postgres/README.md',
     'examples/todo-sqlite/README.md',
     'reference-backend/README.md',
-    'Follow-on starters and proof rails',
+    'After the scaffold, pick the follow-on starter',
   ])
 
   requireIncludes(errors, filePaths.distributed, distributed, [

@@ -79,6 +79,8 @@ fn m049_s05_wrapper_replays_the_named_scaffold_and_example_stack() {
         &[
             "bash scripts/verify-m050-s01.sh",
             "m050-s01-preflight",
+            "bash scripts/verify-m050-s02.sh",
+            "m050-s02-preflight",
             "node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs",
             "cargo test -p mesh-pkg m049_s0 -- --nocapture",
             "cargo test -p meshc --test tooling_e2e test_init_todo_template_ -- --nocapture",
@@ -99,6 +101,7 @@ fn m049_s05_wrapper_replays_the_named_scaffold_and_example_stack() {
             "retained-m045-s02-verify",
             "retained-m047-s05-verify",
             "retained-m048-s05-verify",
+            "retained-m050-s02-verify",
             "retained-m049-s01-artifacts",
             "retained-m049-s02-artifacts",
             "retained-m049-s03-artifacts",
@@ -108,6 +111,10 @@ fn m049_s05_wrapper_replays_the_named_scaffold_and_example_stack() {
             "current-phase.txt",
             "phase-report.txt",
             "full-contract.log",
+            "built-html/getting-started.index.html",
+            "built-html/clustered-example.index.html",
+            "built-html/tooling.index.html",
+            "built-html/summary.json",
             "todos-unmigrated.http",
             "todos-unmigrated.json",
         ],
@@ -115,13 +122,14 @@ fn m049_s05_wrapper_replays_the_named_scaffold_and_example_stack() {
 }
 
 #[test]
-fn m049_s05_wrapper_runs_the_m050_docs_preflight_before_heavier_replays() {
+fn m049_s05_wrapper_runs_the_m050_docs_preflights_before_heavier_replays() {
     let verifier_path = repo_root().join("scripts").join("verify-m049-s05.sh");
 
     assert_source_order(
         &verifier_path,
         &[
             "bash scripts/verify-m050-s01.sh",
+            "bash scripts/verify-m050-s02.sh",
             "node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs",
             "cargo test -p mesh-pkg m049_s0 -- --nocapture",
             "cargo test -p meshc --test tooling_e2e test_init_todo_template_ -- --nocapture",

@@ -577,6 +577,35 @@ assert_text(m048 / 'current-phase.txt', 'complete', 'retained m048 current phase
 assert_non_empty(m048 / 'latest-proof-bundle.txt', 'retained m048 bundle pointer')
 assert_phase_marker(m048 / 'phase-report.txt', 'm048-s05-bundle-shape\tpassed')
 
+m050 = require_dir(bundle_root / 'retained-m050-s02-verify')
+for rel in [
+    'status.txt',
+    'current-phase.txt',
+    'phase-report.txt',
+    'full-contract.log',
+    'latest-proof-bundle.txt',
+    'built-html/getting-started.index.html',
+    'built-html/clustered-example.index.html',
+    'built-html/tooling.index.html',
+    'built-html/summary.json',
+]:
+    require_file(m050 / rel)
+assert_text(m050 / 'status.txt', 'ok', 'retained m050 s02 status')
+assert_text(m050 / 'current-phase.txt', 'complete', 'retained m050 s02 current phase')
+assert_non_empty(m050 / 'latest-proof-bundle.txt', 'retained m050 s02 bundle pointer')
+for marker in [
+    'first-contact-contract\tpassed',
+    'm047-s05-docs-contract\tpassed',
+    'm047-s06-docs-contract\tpassed',
+    'm048-s05-tooling-contract\tpassed',
+    'm036-s03-tooling-contract\tpassed',
+    'docs-build\tpassed',
+    'retain-built-html\tpassed',
+    'built-html\tpassed',
+    'm050-s02-bundle-shape\tpassed',
+]:
+    assert_phase_marker(m050 / 'phase-report.txt', marker)
+
 manifest_paths = [
     bundle_root / 'retained-m049-s01-artifacts.manifest.txt',
     bundle_root / 'retained-m049-s02-artifacts.manifest.txt',
@@ -703,6 +732,9 @@ record_phase init passed
 require_file m050-s01-preflight "$ROOT_DIR/scripts/verify-m050-s01.sh" "fast M050 docs-graph preflight" ".tmp/m050-s01/verify"
 run_expect_success m050-s01-preflight m050-s01-preflight no 1800 ".tmp/m050-s01/verify" \
   bash scripts/verify-m050-s01.sh
+require_file m050-s02-preflight "$ROOT_DIR/scripts/verify-m050-s02.sh" "first-contact docs preflight" ".tmp/m050-s02/verify"
+run_expect_success m050-s02-preflight m050-s02-preflight no 2400 ".tmp/m050-s02/verify" \
+  bash scripts/verify-m050-s02.sh
 run_expect_success m049-s04-onboarding-contract m049-s04-onboarding-contract no 120 "" \
   node --test scripts/tests/verify-m049-s04-onboarding-contract.test.mjs
 run_expect_success m049-scaffold-mesh-pkg m049-scaffold-mesh-pkg yes 2400 "" \
@@ -804,6 +836,22 @@ copy_fixed_dir_or_fail retain-m048-s05-verify \
   retained-proof-bundle
 record_phase retain-m048-s05-verify passed
 
+begin_phase retain-m050-s02-verify
+copy_fixed_dir_or_fail retain-m050-s02-verify \
+  "$ROOT_DIR/.tmp/m050-s02/verify" \
+  "$RETAINED_PROOF_BUNDLE_DIR/retained-m050-s02-verify" \
+  "retained M050 S02 verify directory is missing or malformed" \
+  status.txt \
+  current-phase.txt \
+  phase-report.txt \
+  full-contract.log \
+  latest-proof-bundle.txt \
+  built-html/getting-started.index.html \
+  built-html/clustered-example.index.html \
+  built-html/tooling.index.html \
+  built-html/summary.json
+record_phase retain-m050-s02-verify passed
+
 begin_phase retain-m049-s01-artifacts
 copy_new_artifacts_or_fail \
   retain-m049-s01-artifacts \
@@ -850,6 +898,7 @@ record_phase m049-s05-bundle-shape passed
 for expected_phase in \
   init \
   m050-s01-preflight \
+  m050-s02-preflight \
   m049-s04-onboarding-contract \
   m049-scaffold-mesh-pkg \
   m049-scaffold-tooling \
@@ -867,6 +916,7 @@ for expected_phase in \
   retain-m045-s02-verify \
   retain-m047-s05-verify \
   retain-m048-s05-verify \
+  retain-m050-s02-verify \
   retain-m049-s01-artifacts \
   retain-m049-s02-artifacts \
   retain-m049-s03-artifacts \

@@ -5,9 +5,9 @@ description: Formatter, REPL, package manager, LSP, and editor support for Mesh
 
 # Developer Tools
 
-Mesh ships a developer toolchain centered on the `meshc` compiler plus the companion `meshpkg` package CLI. The verified public install path uses the documentation-served installer pair `https://meshlang.dev/install.sh` and `https://meshlang.dev/install.ps1` to place both binaries on your PATH before you configure formatting, testing, registry workflows, or editor integration.
+Mesh ships a developer toolchain centered on the `meshc` compiler plus the companion `meshpkg` package CLI. The verified public install path uses the documentation-served installer pair `https://meshlang.dev/install.sh` and `https://meshlang.dev/install.ps1` to place both binaries on your PATH before you choose a starter, configure formatting or testing, or wire Mesh into your editor.
 
-> **Production backend proof:** This page documents the tools individually. For the named backend proof commands that tie `meshc fmt`, `meshc test`, staged deploy smoke, and doc-truth verification together, start with [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
+> **Production backend proof:** This page stays focused on the public day-one CLI workflow first. When you need the named backend proof commands that tie `meshc fmt`, `meshc test`, staged deploy smoke, and doc-truth verification together, start later with [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
 
 ## Install the CLI tools
 
@@ -50,162 +50,6 @@ Both commands rerun the canonical installer path and refresh both `meshc` and `m
 For the named backend proof behind this public install contract, see [Production Backend Proof](/docs/production-backend-proof/) and `reference-backend/README.md`.
 
 If you are contributing to Mesh or need an unsupported target, build from source instead; treat that as an alternative workflow, not the primary public install contract.
-
-## Release Assembly Runbook
-
-When you need the full public-release acceptance flow instead of an individual tool check, run the assembled verifier from the repo root with the repo `.env` loaded:
-
-```bash
-set -a && source .env && set +a && bash scripts/verify-m034-s05.sh
-```
-
-The candidate identity stays split on purpose:
-
-- Binary release candidate tag: `v<Cargo version>` from `compiler/meshc/Cargo.toml` and `compiler/meshpkg/Cargo.toml`
-- VS Code extension release candidate tag: `ext-v<extension version>` from `tools/editors/vscode-mesh/package.json`
-
-Hosted rollout evidence must exist for these exact workflows:
-
-- `deploy.yml`
-- `deploy-services.yml`
-- `authoritative-verification.yml`
-- `release.yml`
-- `extension-release-proof.yml`
-- `publish-extension.yml`
-
-The runbook stays tied to these exact public URLs:
-
-- `https://meshlang.dev/install.sh`
-- `https://meshlang.dev/install.ps1`
-- `https://meshlang.dev/docs/getting-started/`
-- `https://meshlang.dev/docs/tooling/`
-- `https://packages.meshlang.dev/packages/snowdamiz/mesh-registry-proof`
-- `https://packages.meshlang.dev/search?q=snowdamiz%2Fmesh-registry-proof`
-- `https://api.packages.meshlang.dev/api/v1/packages?search=snowdamiz%2Fmesh-registry-proof`
-
-The verifier persists the candidate and hosted-run evidence under:
-
-- `.tmp/m034-s05/verify/candidate-tags.json`
-- `.tmp/m034-s05/verify/remote-runs.json`
-
-## Assembled contract verifier
-
-When you need the retained repo-root proof for installer-backed updates, optional override entrypoints, package publish/archive truth, shared grammar parity, and the bounded editor surface, run:
-
-```bash
-bash scripts/verify-m048-s05.sh
-```
-
-## Assembled scaffold/example verifier
-
-When you need the repo-root proof that the public Todo onboarding story still stays scaffold/examples-first — SQLite remains the honest local starter, Postgres remains the serious shared/deployable path, and the retained M048/tooling guardrails stay green underneath that split — run:
-
-```bash
-bash scripts/verify-m049-s05.sh
-```
-
-This assembled verifier replays the dual-db scaffold rails, the direct `/examples` parity check, the retained clustered proof wrappers, and the retained M048 tooling verifier, then publishes one retained bundle under `.tmp/m049-s05/verify/` for diagnosis.
-
-## Formatter
-
-The Mesh formatter canonically formats your source code, enforcing a consistent style across your project:
-
-```bash
-meshc fmt main.mpl
-```
-
-To format a project directory:
-
-```bash
-meshc fmt .
-```
-
-To fail fast in CI or before committing if any file would change:
-
-```bash
-meshc fmt --check reference-backend
-```
-
-The formatter uses the **Wadler-Lindig** pretty-printing algorithm with a CST-based approach. This means:
-
-- **Comments are preserved** -- the formatter works on the concrete syntax tree, so comments stay exactly where you put them
-- **Whitespace and indentation are rewritten** canonically according to Mesh style conventions
-- **Formatting is idempotent** -- running the formatter twice produces the same output as running it once
-
-### Example
-
-Before formatting:
-
-```mesh
-fn add(a,b) do
-a+b
-end
-```
-
-After `meshc fmt`:
-
-```mesh
-fn add(a, b) do
-  a + b
-end
-```
-
-### Format on Save
-
-Mesh only publishes repo-owned format-on-save guidance for the first-class editors in the [support tiers](#support-tiers) below. In VS Code, the Mesh extension routes document formatting through `meshc lsp`. In Neovim, the repo-owned pack attaches the native `meshc lsp` client, so save-time formatting should use your normal Neovim LSP formatting hook. Best-effort editors should invoke `meshc fmt <file>` directly and treat that integration as user-maintained.
-
-## REPL
-
-The Mesh REPL (Read-Eval-Print Loop) provides interactive exploration with full language support:
-
-```bash
-meshc repl
-```
-
-This starts an interactive session where you can evaluate expressions, define functions, and explore the language:
-
-```
-mesh> 1 + 2
-3 :: Int
-
-mesh> let name = "Mesh"
-"Mesh" :: String
-
-mesh> fn double(x) do
-  ...   x * 2
-  ... end
-Defined: double :: (Int) -> Int
-
-mesh> double(21)
-42 :: Int
-```
-
-The REPL uses **LLVM JIT compilation** under the hood, running the full compiler pipeline (parse, typecheck, MIR, LLVM IR) for every expression. This means REPL behavior is identical to compiled code -- there are no interpreter-specific quirks.
-
-### REPL Commands
-
-| Command | Shorthand | Description |
-|---------|-----------|-------------|
-| `:help` | `:h` | Show available commands |
-| `:type <expr>` | `:t` | Show the inferred type without evaluating |
-| `:quit` | `:q` | Exit the REPL |
-| `:clear` | | Clear the screen |
-| `:reset` | | Reset session (clear all definitions and history) |
-| `:load <file>` | | Load and evaluate a Mesh source file |
-
-### Multi-line Input
-
-The REPL automatically detects incomplete input. If you open a `do` block without closing it with `end`, the REPL switches to continuation mode (shown by `...`) until all blocks are balanced:
-
-```
-mesh> fn greet(name) do
-  ...   println("Hello, ${name}!")
-  ... end
-Defined: greet :: (String) -> Unit
-
-mesh> greet("world")
-Hello, world!
-```
 
 ## Package Manager
 
@@ -346,6 +190,107 @@ meshc test --coverage reference-backend
 `--coverage` currently exits non-zero with an explicit unsupported message instead of claiming a stub report.
 
 See the [Testing guide](/docs/testing/) for the full assertion API, grouping, mock actors, and receive expectations.
+
+## Formatter
+
+The Mesh formatter canonically formats your source code, enforcing a consistent style across your project:
+
+```bash
+meshc fmt main.mpl
+```
+
+To format a project directory:
+
+```bash
+meshc fmt .
+```
+
+To fail fast in CI or before committing if any file would change:
+
+```bash
+meshc fmt --check reference-backend
+```
+
+The formatter uses the **Wadler-Lindig** pretty-printing algorithm with a CST-based approach. This means:
+
+- **Comments are preserved** -- the formatter works on the concrete syntax tree, so comments stay exactly where you put them
+- **Whitespace and indentation are rewritten** canonically according to Mesh style conventions
+- **Formatting is idempotent** -- running the formatter twice produces the same output as running it once
+
+### Example
+
+Before formatting:
+
+```mesh
+fn add(a,b) do
+a+b
+end
+```
+
+After `meshc fmt`:
+
+```mesh
+fn add(a, b) do
+  a + b
+end
+```
+
+### Format on Save
+
+Mesh only publishes repo-owned format-on-save guidance for the first-class editors in the [support tiers](#support-tiers) below. In VS Code, the Mesh extension routes document formatting through `meshc lsp`. In Neovim, the repo-owned pack attaches the native `meshc lsp` client, so save-time formatting should use your normal Neovim LSP formatting hook. Best-effort editors should invoke `meshc fmt <file>` directly and treat that integration as user-maintained.
+
+## REPL
+
+The Mesh REPL (Read-Eval-Print Loop) provides interactive exploration with full language support:
+
+```bash
+meshc repl
+```
+
+This starts an interactive session where you can evaluate expressions, define functions, and explore the language:
+
+```
+mesh> 1 + 2
+3 :: Int
+
+mesh> let name = "Mesh"
+"Mesh" :: String
+
+mesh> fn double(x) do
+  ...   x * 2
+  ... end
+Defined: double :: (Int) -> Int
+
+mesh> double(21)
+42 :: Int
+```
+
+The REPL uses **LLVM JIT compilation** under the hood, running the full compiler pipeline (parse, typecheck, MIR, LLVM IR) for every expression. This means REPL behavior is identical to compiled code -- there are no interpreter-specific quirks.
+
+### REPL Commands
+
+| Command | Shorthand | Description |
+|---------|-----------|-------------|
+| `:help` | `:h` | Show available commands |
+| `:type <expr>` | `:t` | Show the inferred type without evaluating |
+| `:quit` | `:q` | Exit the REPL |
+| `:clear` | | Clear the screen |
+| `:reset` | | Reset session (clear all definitions and history) |
+| `:load <file>` | | Load and evaluate a Mesh source file |
+
+### Multi-line Input
+
+The REPL automatically detects incomplete input. If you open a `do` block without closing it with `end`, the REPL switches to continuation mode (shown by `...`) until all blocks are balanced:
+
+```
+mesh> fn greet(name) do
+  ...   println("Hello, ${name}!")
+  ... end
+Defined: greet :: (String) -> Unit
+
+mesh> greet("world")
+Hello, world!
+```
 
 ## meshpkg — Package Registry CLI
 
@@ -539,6 +484,71 @@ That proof is intentionally bounded to the shared syntax corpus plus the native 
 Editors outside the first-class tier can still reuse the shared Mesh surfaces, but those integrations are best-effort. For syntax highlighting, reuse `tools/editors/vscode-mesh/syntaxes/mesh.tmLanguage.json` anywhere that can ingest a TextMate grammar. For LSP, point your editor at `meshc lsp` over stdin/stdout JSON-RPC.
 
 Best-effort examples include Emacs, Helix, Zed, Sublime Text, and TextMate-style consumers of the shared grammar. Mesh does not publish repo-owned editor-host smoke, packaging, or troubleshooting guides for those setups.
+
+## Assembled first-contact docs verifier
+
+When you need the repo-root proof that the public first-contact docs still tell one coherent story — install Mesh, run hello-world, then deliberately choose the clustered scaffold, the honest local SQLite Todo starter, or the serious shared/deployable Postgres starter — run:
+
+```bash
+bash scripts/verify-m050-s02.sh
+```
+
+This verifier replays the slice-owned first-contact source contract, the retained M047 docs rails plus the retained M048 and M036 tooling contracts, then performs a serial `npm --prefix website run build` and copies built HTML snapshots for Getting Started, Clustered Example, and Tooling into `.tmp/m050-s02/verify/` for diagnosis.
+
+## Release Assembly Runbook
+
+When you need the full public-release acceptance flow instead of an individual tool check, run the assembled verifier from the repo root with the repo `.env` loaded:
+
+```bash
+set -a && source .env && set +a && bash scripts/verify-m034-s05.sh
+```
+
+The candidate identity stays split on purpose:
+
+- Binary release candidate tag: `v<Cargo version>` from `compiler/meshc/Cargo.toml` and `compiler/meshpkg/Cargo.toml`
+- VS Code extension release candidate tag: `ext-v<extension version>` from `tools/editors/vscode-mesh/package.json`
+
+Hosted rollout evidence must exist for these exact workflows:
+
+- `deploy.yml`
+- `deploy-services.yml`
+- `authoritative-verification.yml`
+- `release.yml`
+- `extension-release-proof.yml`
+- `publish-extension.yml`
+
+The runbook stays tied to these exact public URLs:
+
+- `https://meshlang.dev/install.sh`
+- `https://meshlang.dev/install.ps1`
+- `https://meshlang.dev/docs/getting-started/`
+- `https://meshlang.dev/docs/tooling/`
+- `https://packages.meshlang.dev/packages/snowdamiz/mesh-registry-proof`
+- `https://packages.meshlang.dev/search?q=snowdamiz%2Fmesh-registry-proof`
+- `https://api.packages.meshlang.dev/api/v1/packages?search=snowdamiz%2Fmesh-registry-proof`
+
+The verifier persists the candidate and hosted-run evidence under:
+
+- `.tmp/m034-s05/verify/candidate-tags.json`
+- `.tmp/m034-s05/verify/remote-runs.json`
+
+## Assembled contract verifier
+
+When you need the retained repo-root proof for installer-backed updates, optional override entrypoints, package publish/archive truth, shared grammar parity, and the bounded editor surface, run:
+
+```bash
+bash scripts/verify-m048-s05.sh
+```
+
+## Assembled scaffold/example verifier
+
+When you need the repo-root proof that the public Todo onboarding story still stays scaffold/examples-first — SQLite remains the honest local starter, Postgres remains the serious shared/deployable path, and the retained M048/tooling guardrails stay green underneath that split — run:
+
+```bash
+bash scripts/verify-m049-s05.sh
+```
+
+This assembled verifier replays the new first-contact docs preflight, the dual-db scaffold rails, the direct `/examples` parity check, the retained clustered proof wrappers, and the retained M048 tooling verifier, then publishes one retained bundle under `.tmp/m049-s05/verify/` for diagnosis.
 
 ## Tool Summary
 

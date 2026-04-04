@@ -405,10 +405,6 @@ fn m047_s04_clustered_runbooks_keep_example_readmes_and_secondary_proof_surfaces
             &sources.distributed,
         ),
         ("website/docs/docs/tooling/index.md", &sources.tooling),
-        (
-            "website/docs/docs/getting-started/clustered-example/index.md",
-            &sources.clustered_example,
-        ),
     ] {
         assert_contains_all(
             path_label,
@@ -441,6 +437,37 @@ fn m047_s04_clustered_runbooks_keep_example_readmes_and_secondary_proof_surfaces
         );
         assert_clustered_surface_omits_routeful_drift(path_label, source);
     }
+
+    assert_contains_all(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        &[
+            TODO_POSTGRES_README,
+            TODO_SQLITE_README,
+            REFERENCE_BACKEND_RUNBOOK,
+            "/docs/distributed-proof/",
+        ],
+    );
+    assert_omits_all(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        &[
+            CUTOVER_RAIL,
+            CLOSEOUT_RAIL,
+            HISTORICAL_M046_CLOSEOUT_ALIAS,
+            HISTORICAL_M046_EQUAL_SURFACE_ALIAS,
+            HISTORICAL_M046_PACKAGE_ALIAS,
+            HISTORICAL_M045_CLOSEOUT_ALIAS,
+            HISTORICAL_M045_ASSEMBLED_ALIAS,
+            HISTORICAL_FAILOVER_SUBRAIL,
+            "tiny-cluster/README.md",
+            "cluster-proof/README.md",
+        ],
+    );
+    assert_clustered_surface_omits_routeful_drift(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+    );
 
     assert_contains(
         "website/docs/docs/tooling/index.md",

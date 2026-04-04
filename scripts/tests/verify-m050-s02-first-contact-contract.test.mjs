@@ -11,6 +11,7 @@ const root = path.resolve(scriptDir, '..', '..')
 const readmePath = 'README.md'
 const gettingStartedPath = 'website/docs/docs/getting-started/index.md'
 const clusteredExamplePath = 'website/docs/docs/getting-started/clustered-example/index.md'
+const toolingPath = 'website/docs/docs/tooling/index.md'
 const starterCommands = [
   'meshc init --clustered',
   'meshc init --template todo-api --db sqlite',
@@ -31,6 +32,13 @@ const gettingStartedStarterHeading = '## Choose your next starter'
 const clusteredExampleStarterHeading = '## After the scaffold, pick the follow-on starter'
 const clusteredExampleProofHeading = '## Need the retained verifier map?'
 const clusteredExampleProofPage = '/docs/distributed-proof/'
+const toolingDocsVerifierHeading = '## Assembled first-contact docs verifier'
+const toolingReleaseRunbookHeading = '## Release Assembly Runbook'
+const toolingContractVerifierHeading = '## Assembled contract verifier'
+const toolingExampleVerifierHeading = '## Assembled scaffold/example verifier'
+const toolingM050VerifierCommand = 'bash scripts/verify-m050-s02.sh'
+const toolingM048VerifierCommand = 'bash scripts/verify-m048-s05.sh'
+const toolingM049VerifierCommand = 'bash scripts/verify-m049-s05.sh'
 const directProofRailMarkers = [
   'scripts/verify-m047-s04.sh',
   'scripts/verify-m047-s05.sh',
@@ -97,6 +105,7 @@ function validateFirstContactContract(baseRoot) {
   const readme = readFrom(baseRoot, readmePath)
   const gettingStarted = readFrom(baseRoot, gettingStartedPath)
   const clusteredExample = readFrom(baseRoot, clusteredExamplePath)
+  const tooling = readFrom(baseRoot, toolingPath)
 
   requireIncludes(errors, readmePath, readme, [
     ...starterCommands,
@@ -134,6 +143,34 @@ function validateFirstContactContract(baseRoot) {
     clusteredExampleProofPage,
   ])
 
+  requireIncludes(errors, toolingPath, tooling, [
+    '## Install the CLI tools',
+    '### Update an installed toolchain',
+    '### Creating a New Project',
+    ...starterCommands,
+    'honest local starter',
+    'shared/deployable',
+    clusteredExampleSqliteReadmeLink,
+    clusteredExamplePostgresReadmeLink,
+    clusteredExampleReferenceBackendLink,
+    'meshc cluster status',
+    'meshc cluster continuity',
+    'meshc cluster diagnostics',
+    '## Editor Support',
+    '### Support tiers',
+    '### VS Code',
+    '### Neovim',
+    '### Best-effort editors',
+    'bash scripts/verify-m036-s03.sh',
+    toolingDocsVerifierHeading,
+    toolingM050VerifierCommand,
+    toolingReleaseRunbookHeading,
+    toolingContractVerifierHeading,
+    toolingM048VerifierCommand,
+    toolingExampleVerifierHeading,
+    toolingM049VerifierCommand,
+  ])
+
   requireExcludes(errors, readmePath, readme, [staleRepoUrl])
   requireExcludes(errors, gettingStartedPath, gettingStarted, [staleRepoUrl])
   requireExcludes(errors, clusteredExamplePath, clusteredExample, [
@@ -142,6 +179,7 @@ function validateFirstContactContract(baseRoot) {
     'Work.execute_declared_work',
     ...directProofRailMarkers,
   ])
+  requireExcludes(errors, toolingPath, tooling, [staleRepoUrl, staleRepoBlobBase])
 
   requireOrdered(errors, readmePath, readme, [
     'meshc init hello_mesh',
@@ -167,6 +205,22 @@ function validateFirstContactContract(baseRoot) {
     clusteredExampleProofPage,
   ])
 
+  requireOrdered(errors, toolingPath, tooling, [
+    '## Install the CLI tools',
+    '### Update an installed toolchain',
+    '### Creating a New Project',
+    ...starterCommands,
+    'Inspect a running clustered app with the same operator order used by the scaffold',
+    '## Editor Support',
+    toolingDocsVerifierHeading,
+    toolingM050VerifierCommand,
+    toolingReleaseRunbookHeading,
+    toolingContractVerifierHeading,
+    toolingM048VerifierCommand,
+    toolingExampleVerifierHeading,
+    toolingM049VerifierCommand,
+  ])
+
   return errors
 }
 
@@ -177,7 +231,7 @@ test('current repo publishes the first-contact starter chooser contract', () => 
 
 test('contract fails closed when README loses the explicit three-way starter split', (t) => {
   const tmpRoot = mkTmpDir(t, 'verify-m050-s02-readme-')
-  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath]) {
+  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath, toolingPath]) {
     copyRepoFile(tmpRoot, relativePath)
   }
 
@@ -195,7 +249,7 @@ test('contract fails closed when README loses the explicit three-way starter spl
 
 test('contract fails closed when Getting Started loses the chooser heading, repo URL, or split starter commands', (t) => {
   const tmpRoot = mkTmpDir(t, 'verify-m050-s02-getting-started-')
-  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath]) {
+  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath, toolingPath]) {
     copyRepoFile(tmpRoot, relativePath)
   }
 
@@ -214,7 +268,7 @@ test('contract fails closed when Getting Started loses the chooser heading, repo
 
 test('contract fails closed when proof pages drift back above the starter chooser', (t) => {
   const tmpRoot = mkTmpDir(t, 'verify-m050-s02-order-')
-  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath]) {
+  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath, toolingPath]) {
     copyRepoFile(tmpRoot, relativePath)
   }
 
@@ -239,7 +293,7 @@ test('contract fails closed when proof pages drift back above the starter choose
 
 test('contract fails closed when Clustered Example loses scaffold-first starter truth, current repo links, or bounded proof-page handoff', (t) => {
   const tmpRoot = mkTmpDir(t, 'verify-m050-s02-clustered-example-')
-  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath]) {
+  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath, toolingPath]) {
     copyRepoFile(tmpRoot, relativePath)
   }
 
@@ -262,4 +316,31 @@ test('contract fails closed when Clustered Example loses scaffold-first starter 
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/getting-started/clustered-example/index.md missing ${JSON.stringify(clusteredExampleSqliteReadmeLink)}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/getting-started/clustered-example/index.md still contains stale text ${JSON.stringify(staleRepoBlobBase)}`)), errors.join('\n'))
   assert.ok(errors.some((error) => error.includes(`website/docs/docs/getting-started/clustered-example/index.md still contains stale text ${JSON.stringify('scripts/verify-m047-s04.sh')}`)), errors.join('\n'))
+})
+
+test('contract fails closed when Tooling loses first-contact ordering, docs-verifier discoverability, or retained editor markers', (t) => {
+  const tmpRoot = mkTmpDir(t, 'verify-m050-s02-tooling-')
+  for (const relativePath of [readmePath, gettingStartedPath, clusteredExamplePath, toolingPath]) {
+    copyRepoFile(tmpRoot, relativePath)
+  }
+
+  let mutatedTooling = readFrom(tmpRoot, toolingPath)
+  mutatedTooling = mutatedTooling.replace(
+    '# Developer Tools\n\n',
+    '# Developer Tools\n\n## Release Assembly Runbook\n\n',
+  )
+  mutatedTooling = mutatedTooling.replace('### Support tiers', '### Editor tiers')
+  mutatedTooling = mutatedTooling.replace(toolingDocsVerifierHeading, '## Docs verifier')
+  mutatedTooling = mutatedTooling.replace(toolingM050VerifierCommand, toolingM048VerifierCommand)
+  mutatedTooling = mutatedTooling.replace(toolingM049VerifierCommand, 'bash scripts/verify-m049-s04.sh')
+  mutatedTooling = mutatedTooling.replace(clusteredExamplePostgresReadmeLink, `${staleRepoBlobBase}examples/todo-postgres/README.md`)
+  writeTo(tmpRoot, toolingPath, mutatedTooling)
+
+  const errors = validateFirstContactContract(tmpRoot)
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md missing ${JSON.stringify('### Support tiers')}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md missing ${JSON.stringify(toolingDocsVerifierHeading)}`) || error.includes(`website/docs/docs/tooling/index.md missing ordered marker ${JSON.stringify(toolingDocsVerifierHeading)}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md missing ${JSON.stringify(toolingM050VerifierCommand)}`) || error.includes(`website/docs/docs/tooling/index.md missing ordered marker ${JSON.stringify(toolingM050VerifierCommand)}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md missing ${JSON.stringify(toolingM049VerifierCommand)}`) || error.includes(`website/docs/docs/tooling/index.md missing ordered marker ${JSON.stringify(toolingM049VerifierCommand)}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes(`website/docs/docs/tooling/index.md still contains stale text ${JSON.stringify(staleRepoBlobBase)}`)), errors.join('\n'))
+  assert.ok(errors.some((error) => error.includes('website/docs/docs/tooling/index.md drifted order around') || error.includes(`website/docs/docs/tooling/index.md missing ordered marker ${JSON.stringify(toolingDocsVerifierHeading)}`)), errors.join('\n'))
 })
