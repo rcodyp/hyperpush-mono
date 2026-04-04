@@ -480,7 +480,6 @@ assert_file_omits_regex \
 
 for surface in \
   website/docs/docs/tooling/index.md \
-  website/docs/docs/getting-started/clustered-example/index.md \
   website/docs/docs/distributed-proof/index.md \
   website/docs/docs/distributed/index.md; do
   safe_name="$(printf '%s' "$surface" | tr '/.' '__')"
@@ -520,6 +519,21 @@ for surface in \
     'reference-backend/README\.md' \
     "$surface lost the deeper backend proof reference"
   assert_file_contains_regex \
+    "${safe_name}-current-repo-postgres" \
+    "$surface" \
+    'https://github\.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README\.md' \
+    "$surface lost the current PostgreSQL starter repo URL"
+  assert_file_contains_regex \
+    "${safe_name}-current-repo-sqlite" \
+    "$surface" \
+    'https://github\.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README\.md' \
+    "$surface lost the current SQLite starter repo URL"
+  assert_file_contains_regex \
+    "${safe_name}-current-repo-reference-backend" \
+    "$surface" \
+    'https://github\.com/snowdamiz/mesh-lang/blob/main/reference-backend/README\.md' \
+    "$surface lost the current backend runbook repo URL"
+  assert_file_contains_regex \
     "${safe_name}-sqlite-template" \
     "$surface" \
     'meshc init --template todo-api --db sqlite' \
@@ -554,12 +568,62 @@ for surface in \
     "$surface" \
     'HTTP\.clustered\(\.\.\.\) is still not shipped' \
     "$surface still claims HTTP.clustered(...) is unshipped"
+  assert_file_omits_regex \
+    "${safe_name}-stale-repo" \
+    "$surface" \
+    'https://github\.com/hyperpush-org/hyperpush-mono/blob/main/' \
+    "$surface still points at the stale hyperpush repo identity"
 done
 assert_file_contains_regex \
   contract-clustered-example-scaffold \
   website/docs/docs/getting-started/clustered-example/index.md \
   'meshc init --clustered' \
   'Clustered Example lost the scaffold-first clustered entrypoint'
+assert_file_contains_regex \
+  contract-clustered-example-sqlite-template \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'meshc init --template todo-api --db sqlite my_local_todo' \
+  'Clustered Example lost the honest local starter split'
+assert_file_contains_regex \
+  contract-clustered-example-postgres-template \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'meshc init --template todo-api --db postgres my_shared_todo' \
+  'Clustered Example lost the serious shared/deployable starter split'
+assert_file_contains_regex \
+  contract-clustered-example-current-repo-postgres \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'https://github\.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README\.md' \
+  'Clustered Example lost the current PostgreSQL starter repo URL'
+assert_file_contains_regex \
+  contract-clustered-example-current-repo-sqlite \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'https://github\.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README\.md' \
+  'Clustered Example lost the current SQLite starter repo URL'
+assert_file_contains_regex \
+  contract-clustered-example-current-repo-reference-backend \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'https://github\.com/snowdamiz/mesh-lang/blob/main/reference-backend/README\.md' \
+  'Clustered Example lost the current backend runbook repo URL'
+assert_file_contains_regex \
+  contract-clustered-example-proof-page \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  '/docs/distributed-proof/' \
+  'Clustered Example lost the proof-page handoff'
+assert_file_omits_regex \
+  contract-clustered-example-direct-rails \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'scripts/verify-m047-s04\.sh|scripts/verify-m047-s05\.sh|scripts/verify-m047-s06\.sh|e2e_m047_s07' \
+  'Clustered Example still inlines retained proof-rail commands instead of handing off to the proof page'
+assert_file_omits_regex \
+  contract-clustered-example-helper-names \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'execute_declared_work\(\.\.\.\)|Work\.execute_declared_work' \
+  'Clustered Example still inlines the helper-shaped migration names'
+assert_file_omits_regex \
+  contract-clustered-example-stale-repo \
+  website/docs/docs/getting-started/clustered-example/index.md \
+  'https://github\.com/hyperpush-org/hyperpush-mono/blob/main/' \
+  'Clustered Example still points at the stale hyperpush repo identity'
 assert_file_contains_regex \
   contract-distributed-proof-prev \
   website/docs/docs/distributed-proof/index.md \

@@ -1651,6 +1651,15 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
         &artifacts.join("tooling_e2e.rs"),
     );
 
+    let current_repo_blob_base = "https://github.com/snowdamiz/mesh-lang/blob/main/";
+    let stale_repo_blob_base = "https://github.com/hyperpush-org/hyperpush-mono/blob/main/";
+    let todo_postgres_readme_url =
+        "https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md";
+    let todo_sqlite_readme_url =
+        "https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md";
+    let reference_backend_readme_url =
+        "https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md";
+
     assert_contains("README.md", &readme, "meshc init --clustered hello_cluster");
     assert_contains(
         "README.md",
@@ -1694,7 +1703,67 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     assert_contains(
         "website/docs/docs/getting-started/clustered-example/index.md",
         &clustered_example,
+        "meshc init --clustered hello_cluster",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "## After the scaffold, pick the follow-on starter",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "meshc init --template todo-api --db sqlite my_local_todo",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "meshc init --template todo-api --db postgres my_shared_todo",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
         "@cluster pub fn add() -> Int do",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "Node.start_from_env()",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "meshc cluster status",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "meshc cluster continuity",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "meshc cluster diagnostics",
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        todo_sqlite_readme_url,
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        todo_postgres_readme_url,
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        reference_backend_readme_url,
+    );
+    assert_contains(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &clustered_example,
+        "/docs/distributed-proof/",
     );
     assert!(
         tiny_cluster_work.contains("@cluster pub fn add()")
@@ -1718,7 +1787,6 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
     );
 
     for (label, source) in [
-        ("README.md", &readme),
         (
             "website/docs/docs/distributed-proof/index.md",
             &distributed_proof,
@@ -1729,6 +1797,21 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
             &clustered_example,
         ),
     ] {
+        assert_contains(label, source, todo_postgres_readme_url);
+        assert_contains(label, source, todo_sqlite_readme_url);
+        assert_contains(label, source, reference_backend_readme_url);
+        assert_contains(label, source, current_repo_blob_base);
+        assert_omits(label, source, stale_repo_blob_base);
+    }
+
+    for (label, source) in [
+        ("README.md", &readme),
+        (
+            "website/docs/docs/distributed-proof/index.md",
+            &distributed_proof,
+        ),
+        ("website/docs/docs/tooling/index.md", &tooling),
+    ] {
         assert_contains(label, source, "execute_declared_work(...)");
         assert_contains(label, source, "Work.execute_declared_work");
         assert_contains(label, source, "HTTP.clustered(1, ...)");
@@ -1738,6 +1821,21 @@ fn m047_s05_public_clustered_surfaces_use_source_first_names_and_todo_template()
         assert_contains(label, source, "mutating routes stay local");
         assert_contains(label, source, "e2e_m047_s07");
         assert_omits(label, source, "HTTP.clustered(...) is still not shipped");
+    }
+
+    for needle in [
+        "execute_declared_work(...)",
+        "Work.execute_declared_work",
+        "scripts/verify-m047-s04.sh",
+        "scripts/verify-m047-s05.sh",
+        "scripts/verify-m047-s06.sh",
+        "e2e_m047_s07",
+    ] {
+        assert_omits(
+            "website/docs/docs/getting-started/clustered-example/index.md",
+            &clustered_example,
+            needle,
+        );
     }
 
     for (label, source) in [

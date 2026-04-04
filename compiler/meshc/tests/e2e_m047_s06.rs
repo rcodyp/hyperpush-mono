@@ -9,6 +9,13 @@ const POSTGRES_STARTER_COMMAND: &str = "meshc init --template todo-api --db post
 const TODO_POSTGRES_README: &str = "examples/todo-postgres/README.md";
 const TODO_SQLITE_README: &str = "examples/todo-sqlite/README.md";
 const REFERENCE_BACKEND_RUNBOOK: &str = "reference-backend/README.md";
+const STALE_REPO_BLOB_BASE: &str = "https://github.com/hyperpush-org/hyperpush-mono/blob/main/";
+const TODO_POSTGRES_README_URL: &str =
+    "https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md";
+const TODO_SQLITE_README_URL: &str =
+    "https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md";
+const REFERENCE_BACKEND_RUNBOOK_URL: &str =
+    "https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md";
 const DISTRIBUTED_PROOF_SITE_URL: &str = "https://meshlang.dev/docs/distributed-proof/";
 const PRODUCTION_BACKEND_PROOF_DOC_LINK: &str = "/docs/production-backend-proof/";
 const PRODUCTION_BACKEND_PROOF_SITE_URL: &str = "https://meshlang.dev/docs/production-backend-proof/";
@@ -185,15 +192,12 @@ fn m047_s06_public_docs_split_sqlite_local_from_postgres_clustered_starters() {
             STALE_SQLITE_CLUSTERED_ROUTES,
             STALE_INTERNAL_FIXTURE_RUNBOOKS[0],
             STALE_INTERNAL_FIXTURE_RUNBOOKS[1],
+            STALE_REPO_BLOB_BASE,
         ],
     );
 
     for (path_label, source) in [
         ("website/docs/docs/tooling/index.md", &sources.tooling),
-        (
-            "website/docs/docs/getting-started/clustered-example/index.md",
-            &sources.clustered_example,
-        ),
         (
             "website/docs/docs/distributed-proof/index.md",
             &sources.distributed_proof,
@@ -212,6 +216,9 @@ fn m047_s06_public_docs_split_sqlite_local_from_postgres_clustered_starters() {
                 TODO_POSTGRES_README,
                 TODO_SQLITE_README,
                 REFERENCE_BACKEND_RUNBOOK,
+                TODO_POSTGRES_README_URL,
+                TODO_SQLITE_README_URL,
+                REFERENCE_BACKEND_RUNBOOK_URL,
                 CUTOVER_RAIL,
                 TODO_SUBRAIL,
                 CLOSEOUT_RAIL,
@@ -228,9 +235,54 @@ fn m047_s06_public_docs_split_sqlite_local_from_postgres_clustered_starters() {
                 STALE_SQLITE_CLUSTERED_ROUTES,
                 STALE_INTERNAL_FIXTURE_RUNBOOKS[0],
                 STALE_INTERNAL_FIXTURE_RUNBOOKS[1],
+                STALE_REPO_BLOB_BASE,
             ],
         );
     }
+
+    assert_contains_all(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        &[
+            CLUSTERED_SCAFFOLD_COMMAND,
+            SQLITE_STARTER_COMMAND,
+            POSTGRES_STARTER_COMMAND,
+            TODO_POSTGRES_README,
+            TODO_SQLITE_README,
+            REFERENCE_BACKEND_RUNBOOK,
+            TODO_POSTGRES_README_URL,
+            TODO_SQLITE_README_URL,
+            REFERENCE_BACKEND_RUNBOOK_URL,
+            "Node.start_from_env()",
+            "@cluster pub fn add() -> Int do",
+            "## After the scaffold, pick the follow-on starter",
+            "## Need the retained verifier map?",
+            "/docs/distributed-proof/",
+        ],
+    );
+    assert_omits(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        STALE_CLUSTERED_NON_GOAL,
+    );
+    assert_omits_all(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        &[
+            STALE_GENERIC_TODO_COMMAND,
+            STALE_SQLITE_CLUSTERED_GUIDANCE,
+            STALE_SQLITE_CLUSTERED_ROUTES,
+            STALE_INTERNAL_FIXTURE_RUNBOOKS[0],
+            STALE_INTERNAL_FIXTURE_RUNBOOKS[1],
+            STALE_REPO_BLOB_BASE,
+            CUTOVER_RAIL,
+            TODO_SUBRAIL,
+            CLOSEOUT_RAIL,
+            S07_RAIL_COMMAND,
+            "execute_declared_work(...)",
+            "Work.execute_declared_work",
+        ],
+    );
 
     assert_contains(
         "website/docs/docs/tooling/index.md",
@@ -313,15 +365,12 @@ fn m047_s06_docs_layer_s04_s05_s06_and_s07_truthfully() {
             S07_RAIL_COMMAND,
             STALE_INTERNAL_FIXTURE_RUNBOOKS[0],
             STALE_INTERNAL_FIXTURE_RUNBOOKS[1],
+            STALE_REPO_BLOB_BASE,
         ],
     );
 
     for (path_label, source) in [
         ("website/docs/docs/tooling/index.md", &sources.tooling),
-        (
-            "website/docs/docs/getting-started/clustered-example/index.md",
-            &sources.clustered_example,
-        ),
         (
             "website/docs/docs/distributed-proof/index.md",
             &sources.distributed_proof,
@@ -334,10 +383,43 @@ fn m047_s06_docs_layer_s04_s05_s06_and_s07_truthfully() {
         assert_contains_all(
             path_label,
             source,
-            &[CUTOVER_RAIL, TODO_SUBRAIL, CLOSEOUT_RAIL, S07_RAIL_COMMAND],
+            &[
+                CUTOVER_RAIL,
+                TODO_SUBRAIL,
+                CLOSEOUT_RAIL,
+                S07_RAIL_COMMAND,
+                TODO_POSTGRES_README_URL,
+                TODO_SQLITE_README_URL,
+                REFERENCE_BACKEND_RUNBOOK_URL,
+            ],
         );
         assert_omits_all(path_label, source, STALE_INTERNAL_FIXTURE_RUNBOOKS);
+        assert_omits(path_label, source, STALE_REPO_BLOB_BASE);
     }
+
+    assert_contains_all(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        &[
+            "/docs/distributed-proof/",
+            TODO_POSTGRES_README_URL,
+            TODO_SQLITE_README_URL,
+            REFERENCE_BACKEND_RUNBOOK_URL,
+        ],
+    );
+    assert_omits_all(
+        "website/docs/docs/getting-started/clustered-example/index.md",
+        &sources.clustered_example,
+        &[
+            CUTOVER_RAIL,
+            TODO_SUBRAIL,
+            CLOSEOUT_RAIL,
+            S07_RAIL_COMMAND,
+            STALE_INTERNAL_FIXTURE_RUNBOOKS[0],
+            STALE_INTERNAL_FIXTURE_RUNBOOKS[1],
+            STALE_REPO_BLOB_BASE,
+        ],
+    );
 
     for (path_label, source) in [
         ("website/docs/docs/tooling/index.md", &sources.tooling),
@@ -381,6 +463,10 @@ fn m047_s06_verifier_contract_wraps_s05_and_owns_retained_bundle() {
             "contract-sidebar-distributed-proof-link",
             "contract-sidebar-production-proof-link",
             "contract-sidebar-proof-footer-opt-out",
+            "https://github\\.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README\\.md",
+            "https://github\\.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README\\.md",
+            "https://github\\.com/snowdamiz/mesh-lang/blob/main/reference-backend/README\\.md",
+            "https://github\\.com/hyperpush-org/hyperpush-mono/blob/main/",
             "examples/todo-postgres/README\\.md",
             "examples/todo-sqlite/README\\.md",
             "reference-backend/README\\.md",
@@ -389,6 +475,10 @@ fn m047_s06_verifier_contract_wraps_s05_and_owns_retained_bundle() {
             "meshc init --template todo-api(?! --db (sqlite|postgres))",
             "tiny-cluster/README\\.md|cluster-proof/README\\.md",
             "e2e_m047_s07",
+            "contract-clustered-example-proof-page",
+            "contract-clustered-example-direct-rails",
+            "contract-clustered-example-helper-names",
+            "contract-clustered-example-stale-repo",
             "status.txt",
             "current-phase.txt",
             "phase-report.txt",

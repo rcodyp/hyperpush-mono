@@ -50,7 +50,7 @@ The highest-risk first-contact drift is still in `Getting Started`: it jumps rea
   - Estimate: 1h30m
   - Files: README.md, website/docs/docs/getting-started/index.md, scripts/tests/verify-m050-s02-first-contact-contract.test.mjs
   - Verify: node --test scripts/tests/verify-m050-s02-first-contact-contract.test.mjs && bash reference-backend/scripts/verify-production-proof-surface.sh
-- [ ] **T02: Align Clustered Example to scaffold truth and retarget retained M047 docs rails** — ---
+- [x] **T02: Rewrote Clustered Example around scaffold-first truth and moved retained M047 rail discoverability onto the proof page.** — ---
 estimated_steps: 12
 estimated_files: 6
 skills_used:

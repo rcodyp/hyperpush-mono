@@ -1,33 +1,13 @@
 ---
 title: Clustered Example
-description: Start the generated clustered scaffold, inspect runtime-owned startup work through the CLI, then branch to the generated PostgreSQL and SQLite examples.
+description: Start the generated clustered scaffold, inspect runtime-owned startup work through the CLI, then choose the honest local SQLite starter or the serious shared/deployable PostgreSQL starter.
 ---
 
 # Clustered Example
 
-Mesh publishes one clustered onboarding split through the scaffold plus generated repo examples:
+Use `meshc init --clustered` when you want the minimal public clustered-app contract first: package-only `mesh.toml`, source-declared `@cluster` work in `work.mpl`, and runtime-owned inspection through `meshc cluster ...`.
 
-- `meshc init --clustered` for the minimal route-free scaffold
-- [`examples/todo-postgres/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-postgres/README.md) for the serious shared/deployable PostgreSQL starter
-- [`examples/todo-sqlite/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-sqlite/README.md) for the honest local single-node SQLite starter
-
-This page teaches the scaffold surface. The generated examples keep the split explicit:
-
-- `mesh.toml` stays package-only on the clustered surfaces
-- `work.mpl` owns the single `@cluster` declaration in source on the scaffold and the PostgreSQL starter
-- `main.mpl` boots only through `Node.start_from_env()` on the scaffold and the PostgreSQL starter
-- the runtime automatically starts declared work at startup
-- operators inspect truth only through `meshc cluster status`, continuity list, continuity record, and diagnostics
-- `examples/todo-postgres` keeps the same source-first `@cluster` contract while adding PostgreSQL, bounded `HTTP.clustered(1, ...)` read routes, and Docker packaging
-- `examples/todo-sqlite` stays local-only: generated package tests, local `/health`, and no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story
-
-Keep [`reference-backend/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/reference-backend/README.md) as the deeper backend proof surface once the starter examples stop being enough.
-
-If you are migrating older clustered code, move `clustered(work)` into source-first `@cluster`, delete any `[cluster]` manifest stanza, and rename helper-shaped entries such as `execute_declared_work(...)` / `Work.execute_declared_work` to ordinary verbs like `add()` or `sync_todos()`. Keep the route-free `@cluster` surfaces canonical: the PostgreSQL Todo starter only dogfoods explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, while `GET /health` and mutating routes stay local. Default-count and two-node clustered-route behavior stay on the repo S07 rail (`cargo test -p meshc --test e2e_m047_s07 -- --nocapture`).
-
-When you want the honest local starter, use `meshc init --template todo-api --db sqlite`. It is the same single-node SQLite Todo API surfaced in [`examples/todo-sqlite/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-sqlite/README.md): generated package tests, local `/health`, and no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story.
-
-When you want a fuller shared or deployable starter without changing that contract, use `meshc init --template todo-api --db postgres`. It matches [`examples/todo-postgres/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-postgres/README.md): `@cluster pub fn sync_todos()` stays route-free in `work.mpl`, selected read routes dogfood explicit-count `HTTP.clustered(1, ...)`, and the rest of the HTTP surface stays local application code.
+This page stays on that scaffold first. Once you have the route-free clustered contract in hand, the explicit SQLite, PostgreSQL, and `reference-backend` follow-ons are listed below.
 
 ## Generate the scaffold
 
@@ -45,6 +25,15 @@ hello_cluster/
   work.mpl
   README.md
 ```
+
+## What the scaffold proves
+
+- `mesh.toml` is package-only and intentionally omits `[cluster]`
+- `main.mpl` has one clustered bootstrap path: `Node.start_from_env()`
+- `work.mpl` declares `@cluster pub fn add()`
+- the runtime-owned handler name is derived from the ordinary source function name as `Work.add`
+- the visible work body stays `1 + 1`
+- the project does not own HTTP routes, submit handlers, or work-delay seams
 
 ## Understand the generated files
 
@@ -87,7 +76,7 @@ The clustered work contract lives in source:
 end
 ```
 
-The visible work body stays intentionally plain. The runtime automatically starts the source-declared `@cluster` handler and closes the continuity record when the declared work returns. If you are upgrading from older clustered code, replace `clustered(work)` plus helper-shaped names such as `execute_declared_work(...)` / `Work.execute_declared_work` with an ordinary `@cluster` function here and remove any matching `[cluster]` manifest stanza.
+The runtime automatically starts the source-declared `@cluster` handler and closes the continuity record when the declared work returns.
 
 ## Build the example
 
@@ -129,7 +118,7 @@ Both terminals should log a runtime bootstrap line showing the resolved node nam
 
 ## Inspect cluster truth with the runtime CLI
 
-Automatic startup work means you already have continuity state to inspect once the nodes finish booting. Follow the same operator order used by the scaffold README and [`examples/todo-postgres/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-postgres/README.md).
+Follow the same operator order used by the scaffold README and the PostgreSQL starter.
 
 ### 1. Status
 
@@ -168,19 +157,19 @@ meshc cluster diagnostics primary@127.0.0.1:4370 --json
 
 Use diagnostics when you need the broader cluster view after checking membership and continuity.
 
-## Follow-on starters and proof rails
+## After the scaffold, pick the follow-on starter
 
-After the minimal scaffold, pick the follow-on that matches the contract you actually want:
+- `meshc init --template todo-api --db sqlite my_local_todo` — the honest local single-node starter. It matches [`examples/todo-sqlite/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-sqlite/README.md): generated package tests, local `/health`, and no `work.mpl`, `HTTP.clustered(...)`, or `meshc cluster` story.
+- `meshc init --template todo-api --db postgres my_shared_todo` — the serious shared/deployable starter. It matches [`examples/todo-postgres/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/examples/todo-postgres/README.md): route-free `work.mpl`, PostgreSQL-backed state, explicit-count `HTTP.clustered(1, ...)` on `GET /todos` and `GET /todos/:id`, and local `/health` plus mutating routes.
+- [`reference-backend/README.md`](https://github.com/snowdamiz/mesh-lang/blob/main/reference-backend/README.md) — the deeper backend proof surface once the starter docs stop being enough.
 
-- stay on this page when you want the public scaffold-first story
-- use [`examples/todo-postgres/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-postgres/README.md) when you want the fuller shared/deployable starter with route-free `work.mpl`, PostgreSQL-backed state, and explicit-count `HTTP.clustered(1, ...)` on the selected read routes while keeping the same source-first `@cluster` contract
-- use [`examples/todo-sqlite/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/examples/todo-sqlite/README.md) when you want the honest local single-node starter with generated package tests, local `/health`, and no clustered/operator claim
-- use [`reference-backend/README.md`](https://github.com/hyperpush-org/hyperpush-mono/blob/main/reference-backend/README.md) when you want the deeper backend proof surface beyond the starter examples
-- use [Distributed Proof](/docs/distributed-proof/) when you want the repo verifier map; `bash scripts/verify-m047-s04.sh` remains the authoritative cutover rail for the source-first route-free clustered contract, `bash scripts/verify-m047-s05.sh` is the retained historical clustered Todo subrail kept behind fixture-backed rails instead of the public starter contract, `cargo test -p meshc --test e2e_m047_s07 -- --nocapture` remains the repo S07 rail for default-count and two-node wrapper behavior beyond the PostgreSQL Todo starter's explicit-count read routes, and `bash scripts/verify-m047-s06.sh` is the docs and retained-proof closeout rail that wraps S05, rebuilds docs truth, and owns the assembled `.tmp/m047-s06/verify` bundle. The lower-level retained fixture rails now live under `scripts/fixtures/clustered/` instead of public README runbooks, while `bash scripts/verify-m046-s06.sh`, `bash scripts/verify-m046-s05.sh`, `bash scripts/verify-m046-s04.sh`, `bash scripts/verify-m045-s05.sh`, and `bash scripts/verify-m045-s04.sh` remain historical compatibility aliases into the M047 cutover rail and `bash scripts/verify-m045-s03.sh` remains the historical failover-specific subrail.
+## Need the retained verifier map?
+
+Use [Distributed Proof](/docs/distributed-proof/) when you need the repo-owned verifier map, retained compatibility wrappers, or the lower-level fixture-backed rails behind this public starter story. This page stays focused on the scaffold plus the SQLite/Postgres/reference-backend split.
 
 ## What to read next
 
 - [Getting Started](/docs/getting-started/) — the single-binary introduction and hello-world path
 - [Developer Tools](/docs/tooling/) — scaffold generation, inspection CLI commands, and editor support
 - [Distributed Actors](/docs/distributed/) — the language/runtime primitives behind node communication
-- [Distributed Proof](/docs/distributed-proof/) — the verifier map for the scaffold/examples-first story and the lower-level retained fixture rails
+- [Distributed Proof](/docs/distributed-proof/) — the named repo verifier map behind the public clustered surfaces
