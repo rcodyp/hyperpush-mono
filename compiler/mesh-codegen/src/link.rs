@@ -200,7 +200,7 @@ pub(crate) fn link_with_plan(
 /// profiles. Prefers the profile matching the compiler's own build: a release
 /// `meshc` links the release runtime, a debug `meshc` links the debug runtime.
 fn find_mesh_rt(target: &LinkTarget) -> Result<PathBuf, String> {
-    // ✅ ENV override (highest priority)
+    // ENV override (highest priority)
     if let Ok(path) = std::env::var("MESH_RT_PATH") {
         let path = PathBuf::from(path);
         if path.exists() {
