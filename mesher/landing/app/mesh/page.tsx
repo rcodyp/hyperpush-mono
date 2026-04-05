@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Zap, Shield, GitBranch, Layers, ChevronRight } f
 import { Header } from "@/components/landing/header"
 import { Footer } from "@/components/landing/footer"
 import { Button } from "@/components/ui/button"
+import { MeshDataflow } from "@/components/landing/mesh-dataflow"
 
 const pillars = [
   {
@@ -168,6 +169,9 @@ export default function MeshPage() {
           </motion.div>
         </div>
       </section>
+
+      {/* ── Animated cluster visualization ───────────────────────────── */}
+      <MeshDataflow />
 
       {/* Stats bar */}
       <section className="border-y border-border bg-card/30">
