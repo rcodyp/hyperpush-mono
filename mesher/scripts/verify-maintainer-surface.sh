@@ -468,7 +468,7 @@ printf 'running\n' >"$STATUS_PATH"
 printf 'init\n' >"$CURRENT_PHASE_PATH"
 
 record_phase init started
-for command_name in bash docker psql python3 rg; do
+for command_name in bash docker psql python3; do
   require_command "$command_name"
 done
 for path in \
@@ -560,7 +560,7 @@ for expected_phase in \
   mesher-migrate-up \
   mesher-runtime-smoke \
   mesher-bundle-shape; do
-  if ! rg -Fq "${expected_phase}	passed" "$PHASE_REPORT_PATH"; then
+  if ! grep -Fq -- "${expected_phase}	passed" "$PHASE_REPORT_PATH"; then
     fail_phase final-phase-report "phase report missing passed marker for ${expected_phase}" "$PHASE_REPORT_PATH"
   fi
 done

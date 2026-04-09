@@ -35,6 +35,29 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache LLVM
+        uses: actions/cache@v4
+        id: cache-llvm
+        with:
+          path: ~/llvm
+          key: llvm-21.1.8-v3-x86_64-unknown-linux-gnu
+
+      - name: Install LLVM 21 (Linux x86_64)
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        timeout-minutes: 10
+        run: |
+          LLVM_VERSION="21.1.8"
+          LLVM_ARCHIVE="LLVM-${LLVM_VERSION}-Linux-X64.tar.xz"
+          LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/${LLVM_ARCHIVE}"
+          curl -sSfL "$LLVM_URL" -o llvm.tar.xz
+          mkdir -p "$HOME/llvm"
+          tar xf llvm.tar.xz --strip-components=1 -C "$HOME/llvm"
+          rm llvm.tar.xz
+
+      - name: Set LLVM prefix (Linux tarball)
+        shell: bash
+        run: echo "LLVM_SYS_211_PREFIX=$HOME/llvm" >> "$GITHUB_ENV"
+
       - name: Build meshc from sibling toolchain repo
         working-directory: mesh-lang
         run: cargo build -p meshc

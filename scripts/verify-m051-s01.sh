@@ -27,7 +27,7 @@ require_file() {
 
 require_phase_marker() {
   local marker="$1"
-  if ! rg -Fq "$marker" "$PHASE_REPORT_PATH"; then
+  if ! grep -Fq -- "$marker" "$PHASE_REPORT_PATH"; then
     fail "delegated verifier phase report drifted: missing ${marker} in ${PHASE_REPORT_PATH}"
   fi
 }

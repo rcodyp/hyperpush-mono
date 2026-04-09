@@ -58,7 +58,7 @@ require_contains() {
   local relative_path="$2"
   local needle="$3"
   local log_path="$ARTIFACT_DIR/${phase_name}.log"
-  if ! rg -Fq "$needle" "$ROOT_DIR/$relative_path"; then
+  if ! grep -Fq -- "$needle" "$ROOT_DIR/$relative_path"; then
     printf '%s missing %s\n' "$relative_path" "$needle" >"$log_path"
     fail_phase "$phase_name" "${relative_path} missing ${needle}" "$log_path"
   fi
@@ -69,7 +69,7 @@ require_absent() {
   local relative_path="$2"
   local needle="$3"
   local log_path="$ARTIFACT_DIR/${phase_name}.log"
-  if rg -Fq "$needle" "$ROOT_DIR/$relative_path"; then
+  if grep -Fq -- "$needle" "$ROOT_DIR/$relative_path"; then
     printf '%s still contains %s\n' "$relative_path" "$needle" >"$log_path"
     fail_phase "$phase_name" "${relative_path} still contains stale text ${needle}" "$log_path"
   fi
