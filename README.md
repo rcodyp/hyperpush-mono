@@ -63,3 +63,20 @@ The landing app and `frontend-exp` stay product-owned here.
 - product changes live here
 - language/toolchain changes live in `mesh-lang`
 - if a product workflow depends on Mesh tooling, wire it to the sibling `mesh-lang` checkout or an explicit `meshc` override instead of copying compiler sources into this repo
+
+## Git safety in the split workspace
+
+If you are working in the blessed sibling workspace, install the tracked split-workspace hooks once from `mesh-lang/`:
+
+```bash
+bash ../mesh-lang/scripts/workspace-git.sh install-hooks
+```
+
+Then check both repos before committing or pushing:
+
+```bash
+bash ../mesh-lang/scripts/workspace-git.sh status
+```
+
+The product repo `pre-push` hook now blocks accidental partial pushes whenever the sibling `mesh-lang` repo is still dirty.
+If you intentionally need a one-sided push, override the guard for that command only with `M055_ALLOW_PARTIAL_PUSH=1 git push ...`.

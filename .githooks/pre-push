@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${M055_ALLOW_PARTIAL_PUSH:-}" == '1' ]]; then
+  exit 0
+fi
+
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$ROOT_DIR" ]]; then
+  echo 'pre-push: must run inside a git worktree' >&2
+  exit 1
+fi
+
+cd "$ROOT_DIR"
+
+fail_guard() {
+  printf 'pre-push: %s\n' "$1" >&2
+  printf 'pre-push: run `bash ../mesh-lang/scripts/workspace-git.sh status` from the blessed sibling workspace before pushing.\n' >&2
+  printf 'pre-push: if you really need a partial push, rerun with M055_ALLOW_PARTIAL_PUSH=1.\n' >&2
+  exit 1
+}
+
+looks_like_mesh_lang_root() {
+  local candidate="$1"
+  [[ -d "$candidate/.git" && -f "$candidate/Cargo.toml" && -f "$candidate/compiler/meshc/Cargo.toml" && -f "$candidate/WORKSPACE.md" ]]
+}
+
+LANGUAGE_ROOT="$ROOT_DIR/../mesh-lang"
+if ! looks_like_mesh_lang_root "$LANGUAGE_ROOT"; then
+  exit 0
+fi
+
+if [[ -n "$(git -C "$LANGUAGE_ROOT" status --porcelain)" ]]; then
+  printf 'pre-push: sibling repo %s is dirty:\n' "$LANGUAGE_ROOT" >&2
+  git -C "$LANGUAGE_ROOT" status --short >&2
+  fail_guard 'refusing to push hyperpush while the language repo still has uncommitted changes'
+fi

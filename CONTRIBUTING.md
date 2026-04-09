@@ -41,6 +41,23 @@ It does **not** contain the Mesh compiler/runtime/docs/registry tree anymore. La
 
 Mesher lives under `hyperpush-mono/mesher/`. Do not flatten it to `<workspace>/mesher`.
 
+## Git safety in the split workspace
+
+If you have the blessed sibling workspace, run this once from `mesh-lang/` to wire the tracked hooks into both repos:
+
+```bash
+bash scripts/workspace-git.sh install-hooks
+```
+
+Before committing or pushing from `hyperpush-mono`, check both repos:
+
+```bash
+bash ../mesh-lang/scripts/workspace-git.sh status
+```
+
+The product repo `pre-push` hook blocks accidental partial pushes whenever the sibling `mesh-lang` repo is still dirty.
+If you intentionally need a one-sided push, override that single command with `M055_ALLOW_PARTIAL_PUSH=1 git push ...`.
+
 ## Common commands
 
 ### Product-root verification
