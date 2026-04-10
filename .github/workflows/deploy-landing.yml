@@ -47,3 +47,21 @@ jobs:
           NEXT_PUBLIC_SITE_URL: https://hyperpush.dev
           NEXT_PUBLIC_DISCORD_URL: https://discord.gg/6SRhbZw7ZG
         run: npm --prefix mesher/landing run build
+
+  deploy-landing:
+    name: Deploy landing to Fly.io
+    needs: build-landing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
+        working-directory: mesher/landing
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
