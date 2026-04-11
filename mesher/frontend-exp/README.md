@@ -24,6 +24,18 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Docker Compose
+
+Use the following Docker Compose commands for development and production:
+
+```bash
+# Development
+docker compose up dev
+
+# Production (build and run in detached mode)
+docker compose up prod --build -d
+```
+
 ## Learn More
 
 To learn more, take a look at the following resources:
