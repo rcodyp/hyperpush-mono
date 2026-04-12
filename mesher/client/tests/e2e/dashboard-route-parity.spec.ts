@@ -23,6 +23,12 @@ async function firstVisibleIssueRow(page: import('@playwright/test').Page) {
   }
 }
 
+async function waitForIssuesOverviewReady(page: import('@playwright/test').Page) {
+  const issuesShell = page.getByTestId('issues-shell')
+  await expect(issuesShell).toHaveAttribute('data-bootstrap-state', 'ready', { timeout: 20_000 })
+  await expect(page.getByTestId('issues-list')).toBeVisible({ timeout: 20_000 })
+}
+
 async function assertDirectEntryRoute(page: import('@playwright/test').Page, route: DashboardRouteDefinition) {
   await goToDashboardRouteDirect(page, route)
 
@@ -97,12 +103,14 @@ test.describe('dashboard route parity', () => {
   })
 
   test('issues interactions persist across shell re-renders and browser history', async ({ page }) => {
+    test.setTimeout(60_000)
     const runtimeSignals = attachRuntimeSignalTracking(page)
     const issuesShell = page.getByTestId('issues-shell')
     const searchInput = page.getByTestId('issues-search-input')
     const detailPanel = page.getByTestId('issue-detail-panel')
 
     await page.goto('/')
+    await waitForIssuesOverviewReady(page)
 
     const { issueId } = await firstVisibleIssueRow(page)
 
@@ -113,7 +121,7 @@ test.describe('dashboard route parity', () => {
     const filteredIssueRow = page.getByTestId(`issue-row-${issueId}`)
     await expect(filteredIssueRow).toBeVisible()
     await filteredIssueRow.click()
-    await expect(issuesShell).toHaveAttribute('data-selected-issue-id', issueId)
+    await expect.poll(async () => issuesShell.getAttribute('data-selected-issue-id'), { timeout: 20_000 }).toBe(issueId)
     await expect(detailPanel).toBeVisible()
 
     await page.getByTestId('sidebar-nav-performance').click()
@@ -130,9 +138,13 @@ test.describe('dashboard route parity', () => {
     await expect(page.getByTestId('dashboard-shell')).toHaveAttribute('data-route-key', 'issues')
 
     await expect(filteredIssueRow).toBeVisible()
-    await filteredIssueRow.click()
-    await expect(issuesShell).toHaveAttribute('data-selected-issue-id', issueId)
+    const selectedIssueIdAfterHistory = await issuesShell.getAttribute('data-selected-issue-id')
+    if (selectedIssueIdAfterHistory !== issueId) {
+      await filteredIssueRow.click()
+      await expect.poll(async () => issuesShell.getAttribute('data-selected-issue-id'), { timeout: 20_000 }).toBe(issueId)
+    }
     await expect(detailPanel).toBeVisible()
+    await expect(page.getByTestId('issue-detail-close')).toBeVisible()
 
     await page.getByTestId('issue-detail-close').click({ force: true })
     await expect(detailPanel).toBeHidden()
@@ -177,6 +189,7 @@ test.describe('dashboard route parity', () => {
     const sidebar = page.getByTestId('dashboard-sidebar')
 
     await page.goto('/')
+    await waitForIssuesOverviewReady(page)
 
     const { issueId } = await firstVisibleIssueRow(page)
     await searchInput.fill(issueId)

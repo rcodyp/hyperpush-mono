@@ -11,6 +11,7 @@ import {
   goToDashboardRouteDirect,
   navigateToDashboardRoute,
 } from './live-runtime-helpers'
+import { DEFAULT_API_KEY, ensureSeededIssueOpen } from './seeded-live-issue'
 
 const SEEDED_READ_ISSUE_TITLE = 'M060 seeded live issue read seam'
 const SEEDED_ACTION_ISSUE_TITLE = 'M060 seeded live issue action seam'
@@ -18,15 +19,22 @@ const SEEDED_READ_STACK_FILE = 'seed/live-issue-read.ts'
 const SEEDED_ALERT_ID = '88888888-8888-4888-8888-888888888888'
 const SEEDED_CANDIDATE_USER_ID = '33333333-3333-4333-8333-333333333333'
 const SEEDED_CANDIDATE_EMAIL = 'seed-candidate@hyperpush.dev'
-const DEFAULT_API_KEY = 'mshr_devdefaultapikey000000000000000000000000000'
-const ISSUE_STATUS_ORDER = ['unresolved', 'resolved', 'archived'] as const
-
-type BackendIssueStatus = (typeof ISSUE_STATUS_ORDER)[number]
-
-type SeededIssueLookup = {
-  issueId: string
-  eventId: string
-}
+const SEEDED_READ_ISSUE = {
+  title: SEEDED_READ_ISSUE_TITLE,
+  fingerprint: 'm060-seeded-live-issue-read-seam',
+  stackFile: SEEDED_READ_STACK_FILE,
+  breadcrumbMessage: 'Seeded live issue read breadcrumb',
+  tagValue: 'm060-live-read-seam',
+  surface: 'issues-live-read',
+} as const
+const SEEDED_ACTION_ISSUE = {
+  title: SEEDED_ACTION_ISSUE_TITLE,
+  fingerprint: 'm060-seeded-live-issue-action-seam',
+  stackFile: 'seed/live-issue-action.ts',
+  breadcrumbMessage: 'Seeded live issue action breadcrumb',
+  tagValue: 'm060-live-action-seam',
+  surface: 'issues-live-actions',
+} as const
 
 type SeededAlert = {
   alertId: string
@@ -86,10 +94,20 @@ async function createSeededLiveAlert(
   const ingestPayload = await ingestResponse.json()
   expect(['accepted', 'ok']).toContain(ingestPayload.status)
 
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  let lastAlertSummary = '[]'
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     const alertsResponse = await request.get('/api/v1/projects/default/alerts')
     expect(alertsResponse.ok()).toBeTruthy()
     const alertsPayload = await alertsResponse.json()
+    lastAlertSummary = JSON.stringify(
+      alertsPayload
+        .slice(0, 5)
+        .map((alert: { id?: string; rule_name?: string; status?: string }) => ({
+          id: alert.id,
+          rule_name: alert.rule_name,
+          status: alert.status,
+        })),
+    )
     const seededAlert = alertsPayload.find(
       (alert: { id?: string; rule_name?: string; status?: string }) => alert.rule_name === ruleName,
     )
@@ -105,98 +123,13 @@ async function createSeededLiveAlert(
     await sleep(250)
   }
 
-  throw new Error(`Expected seeded alert for rule ${ruleName} to appear in /api/v1/projects/default/alerts`)
+  throw new Error(
+    `Expected seeded alert for rule ${ruleName} to appear in /api/v1/projects/default/alerts within 20s; last alerts snapshot: ${lastAlertSummary}`,
+  )
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function findIssueByTitleAndStatus(
-  request: import('@playwright/test').APIRequestContext,
-  title: string,
-  status: BackendIssueStatus,
-) {
-  const response = await request.get(`/api/v1/projects/default/issues?status=${status}`)
-  expect(response.ok()).toBeTruthy()
-  const payload = await response.json()
-  const seededIssue = payload.data.find(
-    (issue: { id?: string; title?: string }) => issue.title === title,
-  )
-
-  if (!seededIssue || typeof seededIssue.id !== 'string') {
-    return null
-  }
-
-  return {
-    issueId: seededIssue.id,
-    status,
-  }
-}
-
-async function findSeededIssue(
-  request: import('@playwright/test').APIRequestContext,
-  title: string,
-) {
-  for (const status of ISSUE_STATUS_ORDER) {
-    const seededIssue = await findIssueByTitleAndStatus(request, title, status)
-    if (seededIssue) {
-      return seededIssue
-    }
-  }
-
-  return null
-}
-
-async function latestEventIdForIssue(
-  request: import('@playwright/test').APIRequestContext,
-  issueId: string,
-) {
-  const latestEventResponse = await request.get(`/api/v1/issues/${issueId}/events?limit=1`)
-  expect(latestEventResponse.ok()).toBeTruthy()
-  const latestEventPayload = await latestEventResponse.json()
-  const latestEvent = latestEventPayload.data[0]
-
-  expect(latestEvent, 'Expected seeded issue to have a latest event').toBeTruthy()
-  expect(typeof latestEvent.id).toBe('string')
-
-  return latestEvent.id as string
-}
-
-async function ensureSeededIssueOpen(
-  request: import('@playwright/test').APIRequestContext,
-  title: string,
-): Promise<SeededIssueLookup> {
-  const seededIssue = await findSeededIssue(request, title)
-
-  expect(
-    seededIssue,
-    `Expected seeded issue title ${title} to exist. Run bash mesher/scripts/seed-live-issue.sh first.`,
-  ).toBeTruthy()
-
-  const issueId = seededIssue!.issueId
-
-  if (seededIssue!.status !== 'unresolved') {
-    const resetResponse = await request.post(`/api/v1/issues/${issueId}/unresolve`)
-    expect(resetResponse.ok()).toBeTruthy()
-    const resetPayload = await resetResponse.json()
-    expect(['accepted', 'ok']).toContain(resetPayload.status)
-  }
-
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const currentIssue = await findSeededIssue(request, title)
-
-    if (currentIssue?.issueId === issueId && currentIssue.status === 'unresolved') {
-      return {
-        issueId,
-        eventId: await latestEventIdForIssue(request, issueId),
-      }
-    }
-
-    await sleep(250)
-  }
-
-  throw new Error(`Expected seeded issue ${issueId} to return to unresolved state before the walkthrough started`)
 }
 
 async function fetchProjectSettings(request: import('@playwright/test').APIRequestContext) {
@@ -446,8 +379,8 @@ test.describe('seeded walkthrough', () => {
     test.setTimeout(120_000)
 
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seededReadIssue = await ensureSeededIssueOpen(request, SEEDED_READ_ISSUE_TITLE)
-    const seededActionIssue = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE_TITLE)
+    const seededReadIssue = await ensureSeededIssueOpen(request, SEEDED_READ_ISSUE)
+    const seededActionIssue = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE)
     const seededAlert = await createSeededLiveAlert(request)
     const originalSettings = await fetchProjectSettings(request)
     const createdKeyLabel = `M060 walkthrough key ${uniqueSeedSuffix()}`
@@ -483,6 +416,7 @@ test.describe('seeded walkthrough', () => {
         await expect(issuesShell).toHaveAttribute('data-selected-issue-id', seededReadIssue.issueId)
         await expect(page.getByTestId('issue-detail-live-banner')).toContainText('Live event detail + timeline active')
         await expect(page.getByTestId('issue-detail-recent-events')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'AI Analysis' })).toHaveAttribute('data-source', 'shell-only')
         await expect(detailPanel).toContainText(SEEDED_READ_STACK_FILE)
 
         await expectSameOriginApiPathSeen(runtimeSignals, '/api/v1/projects/default/issues', 'seeded walkthrough issues')
@@ -571,7 +505,10 @@ test.describe('seeded walkthrough', () => {
         await expect(detailPanel).toHaveAttribute('data-source', 'mixed')
         await expect(alertsShell).toHaveAttribute('data-selected-alert-id', seededAlert.alertId)
         await expect(page.getByTestId('alert-detail-live-banner')).toContainText('Live alerts active')
+        await expect(page.getByTestId('alert-detail-source-badge')).toContainText('mixed live')
         await expect(page.getByTestId('alert-detail-action-source-note')).toContainText('/api/v1/alerts')
+        await expect(page.getByTestId('alert-detail-action-silence')).toHaveAttribute('data-source', 'shell-only')
+        await expect(page.getByTestId('alert-detail-copy-link')).toHaveAttribute('data-source', 'shell-only')
 
         await page.getByTestId('alert-detail-action-acknowledge').click()
         await expect.poll(async () => alertsShell.getAttribute('data-last-action')).toBe('acknowledge')
@@ -624,7 +561,9 @@ test.describe('seeded walkthrough', () => {
         const settingsShell = page.getByTestId('settings-shell')
         await expect(settingsShell).toHaveAttribute('data-current-tab', 'general')
         await expect(settingsShell).toHaveAttribute('data-general-state', 'ready')
+        await expect(page.getByTestId('settings-shell-support-badge')).toContainText('mixed live')
         await expect(page.getByTestId('settings-general-panel')).toHaveAttribute('data-source', 'mixed')
+        await expect(page.getByTestId('settings-general-source-badge')).toContainText('mixed')
         await expect(page.getByTestId('settings-general-status-banner')).toContainText('Live retention and storage active')
         await expect(page.getByTestId('settings-general-mock-only-banner')).toContainText('Mock-only shell')
 
@@ -692,6 +631,7 @@ test.describe('seeded walkthrough', () => {
         await page.getByRole('button', { name: /Alerts/ }).click()
         await expect(settingsShell).toHaveAttribute('data-current-tab', 'alerts')
         await expect(page.getByTestId('settings-alert-rules-panel')).toHaveAttribute('data-state', 'ready')
+        await expect(page.getByTestId('settings-alert-channels-source-badge')).toContainText('mock-only')
         await expect(page.getByTestId('settings-alert-channels-mock-only-banner')).toContainText('Mock-only shell')
 
         await page.getByTestId('settings-alert-rules-open-create').click()

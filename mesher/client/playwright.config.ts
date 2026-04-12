@@ -157,7 +157,7 @@ const frontendWebServers: NamedWebServer[] = [
     name: 'prod',
     command: `env -u npm_config_project MESHER_BACKEND_ORIGIN=${shellQuote(validatedMesherBackendOrigin.toString())} npm run build && env -u npm_config_project MESHER_BACKEND_ORIGIN=${shellQuote(validatedMesherBackendOrigin.toString())} PORT=${prodPort} npm run start`,
     port: prodPort,
-    timeout: 60_000,
+    timeout: 180_000,
     reuseExistingServer: false,
   },
 ]

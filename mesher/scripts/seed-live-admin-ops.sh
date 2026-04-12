@@ -136,19 +136,46 @@ import socket
 import sys
 
 start = int(sys.argv[1])
+max_base_port = 65535 - 1000
 
-def can_bind(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+def can_bind(family: int, host: str, port: int) -> bool:
+    try:
+        sock = socket.socket(family, socket.SOCK_STREAM)
+    except OSError:
+        return False
+
+    with sock:
+        if family == socket.AF_INET6:
+            try:
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            except (AttributeError, OSError):
+                pass
         try:
-            sock.bind(("127.0.0.1", port))
+            sock.bind((host, port))
         except OSError:
             return False
         return True
 
-for candidate in range(start, start + 200):
+
+CHECKS = [
+    (socket.AF_INET, "127.0.0.1"),
+    (socket.AF_INET, "0.0.0.0"),
+]
+if socket.has_ipv6:
+    CHECKS.extend(
+        [
+            (socket.AF_INET6, "::1"),
+            (socket.AF_INET6, "::"),
+        ]
+    )
+
+if start > max_base_port:
+    raise SystemExit(1)
+
+for candidate in range(start, min(start + 200, max_base_port + 1)):
     required_ports = (candidate, candidate + 1, candidate + 1000)
-    if all(can_bind(port) for port in required_ports):
+    if all(all(can_bind(family, host, port) for family, host in CHECKS) for port in required_ports):
         print(candidate)
         raise SystemExit(0)
 raise SystemExit(1)
@@ -191,18 +218,19 @@ start_backend() {
   printf '[seed-live-admin-ops] starting temporary Mesher base_url=%s\n' "$BASE_URL" >&2
   (
     cd "$BUILD_DIR"
-    DATABASE_URL="$DATABASE_URL_VALUE" \
-    PORT="$PORT_VALUE" \
-    MESHER_WS_PORT="$WS_PORT_VALUE" \
-    MESHER_RATE_LIMIT_WINDOW_SECONDS="${MESHER_RATE_LIMIT_WINDOW_SECONDS:-60}" \
-    MESHER_RATE_LIMIT_MAX_EVENTS="${MESHER_RATE_LIMIT_MAX_EVENTS:-1000}" \
-    MESH_CLUSTER_COOKIE="${MESH_CLUSTER_COOKIE:-dev-cookie}" \
-    MESH_NODE_NAME="${MESH_NODE_NAME:-mesher@127.0.0.1:${CLUSTER_PORT_VALUE}}" \
-    MESH_DISCOVERY_SEED="${MESH_DISCOVERY_SEED:-localhost}" \
-    MESH_CLUSTER_PORT="${CLUSTER_PORT_VALUE}" \
-    MESH_CONTINUITY_ROLE="${MESH_CONTINUITY_ROLE:-primary}" \
-    MESH_CONTINUITY_PROMOTION_EPOCH="${MESH_CONTINUITY_PROMOTION_EPOCH:-0}" \
-    "$BINARY_PATH" >"$LOG_FILE" 2>&1
+    exec env \
+      DATABASE_URL="$DATABASE_URL_VALUE" \
+      PORT="$PORT_VALUE" \
+      MESHER_WS_PORT="$WS_PORT_VALUE" \
+      MESHER_RATE_LIMIT_WINDOW_SECONDS="${MESHER_RATE_LIMIT_WINDOW_SECONDS:-60}" \
+      MESHER_RATE_LIMIT_MAX_EVENTS="${MESHER_RATE_LIMIT_MAX_EVENTS:-1000}" \
+      MESH_CLUSTER_COOKIE="${MESH_CLUSTER_COOKIE:-dev-cookie}" \
+      MESH_NODE_NAME="${MESH_NODE_NAME:-mesher@127.0.0.1:${CLUSTER_PORT_VALUE}}" \
+      MESH_DISCOVERY_SEED="${MESH_DISCOVERY_SEED:-localhost}" \
+      MESH_CLUSTER_PORT="${CLUSTER_PORT_VALUE}" \
+      MESH_CONTINUITY_ROLE="${MESH_CONTINUITY_ROLE:-primary}" \
+      MESH_CONTINUITY_PROMOTION_EPOCH="${MESH_CONTINUITY_PROMOTION_EPOCH:-0}" \
+      "$BINARY_PATH" >"$LOG_FILE" 2>&1
   ) &
   SERVER_PID=$!
   STARTED_SERVER='true'

@@ -104,5 +104,8 @@ jobs:
       - name: Install client dependencies
         run: npm --prefix mesher/client ci
 
+      - name: Verify client route-inventory structural contract
+        run: node --test mesher/scripts/tests/verify-client-route-inventory.test.mjs
+
       - name: Build client
         run: npm --prefix mesher/client run build

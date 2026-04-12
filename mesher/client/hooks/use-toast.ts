@@ -126,15 +126,41 @@ export const reducer = (state: State, action: Action): State => {
   }
 }
 
-const listeners: Array<(state: State) => void> = []
+const listeners = new Set<() => void>()
 
 let memoryState: State = { toasts: [] }
 
 function dispatch(action: Action) {
   memoryState = reducer(memoryState, action)
   listeners.forEach((listener) => {
-    listener(memoryState)
+    listener()
   })
+}
+
+function clearToastTimeouts() {
+  toastTimeouts.forEach((timeout) => {
+    clearTimeout(timeout)
+  })
+  toastTimeouts.clear()
+}
+
+function resetToastStore() {
+  clearToastTimeouts()
+  memoryState = { toasts: [] }
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      resetToastStore()
+    }
+  }
+}
+
+function getSnapshot() {
+  return memoryState
 }
 
 type Toast = Omit<ToasterToast, 'id'>
@@ -169,17 +195,7 @@ function toast({ ...props }: Toast) {
 }
 
 function useToast() {
-  const [state, setState] = React.useState<State>(memoryState)
-
-  React.useEffect(() => {
-    listeners.push(setState)
-    return () => {
-      const index = listeners.indexOf(setState)
-      if (index > -1) {
-        listeners.splice(index, 1)
-      }
-    }
-  }, [state])
+  const state = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
   return {
     ...state,

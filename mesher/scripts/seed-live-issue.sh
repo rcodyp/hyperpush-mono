@@ -7,7 +7,9 @@ source "$SCRIPT_DIR/lib/mesh-toolchain.sh"
 
 PORT_VALUE="${PORT:-18080}"
 WS_PORT_VALUE="${MESHER_WS_PORT:-18081}"
+CLUSTER_PORT_VALUE="${MESH_CLUSTER_PORT:-19080}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:${PORT_VALUE}}"
+USE_RUNNING_BACKEND="${MESHER_REUSE_RUNNING_BACKEND:-false}"
 API_KEY="${MESHER_SEED_API_KEY:-mshr_devdefaultapikey000000000000000000000000000}"
 ARTIFACT_DIR="${MESHER_SEED_ARTIFACT_DIR:-$MESHER_PACKAGE_DIR/../.tmp/m060-s02/seed-live-issue}"
 BUILD_DIR="$ARTIFACT_DIR/build"
@@ -96,6 +98,10 @@ if [[ ! "$WS_PORT_VALUE" =~ ^[1-9][0-9]*$ ]]; then
   fail "MESHER_WS_PORT must be a positive integer, got: $WS_PORT_VALUE"
 fi
 
+if [[ ! "$CLUSTER_PORT_VALUE" =~ ^[1-9][0-9]*$ ]]; then
+  fail "MESH_CLUSTER_PORT must be a positive integer, got: $CLUSTER_PORT_VALUE"
+fi
+
 case "$BASE_URL" in
   http://*|https://*) ;;
   *) fail "BASE_URL must start with http:// or https://, got: $BASE_URL" ;;
@@ -114,7 +120,7 @@ wait_for_settings() {
     if last_response="$(curl -fsS "$BASE_URL/api/v1/projects/default/settings" 2>/dev/null)"; then
       local retention_days
       retention_days="$(printf '%s' "$last_response" | json_field retention_days || true)"
-      if [[ "$retention_days" == '90' ]]; then
+      if [[ -n "$retention_days" ]]; then
         LAST_RESPONSE="$last_response"
         return 0
       fi
@@ -124,6 +130,90 @@ wait_for_settings() {
 
   LAST_RESPONSE="$last_response"
   return 1
+}
+
+pick_available_port() {
+  local start_port="$1"
+  python3 - "$start_port" <<'PY'
+import socket
+import sys
+
+start = int(sys.argv[1])
+max_base_port = 65535 - 1000
+scan_width = 200
+fallback_starts = (18080, 28080, 38080, 48080, 58080, 10240)
+
+
+def can_bind(family: int, host: str, port: int) -> bool:
+    try:
+        sock = socket.socket(family, socket.SOCK_STREAM)
+    except OSError:
+        return False
+
+    with sock:
+        if family == socket.AF_INET6:
+            try:
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            except (AttributeError, OSError):
+                pass
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return False
+        return True
+
+
+CHECKS = [
+    (socket.AF_INET, "127.0.0.1"),
+    (socket.AF_INET, "0.0.0.0"),
+]
+if socket.has_ipv6:
+    CHECKS.extend(
+        [
+            (socket.AF_INET6, "::1"),
+            (socket.AF_INET6, "::"),
+        ]
+    )
+
+
+search_starts = []
+for candidate_start in (start, *fallback_starts):
+    if candidate_start < 1024 or candidate_start > max_base_port:
+        continue
+    if candidate_start in search_starts:
+        continue
+    search_starts.append(candidate_start)
+
+for base_start in search_starts:
+    for candidate in range(base_start, min(base_start + scan_width, max_base_port + 1)):
+        required_ports = (candidate, candidate + 1, candidate + 1000)
+        if all(all(can_bind(family, host, port) for family, host in CHECKS) for port in required_ports):
+            print(candidate)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+configure_backend_endpoint() {
+  if [[ "$USE_RUNNING_BACKEND" == 'true' ]]; then
+    return 0
+  fi
+
+  if wait_for_settings; then
+    local original_base_url="$BASE_URL"
+    local isolated_port
+    isolated_port="$(pick_available_port "$((PORT_VALUE + 2))")" || fail "could not find a free port for isolated issue-seed verification"
+    PORT_VALUE="$isolated_port"
+    if [[ -z "${MESHER_WS_PORT:-}" ]]; then
+      WS_PORT_VALUE="$((isolated_port + 1))"
+    fi
+    if [[ -z "${MESH_CLUSTER_PORT:-}" ]]; then
+      CLUSTER_PORT_VALUE="$((isolated_port + 1000))"
+    fi
+    BASE_URL="http://127.0.0.1:${PORT_VALUE}"
+    LAST_RESPONSE=''
+    printf '[seed-live-issue] ignoring existing backend at %s; starting isolated verification backend at %s\n' "$original_base_url" "$BASE_URL" >&2
+  fi
 }
 
 start_backend() {
@@ -139,18 +229,19 @@ start_backend() {
   printf '[seed-live-issue] starting temporary Mesher base_url=%s\n' "$BASE_URL" >&2
   (
     cd "$BUILD_DIR"
-    DATABASE_URL="$DATABASE_URL" \
-    PORT="$PORT_VALUE" \
-    MESHER_WS_PORT="$WS_PORT_VALUE" \
-    MESHER_RATE_LIMIT_WINDOW_SECONDS="${MESHER_RATE_LIMIT_WINDOW_SECONDS:-60}" \
-    MESHER_RATE_LIMIT_MAX_EVENTS="${MESHER_RATE_LIMIT_MAX_EVENTS:-1000}" \
-    MESH_CLUSTER_COOKIE="${MESH_CLUSTER_COOKIE:-dev-cookie}" \
-    MESH_NODE_NAME="${MESH_NODE_NAME:-mesher@127.0.0.1:4370}" \
-    MESH_DISCOVERY_SEED="${MESH_DISCOVERY_SEED:-localhost}" \
-    MESH_CLUSTER_PORT="${MESH_CLUSTER_PORT:-4370}" \
-    MESH_CONTINUITY_ROLE="${MESH_CONTINUITY_ROLE:-primary}" \
-    MESH_CONTINUITY_PROMOTION_EPOCH="${MESH_CONTINUITY_PROMOTION_EPOCH:-0}" \
-    "$BINARY_PATH" >"$LOG_FILE" 2>&1
+    exec env \
+      DATABASE_URL="$DATABASE_URL" \
+      PORT="$PORT_VALUE" \
+      MESHER_WS_PORT="$WS_PORT_VALUE" \
+      MESHER_RATE_LIMIT_WINDOW_SECONDS="${MESHER_RATE_LIMIT_WINDOW_SECONDS:-60}" \
+      MESHER_RATE_LIMIT_MAX_EVENTS="${MESHER_RATE_LIMIT_MAX_EVENTS:-1000}" \
+      MESH_CLUSTER_COOKIE="${MESH_CLUSTER_COOKIE:-dev-cookie}" \
+      MESH_NODE_NAME="${MESH_NODE_NAME:-mesher@127.0.0.1:${CLUSTER_PORT_VALUE}}" \
+      MESH_DISCOVERY_SEED="${MESH_DISCOVERY_SEED:-localhost}" \
+      MESH_CLUSTER_PORT="${CLUSTER_PORT_VALUE}" \
+      MESH_CONTINUITY_ROLE="${MESH_CONTINUITY_ROLE:-primary}" \
+      MESH_CONTINUITY_PROMOTION_EPOCH="${MESH_CONTINUITY_PROMOTION_EPOCH:-0}" \
+      "$BINARY_PATH" >"$LOG_FILE" 2>&1
   ) &
   SERVER_PID=$!
   STARTED_SERVER='true'
@@ -162,7 +253,9 @@ start_backend() {
 }
 
 ensure_backend() {
-  if wait_for_settings; then
+  configure_backend_endpoint
+
+  if [[ "$USE_RUNNING_BACKEND" == 'true' ]] && wait_for_settings; then
     printf '[seed-live-issue] reusing running Mesher at %s\n' "$BASE_URL" >&2
     return 0
   fi

@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test:e2e": "playwright test",
     "test:e2e:dev": "PLAYWRIGHT_PROJECT=dev playwright test --project=dev",
-    "test:e2e:prod": "PLAYWRIGHT_PROJECT=prod playwright test --project=prod"
+    "test:e2e:prod": "PLAYWRIGHT_PROJECT=prod playwright test --project=prod",
+    "verify:route-inventory": "bash ../scripts/verify-client-route-inventory.sh"
   },
   "dependencies": {
     "@fontsource/geist": "5.2.8",

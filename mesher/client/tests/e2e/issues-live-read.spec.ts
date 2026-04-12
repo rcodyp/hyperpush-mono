@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { ensureSeededIssueOpen } from './seeded-live-issue'
 
 type RuntimeSignalTracker = {
   consoleErrors: string[]
@@ -11,14 +12,6 @@ const SEEDED_ISSUE_TITLE = 'M060 seeded live issue read seam'
 const SEEDED_STACK_FILE = 'seed/live-issue-read.ts'
 const SEEDED_BREADCRUMB_MESSAGE = 'Seeded live issue read breadcrumb'
 const SPARSE_EVENT_ID = 'sparse-live-event-id'
-const ISSUE_STATUS_ORDER = ['unresolved', 'resolved', 'archived'] as const
-
-type BackendIssueStatus = (typeof ISSUE_STATUS_ORDER)[number]
-
-type SeededIssueLookup = {
-  issueId: string
-  eventId: string
-}
 
 function attachRuntimeSignalTracking(page: import('@playwright/test').Page): RuntimeSignalTracker {
   const runtimeSignals: RuntimeSignalTracker = {
@@ -83,96 +76,22 @@ function filteredFailedRequests(runtimeSignals: RuntimeSignalTracker) {
   })
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function findSeededIssueByStatus(
-  request: import('@playwright/test').APIRequestContext,
-  status: BackendIssueStatus,
-) {
-  const issuesResponse = await request.get(`/api/v1/projects/default/issues?status=${status}`)
-  expect(issuesResponse.ok()).toBeTruthy()
-  const issuesPayload = await issuesResponse.json()
-  const seededIssue = issuesPayload.data.find(
-    (issue: { id?: string; title?: string }) => issue.title === SEEDED_ISSUE_TITLE,
-  )
-
-  if (!seededIssue || typeof seededIssue.id !== 'string') {
-    return null
-  }
-
-  return {
-    issueId: seededIssue.id,
-    status,
-  }
-}
-
-async function findSeededIssue(request: import('@playwright/test').APIRequestContext) {
-  for (const status of ISSUE_STATUS_ORDER) {
-    const seededIssue = await findSeededIssueByStatus(request, status)
-    if (seededIssue) {
-      return seededIssue
-    }
-  }
-
-  return null
-}
-
-async function latestEventIdForIssue(request: import('@playwright/test').APIRequestContext, issueId: string) {
-  const latestEventResponse = await request.get(`/api/v1/issues/${issueId}/events?limit=1`)
-  expect(latestEventResponse.ok()).toBeTruthy()
-  const latestEventPayload = await latestEventResponse.json()
-  const latestEvent = latestEventPayload.data[0]
-
-  expect(latestEvent, 'Expected seeded issue to have a latest event').toBeTruthy()
-  expect(typeof latestEvent.id).toBe('string')
-
-  return latestEvent.id as string
-}
-
-async function lookupSeededIssue(request: import('@playwright/test').APIRequestContext): Promise<SeededIssueLookup> {
-  const seededIssue = await findSeededIssue(request)
-
-  expect(
-    seededIssue,
-    `Expected seeded read issue title ${SEEDED_ISSUE_TITLE} to exist. Run bash mesher/scripts/seed-live-issue.sh first.`,
-  ).toBeTruthy()
-
-  const issueId = seededIssue!.issueId
-
-  if (seededIssue!.status !== 'unresolved') {
-    const resetResponse = await request.post(`/api/v1/issues/${issueId}/unresolve`)
-    expect(resetResponse.ok()).toBeTruthy()
-    const resetPayload = await resetResponse.json()
-    expect(['accepted', 'ok']).toContain(resetPayload.status)
-  }
-
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const currentIssue = await findSeededIssue(request)
-
-    if (currentIssue?.issueId === issueId && currentIssue.status === 'unresolved') {
-      return {
-        issueId,
-        eventId: await latestEventIdForIssue(request, issueId),
-      }
-    }
-
-    await sleep(250)
-  }
-
-  throw new Error(`Expected seeded read issue ${issueId} to return to unresolved state before the browser proof started`)
-}
-
 test.describe('issues live read seam', () => {
   test('issues live read seam boots seeded context and hydrates selected detail through same-origin reads', async ({ page, request }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await lookupSeededIssue(request)
+    const seeded = await ensureSeededIssueOpen(request, {
+      title: SEEDED_ISSUE_TITLE,
+      fingerprint: 'm060-seeded-live-issue-read-seam',
+      stackFile: SEEDED_STACK_FILE,
+      breadcrumbMessage: SEEDED_BREADCRUMB_MESSAGE,
+      tagValue: 'm060-live-read-seam',
+      surface: 'issues-live-read',
+    })
 
     await page.goto('/')
 
     const issuesShell = page.getByTestId('issues-shell')
-    await expect(issuesShell).toHaveAttribute('data-bootstrap-state', 'ready')
+    await expect(issuesShell).toHaveAttribute('data-bootstrap-state', 'ready', { timeout: 20_000 })
     await expect(issuesShell).toHaveAttribute('data-overview-source', /(live|mixed)/)
     await expect(issuesShell).toHaveAttribute('data-live-issue-count', /\d+/)
     await expect(page.getByRole('heading', { name: 'Issues', level: 1 })).toBeVisible()
@@ -250,7 +169,14 @@ test.describe('issues live read seam', () => {
 
   test('issues live read seam keeps fallback shell sections visible when live detail is sparse', async ({ page, request }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await lookupSeededIssue(request)
+    const seeded = await ensureSeededIssueOpen(request, {
+      title: SEEDED_ISSUE_TITLE,
+      fingerprint: 'm060-seeded-live-issue-read-seam',
+      stackFile: SEEDED_STACK_FILE,
+      breadcrumbMessage: SEEDED_BREADCRUMB_MESSAGE,
+      tagValue: 'm060-live-read-seam',
+      surface: 'issues-live-read',
+    })
 
     await page.route(`**/api/v1/issues/${seeded.issueId}/events?limit=1`, async (route) => {
       await route.fulfill({
@@ -349,7 +275,14 @@ test.describe('issues live read seam', () => {
 
   test('issues live read seam shows a visible toast when selected-issue reads fail', async ({ page, request }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await lookupSeededIssue(request)
+    const seeded = await ensureSeededIssueOpen(request, {
+      title: SEEDED_ISSUE_TITLE,
+      fingerprint: 'm060-seeded-live-issue-read-seam',
+      stackFile: SEEDED_STACK_FILE,
+      breadcrumbMessage: SEEDED_BREADCRUMB_MESSAGE,
+      tagValue: 'm060-live-read-seam',
+      surface: 'issues-live-read',
+    })
 
     await page.route(`**/api/v1/issues/${seeded.issueId}/timeline`, async (route) => {
       await route.fulfill({
@@ -447,7 +380,7 @@ test.describe('issues live read seam', () => {
     await page.goto('/')
 
     const issuesShell = page.getByTestId('issues-shell')
-    await expect(issuesShell).toHaveAttribute('data-bootstrap-state', 'ready')
+    await expect(issuesShell).toHaveAttribute('data-bootstrap-state', 'ready', { timeout: 20_000 })
     await expect(issuesShell).toHaveAttribute('data-overview-source', 'mixed')
     await expect(page.getByTestId('issues-stats-bar')).toHaveAttribute('data-source', 'mixed')
     await expect(page.getByTestId('issues-stat-card-total-events-source')).toHaveText('fallback')

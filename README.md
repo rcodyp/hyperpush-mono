@@ -28,8 +28,10 @@ Do not flatten the product package to `<workspace>/mesher`.
 ## Repo-root maintainer surfaces
 
 - `mesher/README.md` — Mesher maintainer runbook
+- `mesher/client/ROUTE-INVENTORY.md` — canonical client route inventory, backend gap map, and maintainer handoff
 - `bash mesher/scripts/verify-maintainer-surface.sh` — package-owned Mesher maintainer replay
 - `bash scripts/verify-landing-surface.sh` — landing/root-surface verifier
+- `bash scripts/verify-m061-s04.sh` — root-level closeout wrapper for the canonical client inventory handoff
 - `.github/workflows/ci.yml` — product CI for Mesher + landing + `client`
 - `.github/workflows/deploy-landing.yml` — landing deploy/build workflow
 - `.github/dependabot.yml` — product-owned dependency update scope
@@ -56,7 +58,7 @@ If you are working in the blessed sibling workspace, the normal path is:
 
 Canonical product repo URL: https://github.com/hyperpush-org/hyperpush-mono
 
-The landing app and `client` stay product-owned here. `mesher/landing` remains the intentional Next.js runtime surface; `mesher/client` is the mock-data TanStack dashboard.
+The landing app and `client` stay product-owned here. `mesher/landing` remains the intentional Next.js runtime surface; `mesher/client` owns the canonical Mesher dashboard route inventory, backend gap map, and maintainer handoff for later backend expansion slices.
 
 ## Working rules
 

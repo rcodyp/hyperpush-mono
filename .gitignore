@@ -16,6 +16,7 @@ mesher/landing/tsconfig.tsbuildinfo
 # Root-local scratch
 /.tmp/
 .tmp_*/
+mesher/.tmp/
 
 # Local env and runtime state
 .env

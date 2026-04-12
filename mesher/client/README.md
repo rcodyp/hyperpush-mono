@@ -2,6 +2,8 @@
 
 This package is the canonical TanStack dashboard app for Mesher.
 
+`ROUTE-INVENTORY.md` is the canonical maintainer-facing map for top-level dashboard route classification and proof coverage. This README documents workflow and package boundaries; it is not the canonical route inventory.
+
 It runs as a Vite-powered TanStack Start app from `hyperpush-mono/mesher/client/` and now exercises the Issues route through a provider-owned same-origin `/api/v1` seam for both live reads and the supported maintainer actions. The shell stays visually intact by overlaying truthful Mesher issue/detail/timeline state onto the existing mock-shaped dashboard model, so unsupported fields remain visible and explicitly shell-only instead of disappearing or pretending to be live.
 
 ## Package root
@@ -14,7 +16,23 @@ hyperpush-mono/
 
 ## Maintainer workflow
 
-From the product repo root:
+The canonical backend-expansion contract now lives in `mesher/client/ROUTE-INVENTORY.md#maintainer-handoff`. Use that section to choose the next backend-gap row, confirm the expansion order, and see which proof commands must be rerun when a row changes.
+
+From the product repo root, the package-local route-inventory verifier remains:
+
+```bash
+npm --prefix mesher/client run verify:route-inventory
+```
+
+The final root-level closeout wrapper for this maintainer handoff is:
+
+```bash
+bash scripts/verify-m061-s04.sh
+```
+
+That wrapper should be the last rerun before merge; it closes over the canonical inventory plus the retained proof rail. The package-local verifier is still the fastest drift check when you are iterating on `mesher/client` only.
+
+The broader local maintainer loop remains:
 
 ```bash
 npm --prefix mesher ci
@@ -35,6 +53,7 @@ npm ci
 vite dev
 vite build
 node server.mjs
+npm run verify:route-inventory
 bash ../scripts/seed-live-issue.sh
 npm run test:e2e:dev -- --grep "issues live"
 npm run test:e2e:prod -- --grep "issues live"
@@ -72,7 +91,15 @@ npm run test:e2e:prod -- --grep "issues live"
 
 ## Verification notes
 
-The canonical full-shell proof rail layers both seed helpers with the assembled walkthrough and the existing live Issues/admin+ops suites:
+The canonical full-shell route-inventory proof rail is one command:
+
+```bash
+npm --prefix mesher/client run verify:route-inventory
+```
+
+It retains phase/status logs under `mesher/.tmp/m061-s01/verify-client-route-inventory/`, fails closed when the structural inventory contract drifts, and then layers both seed helpers with the assembled walkthrough plus the existing live Issues/admin+ops suites.
+
+The expanded proof sequence remains:
 
 ```bash
 bash mesher/scripts/seed-live-issue.sh

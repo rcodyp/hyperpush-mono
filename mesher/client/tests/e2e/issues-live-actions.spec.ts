@@ -1,22 +1,22 @@
 import { expect, test } from '@playwright/test'
+import { ensureSeededIssueOpen } from './seeded-live-issue'
 
 const SEEDED_ACTION_ISSUE_TITLE = 'M060 seeded live issue action seam'
 const SEEDED_ACTION_STACK_FILE = 'seed/live-issue-action.ts'
-const ISSUE_STATUS_ORDER = ['unresolved', 'resolved', 'archived'] as const
+const SEEDED_ACTION_ISSUE = {
+  title: SEEDED_ACTION_ISSUE_TITLE,
+  fingerprint: 'm060-seeded-live-issue-action-seam',
+  stackFile: SEEDED_ACTION_STACK_FILE,
+  breadcrumbMessage: 'Seeded live issue action breadcrumb',
+  tagValue: 'm060-live-action-seam',
+  surface: 'issues-live-actions',
+} as const
 
 type RuntimeSignalTracker = {
   consoleErrors: string[]
   failedRequests: string[]
   sameOriginApiPaths: string[]
   directBackendRequests: string[]
-}
-
-type BackendIssueStatus = (typeof ISSUE_STATUS_ORDER)[number]
-
-type SeededIssueLookup = {
-  issueId: string
-  eventId: string
-  status: BackendIssueStatus
 }
 
 function attachRuntimeSignalTracking(page: import('@playwright/test').Page): RuntimeSignalTracker {
@@ -82,94 +82,6 @@ function filteredFailedRequests(runtimeSignals: RuntimeSignalTracker) {
   })
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-async function findSeededIssueByStatus(
-  request: import('@playwright/test').APIRequestContext,
-  status: BackendIssueStatus,
-) {
-  const issuesResponse = await request.get(`/api/v1/projects/default/issues?status=${status}`)
-  expect(issuesResponse.ok()).toBeTruthy()
-  const issuesPayload = await issuesResponse.json()
-
-  const seededIssue = issuesPayload.data.find(
-    (issue: { id?: string; title?: string }) => issue.title === SEEDED_ACTION_ISSUE_TITLE,
-  )
-
-  if (!seededIssue || typeof seededIssue.id !== 'string') {
-    return null
-  }
-
-  return {
-    issueId: seededIssue.id,
-    status,
-  }
-}
-
-async function findSeededIssue(request: import('@playwright/test').APIRequestContext) {
-  for (const status of ISSUE_STATUS_ORDER) {
-    const seededIssue = await findSeededIssueByStatus(request, status)
-    if (seededIssue) {
-      return seededIssue
-    }
-  }
-
-  return null
-}
-
-async function latestEventIdForIssue(
-  request: import('@playwright/test').APIRequestContext,
-  issueId: string,
-) {
-  const latestEventResponse = await request.get(`/api/v1/issues/${issueId}/events?limit=1`)
-  expect(latestEventResponse.ok()).toBeTruthy()
-  const latestEventPayload = await latestEventResponse.json()
-  const latestEvent = latestEventPayload.data[0]
-
-  expect(latestEvent, 'Expected seeded issue to have a latest event').toBeTruthy()
-  expect(typeof latestEvent.id).toBe('string')
-
-  return latestEvent.id as string
-}
-
-async function ensureSeededIssueOpen(
-  request: import('@playwright/test').APIRequestContext,
-): Promise<SeededIssueLookup> {
-  const seededIssue = await findSeededIssue(request)
-
-  expect(
-    seededIssue,
-    `Expected seeded action issue title ${SEEDED_ACTION_ISSUE_TITLE} to exist. Run bash mesher/scripts/seed-live-issue.sh first.`,
-  ).toBeTruthy()
-
-  const issueId = seededIssue!.issueId
-
-  if (seededIssue!.status !== 'unresolved') {
-    const resetResponse = await request.post(`/api/v1/issues/${issueId}/unresolve`)
-    expect(resetResponse.ok()).toBeTruthy()
-    const resetPayload = await resetResponse.json()
-    expect(['accepted', 'ok']).toContain(resetPayload.status)
-  }
-
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const currentIssue = await findSeededIssue(request)
-
-    if (currentIssue?.issueId === issueId && currentIssue.status === 'unresolved') {
-      return {
-        issueId,
-        eventId: await latestEventIdForIssue(request, issueId),
-        status: 'unresolved',
-      }
-    }
-
-    await sleep(250)
-  }
-
-  throw new Error(`Expected seeded action issue ${issueId} to return to unresolved state before the browser proof started`)
-}
-
 function detailActionTestId(action: 'resolve' | 'unresolve' | 'archive') {
   return `issue-detail-action-${action}`
 }
@@ -180,7 +92,7 @@ test.describe('issues live actions', () => {
     request,
   }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await ensureSeededIssueOpen(request)
+    const seeded = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE)
 
     await page.goto('/')
 
@@ -206,6 +118,8 @@ test.describe('issues live actions', () => {
     await expect(page.getByTestId(detailActionTestId('resolve'))).toContainText('Resolve')
     await expect(page.getByTestId(detailActionTestId('archive'))).toContainText('Ignore')
     await expect(page.getByTestId('issue-detail-action-source-note')).toContainText('same-origin Mesher seam')
+    await expect(page.getByTestId('issue-detail-action-source-note')).toContainText('shell-only helpers')
+    await expect(page.getByRole('button', { name: 'AI Analysis' })).toHaveAttribute('data-source', 'shell-only')
     await expect(page.getByTestId('issue-action-proof-harness')).toBeVisible()
 
     await page.getByTestId(detailActionTestId('resolve')).click()
@@ -277,7 +191,7 @@ test.describe('issues live actions', () => {
     page,
     request,
   }) => {
-    const seeded = await ensureSeededIssueOpen(request)
+    const seeded = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE)
     let releaseMutation!: () => void
     const mutationBlocked = new Promise<void>((resolve) => {
       releaseMutation = resolve
@@ -318,7 +232,7 @@ test.describe('issues live actions', () => {
     request,
   }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await ensureSeededIssueOpen(request)
+    const seeded = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE)
 
     await page.route(`**/api/v1/issues/${seeded.issueId}/resolve`, async (route) => {
       await route.fulfill({
@@ -366,7 +280,7 @@ test.describe('issues live actions', () => {
     request,
   }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await ensureSeededIssueOpen(request)
+    const seeded = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE)
     let failOverviewRefresh = false
 
     await page.route(`**/api/v1/issues/${seeded.issueId}/resolve`, async (route) => {
@@ -428,7 +342,7 @@ test.describe('issues live actions', () => {
     request,
   }) => {
     const runtimeSignals = attachRuntimeSignalTracking(page)
-    const seeded = await ensureSeededIssueOpen(request)
+    const seeded = await ensureSeededIssueOpen(request, SEEDED_ACTION_ISSUE)
 
     await page.goto('/')
     await page.getByTestId('issues-status-filter-open').click()
@@ -442,6 +356,10 @@ test.describe('issues live actions', () => {
     await expect(issuesShell).toHaveAttribute('data-issue-action-error-code', 'invalid-payload')
     await expect(issuesShell).toHaveAttribute('data-issue-action-error-stage', 'mutation')
     await expect(issuesShell).toHaveAttribute('data-selected-issue-id', seeded.issueId)
+    await expect(page.getByTestId('issue-action-proof-last-action')).toContainText('unsupported-proof')
+    await expect(page.getByTestId('issue-action-proof-last-issue')).toContainText(seeded.issueId)
+    await expect(page.getByTestId('issue-action-proof-error')).toContainText('invalid-payload')
+    await expect(page.getByTestId('issue-action-proof-stage')).toContainText('mutation')
     await expect(
       page.getByRole('region', { name: /Notifications/ }).getByRole('listitem').filter({ hasText: 'Issue action failed' }),
     ).toBeVisible()
@@ -451,6 +369,10 @@ test.describe('issues live actions', () => {
     await expect(issuesShell).toHaveAttribute('data-issue-action-issue-id', 'missing-live-issue-id')
     await expect(issuesShell).toHaveAttribute('data-issue-action-error-code', 'invalid-payload')
     await expect(issuesShell).toHaveAttribute('data-selected-issue-id', seeded.issueId)
+    await expect(page.getByTestId('issue-action-proof-last-action')).toContainText('resolve')
+    await expect(page.getByTestId('issue-action-proof-last-issue')).toContainText('missing-live-issue-id')
+    await expect(page.getByTestId('issue-action-proof-error')).toContainText('invalid-payload')
+    await expect(page.getByTestId('issue-action-proof-stage')).toContainText('mutation')
 
     expect(
       runtimeSignals.sameOriginApiPaths,

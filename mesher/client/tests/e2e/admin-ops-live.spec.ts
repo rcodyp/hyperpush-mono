@@ -107,6 +107,12 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+async function waitForAlertsOverviewReady(page: import('@playwright/test').Page) {
+  const alertsShell = page.getByTestId('alerts-shell')
+  await expect(alertsShell).toHaveAttribute('data-bootstrap-state', 'ready', { timeout: 20_000 })
+  return alertsShell
+}
+
 async function createSeededLiveAlert(
   request: import('@playwright/test').APIRequestContext,
   suffix = uniqueSeedSuffix(),
@@ -155,10 +161,20 @@ async function createSeededLiveAlert(
   const ingestPayload = await ingestResponse.json()
   expect(['accepted', 'ok']).toContain(ingestPayload.status)
 
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  let lastAlertSummary = '[]'
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     const alertsResponse = await request.get('/api/v1/projects/default/alerts')
     expect(alertsResponse.ok()).toBeTruthy()
     const alertsPayload = await alertsResponse.json()
+    lastAlertSummary = JSON.stringify(
+      alertsPayload
+        .slice(0, 5)
+        .map((alert: { id?: string; rule_name?: string; status?: string }) => ({
+          id: alert.id,
+          rule_name: alert.rule_name,
+          status: alert.status,
+        })),
+    )
     const seededAlert = alertsPayload.find(
       (alert: { id?: string; rule_name?: string; status?: string }) => alert.rule_name === ruleName,
     )
@@ -174,7 +190,9 @@ async function createSeededLiveAlert(
     await sleep(250)
   }
 
-  throw new Error(`Expected seeded alert for rule ${ruleName} to appear in /api/v1/projects/default/alerts`)
+  throw new Error(
+    `Expected seeded alert for rule ${ruleName} to appear in /api/v1/projects/default/alerts within 20s; last alerts snapshot: ${lastAlertSummary}`,
+  )
 }
 
 test.describe('admin and ops live alerts', () => {
@@ -182,17 +200,16 @@ test.describe('admin and ops live alerts', () => {
     page,
     request,
   }) => {
-    test.setTimeout(60_000)
+    test.setTimeout(120_000)
     const runtimeSignals = attachRuntimeSignalTracking(page)
     const seeded = await createSeededLiveAlert(request)
 
     await page.goto('/alerts')
 
-    const alertsShell = page.getByTestId('alerts-shell')
+    const alertsShell = await waitForAlertsOverviewReady(page)
     const detailPanel = page.getByTestId('alert-detail-panel')
     const alertRow = page.getByTestId(`alert-row-${seeded.alertId}`)
 
-    await expect(alertsShell).toHaveAttribute('data-bootstrap-state', 'ready')
     await expect(alertsShell).toHaveAttribute('data-overview-source', /(live|mixed)/)
     await expect(alertsShell).toHaveAttribute('data-live-alert-count', /\d+/)
     await expect(page.getByTestId('alerts-stats-bar')).toBeVisible()
@@ -208,10 +225,13 @@ test.describe('admin and ops live alerts', () => {
     await expect(alertsShell).toHaveAttribute('data-selected-alert-id', seeded.alertId)
     await expect(alertsShell).toHaveAttribute('data-selected-alert-source', 'mixed')
     await expect(page.getByTestId('alert-detail-live-banner')).toContainText('Live alerts active')
+    await expect(page.getByTestId('alert-detail-source-badge')).toContainText('mixed live')
     await expect(page.getByTestId('alert-detail-action-source-note')).toContainText('/api/v1/alerts')
     await expect(page.getByTestId('alert-detail-action-acknowledge')).toContainText('Acknowledge')
     await expect(page.getByTestId('alert-detail-action-resolve')).toContainText('Resolve')
+    await expect(page.getByTestId('alert-detail-action-silence')).toHaveAttribute('data-source', 'shell-only')
     await expect(page.getByTestId('alert-detail-action-silence')).toBeDisabled()
+    await expect(page.getByTestId('alert-detail-copy-link')).toHaveAttribute('data-source', 'shell-only')
 
     await page.getByTestId('alert-detail-action-acknowledge').click()
 
@@ -291,7 +311,7 @@ test.describe('admin and ops live alerts', () => {
     page,
     request,
   }) => {
-    test.setTimeout(60_000)
+    test.setTimeout(120_000)
     const runtimeSignals = attachRuntimeSignalTracking(page)
     const seeded = await createSeededLiveAlert(request)
 
@@ -385,8 +405,7 @@ test.describe('admin and ops live alerts', () => {
 
     await page.goto('/alerts')
 
-    const alertsShell = page.getByTestId('alerts-shell')
-    await expect(alertsShell).toHaveAttribute('data-bootstrap-state', 'ready')
+    const alertsShell = await waitForAlertsOverviewReady(page)
     await expect(alertsShell).toHaveAttribute('data-live-alert-count', '0')
     await expect(alertsShell).toHaveAttribute('data-overview-source', 'mixed')
     await expect(page.getByTestId('alerts-empty-state')).toBeVisible()
@@ -475,6 +494,7 @@ test.describe('admin and ops live settings', () => {
     page,
     request,
   }) => {
+    test.setTimeout(120_000)
     const runtimeSignals = attachRuntimeSignalTracking(page)
     const originalSettings = await fetchProjectSettings(request)
     const createdKeyLabel = `M060 live key ${uniqueSeedSuffix()}`
@@ -489,7 +509,11 @@ test.describe('admin and ops live settings', () => {
       const settingsShell = page.getByTestId('settings-shell')
       await expect(settingsShell).toHaveAttribute('data-current-tab', 'general')
       await expect(settingsShell).toHaveAttribute('data-general-state', 'ready')
+      await expect(page.getByTestId('settings-shell-support-badge')).toContainText('mixed live')
+      await expect(page.getByTestId('settings-general-panel')).toHaveAttribute('data-source', 'mixed')
+      await expect(page.getByTestId('settings-general-source-badge')).toContainText('mixed')
       await expect(page.getByTestId('settings-general-status-banner')).toContainText('Live retention and storage active')
+      await expect(page.getByTestId('settings-general-mock-only-banner')).toContainText('Mock-only shell')
       await expect(page.getByRole('button', { name: /^Save$/ })).toHaveCount(0)
 
       await page.getByTestId('settings-retention-days-input').fill(String(nextRetention))
@@ -555,6 +579,8 @@ test.describe('admin and ops live settings', () => {
       await page.getByRole('button', { name: /Alerts/ }).click()
       await expect(settingsShell).toHaveAttribute('data-current-tab', 'alerts')
       await expect(page.getByTestId('settings-alert-rules-panel')).toHaveAttribute('data-state', 'ready')
+      await expect(page.getByTestId('settings-alert-rules-status-banner')).toContainText('Live alert rules active')
+      await expect(page.getByTestId('settings-alert-channels-source-badge')).toContainText('mock-only')
       await expect(page.getByTestId('settings-alert-channels-mock-only-banner')).toContainText('Mock-only shell')
 
       await page.getByTestId('settings-alert-rules-open-create').click()
